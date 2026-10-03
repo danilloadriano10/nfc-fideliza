@@ -43,6 +43,7 @@ import {
   getCompanyCustomers,
   getCompanyActivityLogs,
   getCompanyFeedbacks,
+  fetchFeedbacksForCompany,
   saveCompany,
   directAddPoint,
   redeemReward,
@@ -111,13 +112,36 @@ export const CompanyPanelView: React.FC<CompanyPanelViewProps> = ({
 
   useEffect(() => {
     loadData()
+
+    fetchFeedbacksForCompany(company.id)
+      .then((fresh) => {
+        if (Array.isArray(fresh)) {
+          setFeedbacks(fresh)
+        }
+      })
+      .catch((err) => {
+        console.warn('Error loading feedbacks:', err)
+      })
+
     window.addEventListener(DATA_CHANGE_EVENT, loadData)
     window.addEventListener('storage', loadData)
     return () => {
       window.removeEventListener(DATA_CHANGE_EVENT, loadData)
       window.removeEventListener('storage', loadData)
     }
-  }, [loadData])
+  }, [company.id, loadData])
+
+  useEffect(() => {
+    if (activeTab === 'feedbacks') {
+      fetchFeedbacksForCompany(company.id)
+        .then((fresh) => {
+          if (Array.isArray(fresh)) {
+            setFeedbacks(fresh)
+          }
+        })
+        .catch(() => {})
+    }
+  }, [activeTab, company.id])
 
   const showToast = (type: 'success' | 'error', text: string) => {
     setToastMessage({ type, text })
@@ -826,11 +850,11 @@ export const CompanyPanelView: React.FC<CompanyPanelViewProps> = ({
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-2">
                         <span className="font-bold text-neutral-900 text-xs">
-                          {f.customerName || 'Cliente Anônimo'}
+                          {f.customerName ? f.customerName : 'Cliente Anônimo'}
                         </span>
                         {f.customerPhone && (
                           <span className="text-[11px] font-mono text-neutral-500">
-                            {formatPhone(f.customerPhone)}
+                            · {formatPhone(f.customerPhone)}
                           </span>
                         )}
                       </div>
@@ -851,7 +875,8 @@ export const CompanyPanelView: React.FC<CompanyPanelViewProps> = ({
                           </div>
                         )}
                         <span className="text-[10px] text-neutral-400 font-mono">
-                          {new Date(f.createdAt).toLocaleDateString('pt-BR')}
+                          {new Date(f.createdAt).toLocaleDateString('pt-BR')} às{' '}
+                          {new Date(f.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                         </span>
                       </div>
                     </div>

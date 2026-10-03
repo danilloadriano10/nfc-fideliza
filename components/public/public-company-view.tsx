@@ -113,11 +113,54 @@ export const PublicCompanyView: React.FC<PublicCompanyViewProps> = ({ company })
   // Open Location
   const handleOpenLocation = () => {
     if (company.locationUrl) {
-      window.open(company.locationUrl, '_blank', 'noopener,noreferrer')
+      const raw = company.locationUrl.trim()
+      const targetUrl = /^https?:\/\//i.test(raw) ? raw : `https://${raw}`
+      window.open(targetUrl, '_blank', 'noopener,noreferrer')
+    } else if (company.addressText) {
+      const targetUrl = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(company.addressText)}`
+      window.open(targetUrl, '_blank', 'noopener,noreferrer')
     }
   }
 
-  const { modules, loyaltyProgram } = company
+  // Open / Connect Wi-Fi
+  const handleOpenWifi = () => {
+    if (!company.wifi?.ssid) return
+
+    const ssid = company.wifi.ssid.trim()
+    const password = company.wifi.password ? company.wifi.password.trim() : ''
+    const security = company.wifi.security || (password ? 'WPA/WPA2' : 'OPEN')
+    const type = security === 'OPEN' || !password ? 'nopass' : 'WPA'
+    const wifiPayload = `WIFI:S:${ssid};T:${type};P:${password};;`
+
+    // Try direct connection on supported devices
+    try {
+      const link = document.createElement('a')
+      link.href = wifiPayload
+      link.click()
+    } catch {
+      // Fallback
+    }
+
+    // Immediately open sheet with QR code, hidden password, copy, and network name
+    setIsWifiOpen(true)
+  }
+
+  const modules = company.modules || {
+    loyalty: true,
+    googleReview: true,
+    menu: true,
+    wifi: true,
+    whatsapp: true,
+    location: true,
+    feedback: true,
+    instagram: true,
+  }
+  const loyaltyProgram = company.loyaltyProgram || {
+    isActive: true,
+    goalPoints: 10,
+    rewardDescription: 'Recompensa Especial',
+    campaignName: 'Cartão Fidelidade',
+  }
 
   return (
     <div className="min-h-screen bg-neutral-100 flex justify-center selection:bg-neutral-900 selection:text-white">
@@ -238,13 +281,13 @@ export const PublicCompanyView: React.FC<PublicCompanyViewProps> = ({ company })
           )}
 
           {/* 4. 📶 WI-FI */}
-          {modules.wifi && company.wifi.ssid && (
+          {modules.wifi && company.wifi?.ssid && (
             <ActionCard
               icon={<Wifi className="w-6 h-6 text-sky-400" />}
               title="Wi-Fi"
               subtitle="Conecte-se à nossa rede"
               accentColor="#0369A1"
-              onClick={() => setIsWifiOpen(true)}
+              onClick={handleOpenWifi}
             />
           )}
 
@@ -260,7 +303,7 @@ export const PublicCompanyView: React.FC<PublicCompanyViewProps> = ({ company })
           )}
 
           {/* 6. 📍 LOCALIZAÇÃO */}
-          {modules.location && company.locationUrl && (
+          {modules.location && (company.locationUrl || company.addressText) && (
             <ActionCard
               icon={<MapPin className="w-6 h-6 text-rose-400" />}
               title="Localização"
@@ -306,7 +349,7 @@ export const PublicCompanyView: React.FC<PublicCompanyViewProps> = ({ company })
         <WifiSheet
           isOpen={isWifiOpen}
           onClose={() => setIsWifiOpen(false)}
-          wifi={company.wifi}
+          wifi={company.wifi || { ssid: '', security: 'OPEN' }}
           companyName={company.name}
           primaryColor={company.primaryColor}
         />

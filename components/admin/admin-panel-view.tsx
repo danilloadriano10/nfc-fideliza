@@ -32,6 +32,7 @@ import {
 import { Company, Customer, ActivityLog, GlobalStats } from '@/types/platform'
 import {
   getAllCompanies,
+  syncCompaniesFromServer,
   getGlobalPlatformStats,
   getAllActivityLogs,
   toggleCompanyStatus,
@@ -75,6 +76,7 @@ export const AdminPanelView: React.FC = () => {
 
   useEffect(() => {
     loadData()
+    syncCompaniesFromServer().then(() => loadData())
     const handleAuth = () => {
       setIsAuthenticated(isAdminAuthenticated())
     }

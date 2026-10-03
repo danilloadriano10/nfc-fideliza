@@ -92,6 +92,20 @@ export function getCompanyById(id: string): Company | null {
   return companies.find((c) => c.id === id) || null
 }
 
+export function saveCompanyLocally(company: Company): void {
+  const current = getAllCompanies()
+  const idx = current.findIndex((c) => c.id === company.id || c.slug.toLowerCase() === company.slug.toLowerCase())
+  let updated: Company[]
+  if (idx >= 0) {
+    updated = [...current.slice(0, idx), company, ...current.slice(idx + 1)]
+  } else {
+    updated = [company, ...current]
+  }
+  setItem(STORAGE_KEYS.COMPANIES, updated)
+  memoryCompanies = updated
+  notifyDataChange()
+}
+
 export function saveCompany(updated: Company): { success: boolean; error?: string } {
   const companies = getAllCompanies()
   // Ensure slug is unique if changed
@@ -120,6 +134,16 @@ export function saveCompany(updated: Company): { success: boolean; error?: strin
   setItem(STORAGE_KEYS.COMPANIES, newCompanies)
   memoryCompanies = newCompanies
   notifyDataChange()
+
+  // Asynchronously synchronize with shared server storage
+  if (isBrowser()) {
+    fetch('/api/companies', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(updated),
+    }).catch((err) => console.error('Error syncing company to server:', err))
+  }
+
   return { success: true }
 }
 
@@ -137,6 +161,13 @@ export function toggleCompanyStatus(companyId: string): boolean {
   setItem(STORAGE_KEYS.COMPANIES, companies)
   memoryCompanies = companies
   notifyDataChange()
+
+  if (isBrowser()) {
+    fetch(`/api/companies?id=${encodeURIComponent(companyId)}`, {
+      method: 'PATCH',
+    }).catch((err) => console.error('Error toggling company status on server:', err))
+  }
+
   return true
 }
 
@@ -170,6 +201,13 @@ export function deleteCompany(companyId: string): boolean {
   setItem(STORAGE_KEYS.FEEDBACKS, feedbacks)
 
   notifyDataChange()
+
+  if (isBrowser()) {
+    fetch(`/api/companies?id=${encodeURIComponent(companyId)}`, {
+      method: 'DELETE',
+    }).catch((err) => console.error('Error deleting company on server:', err))
+  }
+
   return true
 }
 
@@ -639,12 +677,80 @@ export function submitFeedback(
   memoryFeedbacks = updated
   notifyDataChange()
 
+  // Asynchronously synchronize with shared server storage
+  if (isBrowser()) {
+    fetch('/api/feedbacks', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        companyId,
+        rating: data.rating,
+        message: data.message,
+        customerName: data.customerName,
+        customerPhone: data.customerPhone,
+      }),
+    }).catch((err) => console.error('Error syncing feedback to server:', err))
+  }
+
   return { success: true }
 }
 
 export function getCompanyFeedbacks(companyId: string): PrivateFeedback[] {
+  if (!companyId) return []
   const all = getItem<PrivateFeedback[]>(STORAGE_KEYS.FEEDBACKS, INITIAL_FEEDBACKS)
   return all.filter((f) => f.companyId === companyId)
+}
+
+export async function fetchFeedbacksForCompany(companyId: string): Promise<PrivateFeedback[]> {
+  if (!companyId) return []
+  if (!isBrowser()) return getCompanyFeedbacks(companyId)
+
+  try {
+    const res = await fetch(`/api/feedbacks?companyId=${encodeURIComponent(companyId)}`, {
+      method: 'GET',
+      headers: {
+        'Accept': 'application/json',
+      },
+      cache: 'no-store',
+    })
+
+    if (res.ok) {
+      const data = await res.json()
+      if (Array.isArray(data?.feedbacks)) {
+        const current = getItem<PrivateFeedback[]>(STORAGE_KEYS.FEEDBACKS, INITIAL_FEEDBACKS)
+        const others = current.filter((f) => f.companyId !== companyId)
+        const merged = [...data.feedbacks, ...others]
+        setItem(STORAGE_KEYS.FEEDBACKS, merged)
+        memoryFeedbacks = merged
+        // Do NOT call notifyDataChange() here to prevent recursive re-fetch loops
+        return data.feedbacks
+      }
+    }
+  } catch (err) {
+    // Graceful fallback: return local feedbacks or empty array without crashing
+    console.warn('Could not fetch remote feedbacks, using local cache:', err)
+  }
+
+  return getCompanyFeedbacks(companyId) || []
+}
+
+export async function syncCompaniesFromServer(): Promise<Company[]> {
+  if (!isBrowser()) return memoryCompanies
+  try {
+    const res = await fetch('/api/companies')
+    if (res.ok) {
+      const data = await res.json()
+      if (Array.isArray(data.companies) && data.companies.length > 0) {
+        setItem(STORAGE_KEYS.COMPANIES, data.companies)
+        memoryCompanies = data.companies
+        notifyDataChange()
+        return data.companies
+      }
+    }
+  } catch (err) {
+    console.error('Error syncing companies from server:', err)
+  }
+  return getAllCompanies()
 }
 
 // ==========================================

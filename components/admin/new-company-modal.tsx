@@ -757,18 +757,32 @@ export const NewCompanyModal: React.FC<NewCompanyModalProps> = ({
                   </div>
                 </div>
 
-                {/* Endereço */}
-                <div>
-                  <label className="block text-xs font-medium text-neutral-700 mb-1">
-                    Endereço Completo
-                  </label>
-                  <input
-                    type="text"
-                    placeholder="Ex: Av. T-4, 123 - Setor Bueno, Goiânia - GO"
-                    value={addressText}
-                    onChange={(e) => setAddressText(e.target.value)}
-                    className="w-full px-3 py-2 text-xs rounded-xl border border-neutral-200"
-                  />
+                {/* Endereço e Localização Google Maps */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-xs font-medium text-neutral-700 mb-1">
+                      Endereço Completo
+                    </label>
+                    <input
+                      type="text"
+                      placeholder="Ex: Av. T-4, 123 - Setor Bueno, Goiânia - GO"
+                      value={addressText}
+                      onChange={(e) => setAddressText(e.target.value)}
+                      className="w-full px-3 py-2 text-xs rounded-xl border border-neutral-200"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-neutral-700 mb-1">
+                      Link da Localização (Google Maps)
+                    </label>
+                    <input
+                      type="text"
+                      placeholder="https://maps.app.goo.gl/... ou https://google.com/maps?q=..."
+                      value={locationUrl}
+                      onChange={(e) => setLocationUrl(e.target.value)}
+                      className="w-full px-3 py-2 text-xs rounded-xl border border-neutral-200"
+                    />
+                  </div>
                 </div>
               </div>
 
