@@ -15,7 +15,7 @@ import {
   ArrowLeft,
 } from 'lucide-react'
 import { Company } from '@/types/platform'
-import { loginOwner, findCompanyByOwnerLogin } from '@/lib/auth'
+import { loginOwnerAsync, findCompanyByOwnerLoginAsync } from '@/lib/auth'
 import { getAllCompanies } from '@/lib/storage'
 
 interface CompanyLoginViewProps {
@@ -32,15 +32,15 @@ export const CompanyLoginView: React.FC<CompanyLoginViewProps> = ({
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
   const [isLoading, setIsLoading] = useState(false)
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setErrorMessage(null)
     setIsLoading(true)
 
-    setTimeout(() => {
+    try {
       if (company) {
-        // Logging in to specific company
-        const res = loginOwner(company, username, password)
+        // Logging in to specific company via secure server check
+        const res = await loginOwnerAsync(company, username, password)
         if (res.success) {
           onSuccess(company)
         } else {
@@ -48,16 +48,18 @@ export const CompanyLoginView: React.FC<CompanyLoginViewProps> = ({
         }
       } else {
         // General owner portal: identify company by credentials
-        const found = findCompanyByOwnerLogin(username, password)
+        const found = await findCompanyByOwnerLoginAsync(username, password)
         if (found) {
-          loginOwner(found, username, password)
           onSuccess(found)
         } else {
           setErrorMessage('Usuário ou senha incorretos. Nenhuma empresa encontrada.')
         }
       }
+    } catch {
+      setErrorMessage('Erro ao autenticar. Tente novamente.')
+    } finally {
       setIsLoading(false)
-    }, 250)
+    }
   }
 
   const handleQuickDemo = (targetComp: Company) => {

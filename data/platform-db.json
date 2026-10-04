@@ -174,6 +174,30 @@
   ],
   "customers": [
     {
+      "id": "cust_1791128878671_u0jj",
+      "companyId": "comp_barbearia_junior",
+      "name": "Luciana Souza",
+      "phone": "62988771122",
+      "currentPoints": 0,
+      "totalVisits": 1,
+      "completedCycles": 0,
+      "availableRewards": 0,
+      "createdAt": "2026-10-04T15:47:58.671Z",
+      "lastActivityAt": "2026-10-04T15:47:58.671Z"
+    },
+    {
+      "id": "cust_1791128863262_948x",
+      "companyId": "comp_cafe_central",
+      "name": "Carlos Teste",
+      "phone": "62998877665",
+      "currentPoints": 1,
+      "totalVisits": 2,
+      "completedCycles": 0,
+      "availableRewards": 0,
+      "createdAt": "2026-10-04T15:47:43.262Z",
+      "lastActivityAt": "2026-10-04T15:47:49.876Z"
+    },
+    {
       "id": "cust_maria_cafe",
       "companyId": "comp_cafe_central",
       "name": "Maria Silva",
@@ -236,6 +260,28 @@
   ],
   "requests": [
     {
+      "id": "req_1791128878671_fc2ll",
+      "companyId": "comp_barbearia_junior",
+      "customerId": "cust_1791128878671_u0jj",
+      "customerName": "Luciana Souza",
+      "customerPhone": "62988771122",
+      "status": "rejected",
+      "createdAt": "2026-10-04T15:47:58.671Z",
+      "updatedAt": "2026-10-04T15:47:58.718Z",
+      "rejectedBy": "Caixa Balcão"
+    },
+    {
+      "id": "req_1791128863262_76nrh",
+      "companyId": "comp_cafe_central",
+      "customerId": "cust_1791128863262_948x",
+      "customerName": "Carlos Teste",
+      "customerPhone": "62998877665",
+      "status": "approved",
+      "createdAt": "2026-10-04T15:47:43.262Z",
+      "updatedAt": "2026-10-04T15:47:49.876Z",
+      "approvedBy": "Caixa Balcão"
+    },
+    {
       "id": "req_demo_1",
       "companyId": "comp_cafe_central",
       "customerId": "cust_maria_cafe",
@@ -246,6 +292,40 @@
     }
   ],
   "logs": [
+    {
+      "id": "log_1791128878671_p15b",
+      "companyId": "comp_barbearia_junior",
+      "customerId": "",
+      "type": "customer_created",
+      "customerName": "Luciana Souza",
+      "customerPhone": "62988771122",
+      "description": "Novo cliente cadastrado no cartão fidelidade.",
+      "approvedBy": "Autoatendimento NFC",
+      "timestamp": "2026-10-04T15:47:58.671Z"
+    },
+    {
+      "id": "log_1791128869876_x3km",
+      "companyId": "comp_cafe_central",
+      "customerId": "",
+      "type": "point_added",
+      "customerName": "Carlos Teste",
+      "customerPhone": "62998877665",
+      "pointsChange": 1,
+      "description": "+1 Ponto confirmado pelo Caixa (Caixa Balcão). Saldo: 1/10",
+      "approvedBy": "Caixa Balcão",
+      "timestamp": "2026-10-04T15:47:49.876Z"
+    },
+    {
+      "id": "log_1791128863262_h2n4",
+      "companyId": "comp_cafe_central",
+      "customerId": "",
+      "type": "customer_created",
+      "customerName": "Carlos Teste",
+      "customerPhone": "62998877665",
+      "description": "Novo cliente cadastrado no cartão fidelidade.",
+      "approvedBy": "Autoatendimento NFC",
+      "timestamp": "2026-10-04T15:47:43.262Z"
+    },
     {
       "id": "log_1",
       "companyId": "comp_cafe_central",

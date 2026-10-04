@@ -12,7 +12,7 @@ interface PageProps {
 
 export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
   const { slug } = await params
-  const company = getServerCompanyBySlug(slug)
+  const company = await getServerCompanyBySlug(slug)
 
   return {
     title: company ? `Painel · ${company.name}` : 'Painel do Estabelecimento',
@@ -22,6 +22,6 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
 
 export default async function PainelPage({ params }: PageProps) {
   const { slug } = await params
-  const company = getServerCompanyBySlug(slug)
+  const company = await getServerCompanyBySlug(slug)
   return <PainelClientPage slug={slug} initialCompany={company} />
 }

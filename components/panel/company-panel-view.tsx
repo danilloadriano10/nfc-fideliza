@@ -14,6 +14,7 @@ import {
   ExternalLink,
   Search,
   Check,
+  X,
   Plus,
   Star,
   Phone,
@@ -38,17 +39,22 @@ import {
   ActivityLog,
   PrivateFeedback,
   WifiSecurity,
+  PointRequest,
 } from '@/types/platform'
 import {
   getCompanyCustomers,
   getCompanyActivityLogs,
   getCompanyFeedbacks,
   fetchFeedbacksForCompany,
+  fetchCompanyCustomersFromServer,
   saveCompany,
   directAddPoint,
   redeemReward,
   toggleCompanyStatus,
   DATA_CHANGE_EVENT,
+  fetchCompanyRequestsFromServer,
+  approvePointRequestOnServerApi,
+  rejectPointRequestOnServerApi,
 } from '@/lib/storage'
 import { formatPhone, normalizePhone } from '@/lib/utils'
 import { QRCodeView } from '@/components/common/qr-code'
@@ -75,6 +81,7 @@ export const CompanyPanelView: React.FC<CompanyPanelViewProps> = ({
   const [customers, setCustomers] = useState<Customer[]>([])
   const [logs, setLogs] = useState<ActivityLog[]>([])
   const [feedbacks, setFeedbacks] = useState<PrivateFeedback[]>([])
+  const [pendingRequests, setPendingRequests] = useState<PointRequest[]>([])
   const [customerSearch, setCustomerSearch] = useState('')
   const [toastMessage, setToastMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null)
   const [copiedLink, setCopiedLink] = useState(false)
@@ -108,7 +115,51 @@ export const CompanyPanelView: React.FC<CompanyPanelViewProps> = ({
     setCustomers(getCompanyCustomers(company.id))
     setLogs(getCompanyActivityLogs(company.id))
     setFeedbacks(getCompanyFeedbacks(company.id))
+    fetchCompanyRequestsFromServer(company.id, 'pending').then((reqs) => {
+      if (Array.isArray(reqs)) setPendingRequests(reqs)
+    })
+    fetchCompanyCustomersFromServer(company.id).then((custs) => {
+      if (Array.isArray(custs)) setCustomers(custs)
+    })
   }, [company.id])
+
+  // Live polling for requests every 2.5 seconds
+  useEffect(() => {
+    const interval = setInterval(async () => {
+      try {
+        const fresh = await fetchCompanyRequestsFromServer(company.id, 'pending')
+        if (Array.isArray(fresh)) {
+          setPendingRequests(fresh)
+        }
+      } catch (err) {
+        console.warn('Silent polling error in CompanyPanelView:', err)
+      }
+    }, 2500)
+    return () => clearInterval(interval)
+  }, [company.id])
+
+  const handleApproveRequest = async (req: PointRequest) => {
+    const res = await approvePointRequestOnServerApi(req.id, 'Painel do Estabelecimento')
+    if (res.success) {
+      confetti({ particleCount: 50, spread: 50, origin: { y: 0.6 } })
+      showToast('success', `+1 Ponto confirmado para ${req.customerName}!`)
+      setPendingRequests((prev) => prev.filter((r) => r.id !== req.id))
+      loadData()
+    } else {
+      showToast('error', res.error || 'Erro ao aprovar solicitação.')
+    }
+  }
+
+  const handleRejectRequest = async (req: PointRequest) => {
+    const res = await rejectPointRequestOnServerApi(req.id, 'Painel do Estabelecimento')
+    if (res.success) {
+      showToast('error', `Solicitação de ${req.customerName} recusada.`)
+      setPendingRequests((prev) => prev.filter((r) => r.id !== req.id))
+      loadData()
+    } else {
+      showToast('error', res.error || 'Erro ao recusar solicitação.')
+    }
+  }
 
   useEffect(() => {
     loadData()
@@ -389,6 +440,66 @@ export const CompanyPanelView: React.FC<CompanyPanelViewProps> = ({
         {/* ============================================== */}
         {activeTab === 'dashboard' && (
           <div className="space-y-6">
+            {/* Live Pending Point Requests Alert (Multi-device Real-time) */}
+            {pendingRequests.length > 0 && (
+              <div className="p-4 sm:p-5 bg-gradient-to-r from-amber-50 to-orange-50 border-2 border-amber-300 rounded-3xl shadow-sm space-y-3">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                  <div className="flex items-center gap-2.5">
+                    <span className="w-3 h-3 rounded-full bg-amber-500 animate-ping shrink-0" />
+                    <h3 className="font-bold text-amber-950 text-sm flex items-center gap-2">
+                      Solicitações de Pontos em Tempo Real ({pendingRequests.length})
+                    </h3>
+                  </div>
+                  <Link
+                    href={`/empresa/${company.slug}/caixa`}
+                    className="text-xs font-semibold text-amber-800 hover:text-amber-950 underline underline-offset-2 flex items-center gap-1 self-start sm:self-auto"
+                  >
+                    <span>Abrir Modo Caixa Completo</span>
+                    <ExternalLink className="w-3 h-3" />
+                  </Link>
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                  {pendingRequests.map((req) => (
+                    <div
+                      key={req.id}
+                      className="bg-white p-3.5 rounded-2xl border border-amber-200/80 shadow-sm flex items-center justify-between gap-3"
+                    >
+                      <div className="min-w-0">
+                        <p className="font-bold text-neutral-900 text-xs truncate">
+                          {req.customerName}
+                        </p>
+                        <p className="text-[11px] font-mono text-neutral-500">
+                          {formatPhone(req.customerPhone)}
+                        </p>
+                        <p className="text-[10px] text-neutral-400 mt-0.5">
+                          {new Date(req.createdAt).toLocaleTimeString([], {
+                            hour: '2-digit',
+                            minute: '2-digit',
+                          })}
+                        </p>
+                      </div>
+                      <div className="flex items-center gap-1.5 shrink-0">
+                        <button
+                          onClick={() => handleRejectRequest(req)}
+                          className="p-2 rounded-xl bg-neutral-100 hover:bg-red-50 text-neutral-600 hover:text-red-600 transition-colors"
+                          title="Recusar"
+                        >
+                          <X className="w-4 h-4" />
+                        </button>
+                        <button
+                          onClick={() => handleApproveRequest(req)}
+                          className="px-3 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs shadow-sm transition-all flex items-center gap-1"
+                        >
+                          <Check className="w-3.5 h-3.5" />
+                          <span>Aprovar (+1)</span>
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
             {/* Top Stat Cards */}
             <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 sm:gap-4">
               <div className="bg-white p-4 rounded-2xl border border-neutral-200/80 shadow-sm space-y-1">

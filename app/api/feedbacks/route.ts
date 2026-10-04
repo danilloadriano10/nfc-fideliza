@@ -13,12 +13,11 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ feedbacks: [] }, { status: 200 })
     }
 
-    // Strict tenant isolation: only return feedbacks for the requested company
-    const feedbacks = getServerFeedbacks(companyId) || []
+    // Strict tenant isolation: only return feedbacks for the requested company from Firestore
+    const feedbacks = (await getServerFeedbacks(companyId)) || []
     return NextResponse.json({ feedbacks }, { status: 200 })
   } catch (err) {
     console.error('Error in GET /api/feedbacks:', err)
-    // Never fail with 500 to keep the panel resilient
     return NextResponse.json({ feedbacks: [] }, { status: 200 })
   }
 }
@@ -42,7 +41,7 @@ export async function POST(req: NextRequest) {
       )
     }
 
-    const res = saveServerFeedback({
+    const res = await saveServerFeedback({
       companyId,
       rating: typeof rating === 'number' ? rating : undefined,
       message: String(message).trim(),
@@ -58,7 +57,7 @@ export async function POST(req: NextRequest) {
   } catch (err) {
     console.error('Error in POST /api/feedbacks:', err)
     return NextResponse.json(
-      { success: false, error: 'Falha ao registrar feedback no servidor.' },
+      { success: false, error: 'Falha ao registrar feedback no Firestore.' },
       { status: 500 }
     )
   }

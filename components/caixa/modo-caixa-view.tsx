@@ -23,13 +23,15 @@ import confetti from 'canvas-confetti'
 import { Company, Customer, PointRequest, ActivityLog } from '@/types/platform'
 import {
   getCompanyPointRequests,
-  approvePointRequest,
-  rejectPointRequest,
   getCompanyCustomers,
-  directAddPoint,
-  redeemReward,
   getCompanyActivityLogs,
   DATA_CHANGE_EVENT,
+  fetchCompanyRequestsFromServer,
+  fetchCompanyCustomersFromServer,
+  approvePointRequestOnServerApi,
+  rejectPointRequestOnServerApi,
+  directAddPointOnServerApi,
+  redeemRewardOnServerApi,
 } from '@/lib/storage'
 import { formatPhone, normalizePhone } from '@/lib/utils'
 
@@ -47,21 +49,49 @@ export const ModoCaixaView: React.FC<ModoCaixaViewProps> = ({ company }) => {
   const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null)
   const [processingIds, setProcessingIds] = useState<string[]>([])
 
-  const loadData = React.useCallback(() => {
+  const loadData = React.useCallback(async () => {
     setRequests(getCompanyPointRequests(company.id))
     setCustomers(getCompanyCustomers(company.id))
     setLogs(getCompanyActivityLogs(company.id).slice(0, 10))
+
+    // Pull from central server
+    try {
+      const serverReqs = await fetchCompanyRequestsFromServer(company.id, 'pending')
+      if (Array.isArray(serverReqs)) {
+        setRequests(serverReqs)
+      }
+      const serverCusts = await fetchCompanyCustomersFromServer(company.id)
+      if (Array.isArray(serverCusts)) {
+        setCustomers(serverCusts)
+      }
+    } catch (err) {
+      console.warn('Error fetching server data in ModoCaixa:', err)
+    }
   }, [company.id])
 
   useEffect(() => {
     loadData()
+
+    // Real-time server polling: checks for new requests every 2 seconds
+    const interval = setInterval(async () => {
+      try {
+        const fresh = await fetchCompanyRequestsFromServer(company.id, 'pending')
+        if (Array.isArray(fresh)) {
+          setRequests(fresh)
+        }
+      } catch (err) {
+        console.warn('Polling error in ModoCaixa:', err)
+      }
+    }, 2000)
+
     window.addEventListener(DATA_CHANGE_EVENT, loadData)
     window.addEventListener('storage', loadData)
     return () => {
+      clearInterval(interval)
       window.removeEventListener(DATA_CHANGE_EVENT, loadData)
       window.removeEventListener('storage', loadData)
     }
-  }, [loadData])
+  }, [loadData, company.id])
 
   const showNotice = (type: 'success' | 'error', text: string) => {
     setFeedbackNotice({ type, text })
@@ -69,11 +99,12 @@ export const ModoCaixaView: React.FC<ModoCaixaViewProps> = ({ company }) => {
   }
 
   // Handle live request approve
-  const handleApprove = (req: PointRequest) => {
+  const handleApprove = async (req: PointRequest) => {
     if (processingIds.includes(req.id)) return
     setProcessingIds((prev) => [...prev, req.id])
 
-    const res = approvePointRequest(req.id, cashierName)
+    // Calls central server to add exactly 1 point and mark approved
+    const res = await approvePointRequestOnServerApi(req.id, cashierName)
     if (res.success) {
       confetti({
         particleCount: 50,
@@ -81,7 +112,7 @@ export const ModoCaixaView: React.FC<ModoCaixaViewProps> = ({ company }) => {
         origin: { y: 0.7 },
       })
       showNotice('success', `+1 Ponto confirmado para ${req.customerName}!`)
-      loadData()
+      await loadData()
     } else {
       showNotice('error', res.error || 'Erro ao aprovar solicitação.')
     }
@@ -92,19 +123,19 @@ export const ModoCaixaView: React.FC<ModoCaixaViewProps> = ({ company }) => {
   }
 
   // Handle live request reject
-  const handleReject = (req: PointRequest) => {
-    const res = rejectPointRequest(req.id, cashierName)
+  const handleReject = async (req: PointRequest) => {
+    const res = await rejectPointRequestOnServerApi(req.id, cashierName)
     if (res.success) {
       showNotice('error', `Solicitação de ${req.customerName} recusada.`)
-      loadData()
+      await loadData()
     } else {
       showNotice('error', res.error || 'Erro ao rejeitar.')
     }
   }
 
   // Handle direct point credit from search
-  const handleDirectAdd = (customerId: string, custName: string) => {
-    const res = directAddPoint(company.id, customerId, cashierName)
+  const handleDirectAdd = async (customerId: string, custName: string) => {
+    const res = await directAddPointOnServerApi(company.id, customerId, cashierName)
     if (res.success) {
       confetti({
         particleCount: 40,
@@ -112,25 +143,26 @@ export const ModoCaixaView: React.FC<ModoCaixaViewProps> = ({ company }) => {
         origin: { y: 0.6 },
       })
       showNotice('success', `+1 Ponto creditado com sucesso para ${custName}!`)
-      loadData()
+      await loadData()
     } else {
       showNotice('error', res.error || 'Não foi possível adicionar o ponto.')
     }
   }
 
   // Handle reward redemption
-  const handleRedeem = (customerId: string, custName: string) => {
-    const res = redeemReward(company.id, customerId, cashierName)
+  const handleRedeem = async (customerId: string, custName: string) => {
+    const res = await redeemRewardOnServerApi(company.id, customerId, cashierName)
     if (res.success) {
       confetti({
-        particleCount: 80,
-        spread: 70,
-        origin: { y: 0.5 },
+        particleCount: 70,
+        spread: 60,
+        origin: { y: 0.6 },
       })
-      showNotice('success', `🎁 Recompensa resgatada com sucesso para ${custName}! Novo ciclo iniciado.`)
-      loadData()
+      showNotice('success', `🎁 Recompensa resgatada para ${custName}!`)
+      await loadData()
+      setSelectedCustomer(null)
     } else {
-      showNotice('error', res.error || 'Erro ao resgatar recompensa.')
+      showNotice('error', res.error || 'Não foi possível resgatar o prêmio.')
     }
   }
 

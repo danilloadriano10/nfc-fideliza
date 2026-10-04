@@ -74,8 +74,11 @@ export interface PointRequest {
   customerPhone: string
   status: 'pending' | 'approved' | 'rejected'
   createdAt: string
+  updatedAt?: string
   resolvedAt?: string
   resolvedBy?: string
+  approvedBy?: string
+  rejectedBy?: string
 }
 
 export type ActivityType =

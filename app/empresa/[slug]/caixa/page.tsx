@@ -12,7 +12,7 @@ interface PageProps {
 
 export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
   const { slug } = await params
-  const company = getServerCompanyBySlug(slug)
+  const company = await getServerCompanyBySlug(slug)
 
   return {
     title: company ? `Modo Caixa · ${company.name}` : 'Modo Caixa',
@@ -22,6 +22,6 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
 
 export default async function CaixaPage({ params }: PageProps) {
   const { slug } = await params
-  const company = getServerCompanyBySlug(slug)
+  const company = await getServerCompanyBySlug(slug)
   return <CaixaClientPage slug={slug} initialCompany={company} />
 }

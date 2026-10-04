@@ -37,6 +37,7 @@ import {
   getAllActivityLogs,
   toggleCompanyStatus,
   deleteCompany,
+  deleteCompanyAsync,
   resetDemoData,
   DATA_CHANGE_EVENT,
 } from '@/lib/storage'
@@ -45,7 +46,7 @@ import { isAdminAuthenticated, logoutAdmin, AUTH_CHANGE_EVENT } from '@/lib/auth
 import { NewCompanyModal } from './new-company-modal'
 import { AdminLoginView } from './admin-login-view'
 
-type AdminTab = 'dashboard' | 'companies' | 'customers' | 'activity' | 'settings'
+type AdminTab = 'dashboard' | 'companies' | 'customers' | 'activity' | 'delete_company' | 'settings'
 
 export const AdminPanelView: React.FC = () => {
   const [activeTab, setActiveTab] = useState<AdminTab>('dashboard')
@@ -108,12 +109,12 @@ export const AdminPanelView: React.FC = () => {
     notify(`Status de ${name} alterado com sucesso.`)
   }
 
-  const handleDeleteCompany = (id: string, name: string) => {
-    if (confirm(`Atenção: Tem certeza que deseja EXCLUIR a empresa "${name}"? Esta ação removerá a empresa e todos os seus registros de clientes e fidelidade.`)) {
-      const res = deleteCompany(id)
+  const handleDeleteCompany = async (id: string, name: string) => {
+    if (confirm(`Atenção: Tem certeza que deseja EXCLUIR a empresa "${name}"? Esta ação removerá a empresa e todos os seus registros de clientes e fidelidade do banco central permanentemente.`)) {
+      const res = await deleteCompanyAsync(id)
       if (res) {
         loadData()
-        notify(`Empresa "${name}" excluída do sistema.`)
+        notify(`Empresa "${name}" excluída do sistema com sucesso.`)
       }
     }
   }
@@ -219,6 +220,13 @@ export const AdminPanelView: React.FC = () => {
               Atividade Global
             </button>
             <button
+              onClick={() => setActiveTab('delete_company')}
+              className={`hover:text-red-600 transition-colors flex items-center gap-1.5 ${activeTab === 'delete_company' ? 'text-red-600 underline underline-offset-8 font-bold' : 'text-neutral-600'}`}
+            >
+              <Trash2 className="w-3.5 h-3.5 text-red-500" />
+              <span>Excluir Empresa</span>
+            </button>
+            <button
               onClick={() => setActiveTab('settings')}
               className={`hover:text-neutral-900 transition-colors ${activeTab === 'settings' ? 'text-neutral-900 underline underline-offset-8 font-bold' : ''}`}
             >
@@ -259,6 +267,7 @@ export const AdminPanelView: React.FC = () => {
             { id: 'companies', label: `Empresas (${companies.length})` },
             { id: 'customers', label: `Clientes (${stats.totalCustomers})` },
             { id: 'activity', label: 'Atividade' },
+            { id: 'delete_company', label: 'Excluir Empresa' },
             { id: 'settings', label: 'Configurações' },
           ].map((t) => (
             <button
@@ -704,7 +713,103 @@ export const AdminPanelView: React.FC = () => {
         )}
 
         {/* ============================================== */}
-        {/* 5. CONFIGURAÇÕES DA PLATAFORMA */}
+        {/* 5. ABA EXCLUIR EMPRESA */}
+        {/* ============================================== */}
+        {activeTab === 'delete_company' && (
+          <div className="bg-white rounded-3xl border border-red-200/80 shadow-sm p-6 space-y-6">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-neutral-100 pb-5">
+              <div>
+                <div className="flex items-center gap-2 text-red-600 mb-1">
+                  <Trash2 className="w-5 h-5" />
+                  <h2 className="text-base font-bold text-neutral-900">
+                    Excluir Estabelecimentos do Sistema
+                  </h2>
+                </div>
+                <p className="text-xs text-neutral-500 max-w-2xl">
+                  Selecione a empresa que deseja excluir permanentemente. A exclusão remove a empresa, seus clientes cadastrados, solicitações de ponto, históricos e feedbacks do banco de dados central com persistência garantida.
+                </p>
+              </div>
+
+              {/* Search filter */}
+              <div className="relative w-full sm:w-72">
+                <Search className="w-4 h-4 text-neutral-400 absolute left-3 top-2.5" />
+                <input
+                  type="text"
+                  value={searchFilter}
+                  onChange={(e) => setSearchFilter(e.target.value)}
+                  placeholder="Buscar por nome ou slug..."
+                  className="w-full pl-9 pr-3 py-2 rounded-xl border border-neutral-300 text-xs focus:outline-none focus:ring-2 focus:ring-red-500"
+                />
+              </div>
+            </div>
+
+            {/* List of Companies to Delete */}
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {filteredCompanies.map((c) => (
+                <div
+                  key={c.id}
+                  className="p-5 rounded-2xl border border-neutral-200 bg-neutral-50/50 space-y-3 hover:border-red-300 transition-colors shadow-sm flex flex-col justify-between"
+                >
+                  <div className="space-y-3">
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="flex items-center gap-2.5">
+                        <div
+                          className="w-10 h-10 rounded-xl flex items-center justify-center text-white font-bold text-sm shrink-0 shadow-sm"
+                          style={{ backgroundColor: c.primaryColor }}
+                        >
+                          {c.name.slice(0, 2).toUpperCase()}
+                        </div>
+                        <div>
+                          <h4 className="font-bold text-neutral-900 text-sm leading-tight">{c.name}</h4>
+                          <span className="text-[11px] font-mono text-neutral-500">/empresa/{c.slug}</span>
+                        </div>
+                      </div>
+                      <span
+                        className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
+                          c.isActive ? 'bg-emerald-100 text-emerald-800' : 'bg-neutral-200 text-neutral-600'
+                        }`}
+                      >
+                        {c.isActive ? 'Ativo' : 'Pausado'}
+                      </span>
+                    </div>
+
+                    <div className="text-xs text-neutral-600 space-y-1 bg-white p-3 rounded-xl border border-neutral-200/60 font-mono">
+                      <p className="flex justify-between">
+                        <span className="text-neutral-400">ID Interno:</span>
+                        <span className="font-semibold truncate max-w-[150px]">{c.id}</span>
+                      </p>
+                      <p className="flex justify-between">
+                        <span className="text-neutral-400">WhatsApp:</span>
+                        <span>{formatPhone(c.whatsapp) || 'Não informado'}</span>
+                      </p>
+                      <p className="flex justify-between">
+                        <span className="text-neutral-400">Data de Criação:</span>
+                        <span>{new Date(c.createdAt).toLocaleDateString('pt-BR')}</span>
+                      </p>
+                    </div>
+                  </div>
+
+                  <button
+                    onClick={() => handleDeleteCompany(c.id, c.name)}
+                    className="w-full py-2.5 px-3 rounded-xl bg-red-50 hover:bg-red-600 text-red-600 hover:text-white font-bold text-xs border border-red-200 hover:border-red-600 transition-all flex items-center justify-center gap-1.5 shadow-sm active:scale-[0.98]"
+                  >
+                    <Trash2 className="w-3.5 h-3.5" />
+                    <span>Excluir Empresa Definitivamente</span>
+                  </button>
+                </div>
+              ))}
+            </div>
+
+            {filteredCompanies.length === 0 && (
+              <div className="text-center py-12 text-neutral-400 text-xs">
+                Nenhum estabelecimento encontrado com o filtro aplicado.
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* ============================================== */}
+        {/* 6. CONFIGURAÇÕES DA PLATAFORMA */}
         {/* ============================================== */}
         {activeTab === 'settings' && (
           <div className="bg-white rounded-3xl border border-neutral-200/80 shadow-sm p-6 space-y-6 max-w-2xl">

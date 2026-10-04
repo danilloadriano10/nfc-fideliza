@@ -147,6 +147,34 @@ export function saveCompany(updated: Company): { success: boolean; error?: strin
   return { success: true }
 }
 
+export async function saveCompanyAsync(company: Company): Promise<{ success: boolean; error?: string }> {
+  const cleanSlug = company.slug.toLowerCase().trim()
+  const updated: Company = {
+    ...company,
+    slug: cleanSlug,
+  }
+
+  if (isBrowser()) {
+    try {
+      const res = await fetch('/api/companies', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(updated),
+      })
+      const data = await res.json()
+      if (!res.ok || !data.success) {
+        return { success: false, error: data.error || 'Erro ao salvar no servidor.' }
+      }
+    } catch (err) {
+      console.error('Error saving company to server:', err)
+      return { success: false, error: 'Falha de comunicação com o servidor.' }
+    }
+  }
+
+  saveCompany(updated)
+  return { success: true }
+}
+
 export function toggleCompanyStatus(companyId: string): boolean {
   const companies = getAllCompanies()
   const index = companies.findIndex((c) => c.id === companyId)
@@ -209,6 +237,24 @@ export function deleteCompany(companyId: string): boolean {
   }
 
   return true
+}
+
+export async function deleteCompanyAsync(companyId: string): Promise<boolean> {
+  if (isBrowser()) {
+    try {
+      const res = await fetch(`/api/companies?id=${encodeURIComponent(companyId)}`, {
+        method: 'DELETE',
+      })
+      const data = await res.json()
+      if (res.ok && data.success) {
+        deleteCompany(companyId)
+        return true
+      }
+    } catch (err) {
+      console.error('Error deleting company on server:', err)
+    }
+  }
+  return deleteCompany(companyId)
 }
 
 // ==========================================
@@ -490,6 +536,321 @@ export function rejectPointRequest(
 
   notifyDataChange()
   return { success: true }
+}
+
+// ==========================================
+// SERVER-BACKED REAL-TIME POINT REQUESTS
+// ==========================================
+
+export async function fetchCompanyRequestsFromServer(
+  companyId: string,
+  status?: 'pending' | 'approved' | 'rejected'
+): Promise<PointRequest[]> {
+  if (!companyId) return []
+  if (!isBrowser()) return getCompanyPointRequests(companyId)
+
+  try {
+    const url = `/api/requests?companyId=${encodeURIComponent(companyId)}${status ? `&status=${status}` : ''}`
+    const res = await fetch(url, { cache: 'no-store' })
+    if (res.ok) {
+      const data = await res.json()
+      if (Array.isArray(data?.requests)) {
+        const all = getItem<PointRequest[]>(STORAGE_KEYS.REQUESTS, INITIAL_REQUESTS)
+        const others = all.filter((r) => r.companyId !== companyId)
+        const merged = [...data.requests, ...others]
+        setItem(STORAGE_KEYS.REQUESTS, merged)
+        memoryRequests = merged
+        return data.requests
+      }
+    }
+  } catch (err) {
+    console.warn('Could not fetch requests from server:', err)
+  }
+  return getCompanyPointRequests(companyId)
+}
+
+export async function submitPointRequestToServer(
+  companyId: string,
+  data: { customerId?: string; name: string; phone: string }
+): Promise<{ success: boolean; request?: PointRequest; customer?: Customer; error?: string }> {
+  if (!isBrowser()) {
+    return { success: false, error: 'Apenas no navegador.' }
+  }
+
+  try {
+    const res = await fetch('/api/requests', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ companyId, ...data }),
+      cache: 'no-store',
+    })
+    const json = await res.json()
+    if (res.ok && json.success && json.request) {
+      const all = getItem<PointRequest[]>(STORAGE_KEYS.REQUESTS, INITIAL_REQUESTS)
+      const filtered = all.filter((r) => r.id !== json.request.id)
+      const updated = [json.request, ...filtered]
+      setItem(STORAGE_KEYS.REQUESTS, updated)
+      memoryRequests = updated
+
+      if (json.customer) {
+        const custs = getItem<Customer[]>(STORAGE_KEYS.CUSTOMERS, INITIAL_CUSTOMERS)
+        const filteredCusts = custs.filter((c) => c.id !== json.customer.id)
+        const updatedCusts = [json.customer, ...filteredCusts]
+        setItem(STORAGE_KEYS.CUSTOMERS, updatedCusts)
+        memoryCustomers = updatedCusts
+      }
+
+      notifyDataChange()
+      return { success: true, request: json.request, customer: json.customer }
+    }
+    return { success: false, error: json.error || 'Erro ao registrar solicitação de ponto.' }
+  } catch (err) {
+    console.error('Error submitting point request to server:', err)
+    return { success: false, error: 'Falha de conexão com o servidor ao solicitar ponto.' }
+  }
+}
+
+export async function approvePointRequestOnServerApi(
+  requestId: string,
+  operatorName: string = 'Caixa Balcão'
+): Promise<{ success: boolean; request?: PointRequest; customer?: Customer; error?: string }> {
+  if (!isBrowser()) return { success: false, error: 'Apenas no navegador.' }
+
+  try {
+    const res = await fetch('/api/requests', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ requestId, action: 'approve', operatorName }),
+      cache: 'no-store',
+    })
+    const json = await res.json()
+    if (res.ok && json.success) {
+      if (json.request) {
+        const all = getItem<PointRequest[]>(STORAGE_KEYS.REQUESTS, INITIAL_REQUESTS)
+        const index = all.findIndex((r) => r.id === requestId)
+        if (index >= 0) {
+          all[index] = json.request
+        } else {
+          all.unshift(json.request)
+        }
+        setItem(STORAGE_KEYS.REQUESTS, all)
+        memoryRequests = all
+      }
+      if (json.customer) {
+        const custs = getItem<Customer[]>(STORAGE_KEYS.CUSTOMERS, INITIAL_CUSTOMERS)
+        const cIndex = custs.findIndex((c) => c.id === json.customer.id)
+        if (cIndex >= 0) {
+          custs[cIndex] = json.customer
+        } else {
+          custs.unshift(json.customer)
+        }
+        setItem(STORAGE_KEYS.CUSTOMERS, custs)
+        memoryCustomers = custs
+      }
+      notifyDataChange()
+      return { success: true, request: json.request, customer: json.customer }
+    }
+    return { success: false, error: json.error || 'Erro ao aprovar solicitação.' }
+  } catch (err) {
+    console.error('Error approving point request on server:', err)
+    return { success: false, error: 'Falha de comunicação ao aprovar solicitação.' }
+  }
+}
+
+export async function rejectPointRequestOnServerApi(
+  requestId: string,
+  operatorName: string = 'Caixa Balcão'
+): Promise<{ success: boolean; request?: PointRequest; error?: string }> {
+  if (!isBrowser()) return { success: false, error: 'Apenas no navegador.' }
+
+  try {
+    const res = await fetch('/api/requests', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ requestId, action: 'reject', operatorName }),
+      cache: 'no-store',
+    })
+    const json = await res.json()
+    if (res.ok && json.success) {
+      if (json.request) {
+        const all = getItem<PointRequest[]>(STORAGE_KEYS.REQUESTS, INITIAL_REQUESTS)
+        const index = all.findIndex((r) => r.id === requestId)
+        if (index >= 0) {
+          all[index] = json.request
+        }
+        setItem(STORAGE_KEYS.REQUESTS, all)
+        memoryRequests = all
+      }
+      notifyDataChange()
+      return { success: true, request: json.request }
+    }
+    return { success: false, error: json.error || 'Erro ao recusar solicitação.' }
+  } catch (err) {
+    console.error('Error rejecting point request on server:', err)
+    return { success: false, error: 'Falha ao recusar solicitação.' }
+  }
+}
+
+export async function fetchPointRequestByIdFromServer(
+  requestId: string
+): Promise<PointRequest | null> {
+  if (!requestId || !isBrowser()) return null
+  try {
+    const res = await fetch(`/api/requests?requestId=${encodeURIComponent(requestId)}`, {
+      cache: 'no-store',
+    })
+    if (res.ok) {
+      const json = await res.json()
+      if (json.success && json.request) {
+        return json.request
+      }
+    }
+  } catch (err) {
+    console.warn('Error polling point request from server:', err)
+  }
+  return null
+}
+
+export async function fetchCustomerByPhoneFromServer(
+  companyId: string,
+  phone: string
+): Promise<Customer | null> {
+  if (!companyId || !phone || !isBrowser()) return null
+  try {
+    const res = await fetch(
+      `/api/customers?companyId=${encodeURIComponent(companyId)}&phone=${encodeURIComponent(phone)}`,
+      { cache: 'no-store' }
+    )
+    if (res.ok) {
+      const json = await res.json()
+      if (json.success && json.customer) {
+        const all = getItem<Customer[]>(STORAGE_KEYS.CUSTOMERS, INITIAL_CUSTOMERS)
+        const filtered = all.filter((c) => c.id !== json.customer.id)
+        const updated = [json.customer, ...filtered]
+        setItem(STORAGE_KEYS.CUSTOMERS, updated)
+        memoryCustomers = updated
+        return json.customer
+      }
+    }
+  } catch (err) {
+    console.warn('Error fetching customer from server:', err)
+  }
+  return getCustomerByPhone(companyId, phone)
+}
+
+export async function fetchCompanyCustomersFromServer(companyId: string): Promise<Customer[]> {
+  if (!companyId || !isBrowser()) return getCompanyCustomers(companyId)
+  try {
+    const res = await fetch(`/api/customers?companyId=${encodeURIComponent(companyId)}`, {
+      cache: 'no-store',
+    })
+    if (res.ok) {
+      const json = await res.json()
+      if (json.success && Array.isArray(json.customers)) {
+        const all = getItem<Customer[]>(STORAGE_KEYS.CUSTOMERS, INITIAL_CUSTOMERS)
+        const others = all.filter((c) => c.companyId !== companyId)
+        const updated = [...json.customers, ...others]
+        setItem(STORAGE_KEYS.CUSTOMERS, updated)
+        memoryCustomers = updated
+        return json.customers
+      }
+    }
+  } catch (err) {
+    console.warn('Error fetching customers from server:', err)
+  }
+  return getCompanyCustomers(companyId)
+}
+
+export async function registerCustomerOnServer(
+  companyId: string,
+  data: { name: string; phone: string }
+): Promise<{ success: boolean; customer?: Customer; error?: string }> {
+  if (!isBrowser()) return registerCustomer(companyId, data)
+  try {
+    const res = await fetch('/api/customers', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ companyId, ...data }),
+      cache: 'no-store',
+    })
+    const json = await res.json()
+    if (res.ok && json.success && json.customer) {
+      const all = getItem<Customer[]>(STORAGE_KEYS.CUSTOMERS, INITIAL_CUSTOMERS)
+      const filtered = all.filter((c) => c.id !== json.customer.id)
+      const updated = [json.customer, ...filtered]
+      setItem(STORAGE_KEYS.CUSTOMERS, updated)
+      memoryCustomers = updated
+      saveLocalCustomerSession(companyId, json.customer.phone)
+      notifyDataChange()
+      return { success: true, customer: json.customer }
+    }
+    return { success: false, error: json.error || 'Erro ao registrar cliente.' }
+  } catch (err) {
+    console.error('Error registering customer on server:', err)
+    return registerCustomer(companyId, data)
+  }
+}
+
+export async function directAddPointOnServerApi(
+  companyId: string,
+  customerId: string,
+  operatorName: string = 'Caixa Balcão'
+): Promise<{ success: boolean; customer?: Customer; error?: string }> {
+  if (!isBrowser()) return directAddPoint(companyId, customerId, operatorName)
+  try {
+    const res = await fetch('/api/customers', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ companyId, customerId, action: 'add_point', operatorName }),
+      cache: 'no-store',
+    })
+    const json = await res.json()
+    if (res.ok && json.success && json.customer) {
+      const all = getItem<Customer[]>(STORAGE_KEYS.CUSTOMERS, INITIAL_CUSTOMERS)
+      const index = all.findIndex((c) => c.id === customerId)
+      if (index >= 0) all[index] = json.customer
+      else all.unshift(json.customer)
+      setItem(STORAGE_KEYS.CUSTOMERS, all)
+      memoryCustomers = all
+      notifyDataChange()
+      return { success: true, customer: json.customer }
+    }
+    return { success: false, error: json.error || 'Erro ao adicionar ponto no servidor.' }
+  } catch (err) {
+    console.error('Error in directAddPointOnServerApi:', err)
+    return directAddPoint(companyId, customerId, operatorName)
+  }
+}
+
+export async function redeemRewardOnServerApi(
+  companyId: string,
+  customerId: string,
+  operatorName: string = 'Gerente / Caixa'
+): Promise<{ success: boolean; customer?: Customer; error?: string }> {
+  if (!isBrowser()) return redeemReward(companyId, customerId, operatorName)
+  try {
+    const res = await fetch('/api/customers', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ companyId, customerId, action: 'redeem', operatorName }),
+      cache: 'no-store',
+    })
+    const json = await res.json()
+    if (res.ok && json.success && json.customer) {
+      const all = getItem<Customer[]>(STORAGE_KEYS.CUSTOMERS, INITIAL_CUSTOMERS)
+      const index = all.findIndex((c) => c.id === customerId)
+      if (index >= 0) all[index] = json.customer
+      else all.unshift(json.customer)
+      setItem(STORAGE_KEYS.CUSTOMERS, all)
+      memoryCustomers = all
+      notifyDataChange()
+      return { success: true, customer: json.customer }
+    }
+    return { success: false, error: json.error || 'Erro ao resgatar recompensa no servidor.' }
+  } catch (err) {
+    console.error('Error in redeemRewardOnServerApi:', err)
+    return redeemReward(companyId, customerId, operatorName)
+  }
 }
 
 export function directAddPoint(

@@ -1,6 +1,7 @@
 'use client'
 
 import React, { useState, useEffect } from 'react'
+import Image from 'next/image'
 import { motion } from 'motion/react'
 import {
   X,
@@ -18,8 +19,9 @@ import {
   KeyRound,
 } from 'lucide-react'
 import { Company, WifiSecurity } from '@/types/platform'
-import { saveCompany, getAllCompanies } from '@/lib/storage'
+import { saveCompany, saveCompanyAsync, getAllCompanies } from '@/lib/storage'
 import { slugify } from '@/lib/utils'
+import QRCode from 'qrcode'
 
 interface NewCompanyModalProps {
   isOpen: boolean
@@ -148,6 +150,24 @@ export const NewCompanyModal: React.FC<NewCompanyModalProps> = ({
     setErrorMessage(null)
   }, [companyToEdit, isOpen])
 
+  const [qrCodeDataUrl, setQrCodeDataUrl] = useState<string>('')
+
+  useEffect(() => {
+    if (createdCompany?.slug) {
+      const url = `${typeof window !== 'undefined' ? window.location.origin : ''}/empresa/${createdCompany.slug}`
+      QRCode.toDataURL(url, {
+        width: 180,
+        margin: 1,
+        color: {
+          dark: '#000000',
+          light: '#ffffff',
+        },
+      })
+        .then(setQrCodeDataUrl)
+        .catch(console.error)
+    }
+  }, [createdCompany])
+
   if (!isOpen) return null
 
   const handleNameChange = (val: string) => {
@@ -199,7 +219,7 @@ export const NewCompanyModal: React.FC<NewCompanyModalProps> = ({
     reader.readAsDataURL(file)
   }
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setErrorMessage(null)
 
@@ -262,7 +282,7 @@ export const NewCompanyModal: React.FC<NewCompanyModalProps> = ({
       updatedAt: new Date().toISOString(),
     }
 
-    const res = saveCompany(targetCompany)
+    const res = await saveCompanyAsync(targetCompany)
     if (res.success) {
       setCreatedCompany(targetCompany)
       setStep('success')
@@ -368,6 +388,37 @@ export const NewCompanyModal: React.FC<NewCompanyModalProps> = ({
                     <span>{copiedLink ? 'Copiado!' : 'Copiar'}</span>
                   </button>
                 </div>
+
+                {qrCodeDataUrl && (
+                  <div className="pt-3 border-t border-neutral-200/80 flex flex-col sm:flex-row items-center gap-4">
+                    <div className="p-2 bg-white rounded-xl border border-neutral-200 shadow-sm shrink-0">
+                      <Image
+                        src={qrCodeDataUrl}
+                        alt="QR Code da Placa NFC"
+                        width={100}
+                        height={100}
+                        className="rounded-lg"
+                        unoptimized
+                      />
+                    </div>
+                    <div className="text-xs text-neutral-600 space-y-1 text-center sm:text-left">
+                      <p className="font-bold text-neutral-900 flex items-center justify-center sm:justify-start gap-1.5">
+                        <Sparkles className="w-3.5 h-3.5 text-amber-500" />
+                        QR Code da Placa NFC
+                      </p>
+                      <p className="text-[11px] text-neutral-500 leading-relaxed">
+                        Gerado exclusivamente para esta URL de produção. Use para testes com a câmera ou grave o chip NFC físico.
+                      </p>
+                      <a
+                        href={qrCodeDataUrl}
+                        download={`qrcode-${createdCompany.slug}.png`}
+                        className="inline-block text-[11px] text-amber-600 hover:text-amber-700 font-semibold underline pt-0.5"
+                      >
+                        Baixar PNG do QR Code
+                      </a>
+                    </div>
+                  </div>
+                )}
               </div>
 
               {/* 2. Owner Credentials Card */}

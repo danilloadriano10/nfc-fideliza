@@ -1,0 +1,39 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function isValidId(id) {
+      return id is string && id.size() > 0 && id.size() <= 128;
+    }
+
+    // Companies collection (read & write with valid document ID)
+    match /companies/{companyId} {
+      allow read, write: if isValidId(companyId);
+    }
+
+    // Customers collection
+    match /customers/{customerId} {
+      allow read, write: if isValidId(customerId);
+    }
+
+    // Point Requests collection
+    match /pointRequests/{requestId} {
+      allow read, write: if isValidId(requestId);
+    }
+
+    // Feedbacks collection
+    match /feedbacks/{feedbackId} {
+      allow read, write: if isValidId(feedbackId);
+    }
+
+    // Activity Logs collection
+    match /activityLogs/{logId} {
+      allow read, write: if isValidId(logId);
+    }
+
+    // Settings collection (system migration and flags)
+    match /settings/{settingId} {
+      allow read, write: if isValidId(settingId);
+    }
+  }
+}

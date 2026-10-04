@@ -1,0 +1,124 @@
+{
+  "entities": {
+    "Company": {
+      "title": "Company",
+      "description": "Registered company / establishment in the multi-tenant TapHub platform.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128 },
+        "name": { "type": "string", "maxLength": 150 },
+        "slug": { "type": "string", "maxLength": 100 },
+        "tagline": { "type": "string", "maxLength": 250 },
+        "logoUrl": { "type": "string", "maxLength": 2048 },
+        "coverUrl": { "type": "string", "maxLength": 2048 },
+        "primaryColor": { "type": "string", "maxLength": 30 },
+        "secondaryColor": { "type": "string", "maxLength": 30 },
+        "whatsapp": { "type": "string", "maxLength": 30 },
+        "instagram": { "type": "string", "maxLength": 50 },
+        "googleReviewUrl": { "type": "string", "maxLength": 2048 },
+        "menuUrl": { "type": "string", "maxLength": 2048 },
+        "addressText": { "type": "string", "maxLength": 300 },
+        "locationUrl": { "type": "string", "maxLength": 2048 },
+        "isActive": { "type": "boolean" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "name", "slug", "primaryColor", "isActive"]
+    },
+    "Customer": {
+      "title": "Customer",
+      "description": "Customer registered in a company loyalty program.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128 },
+        "companyId": { "type": "string", "maxLength": 128 },
+        "name": { "type": "string", "maxLength": 150 },
+        "phone": { "type": "string", "maxLength": 30 },
+        "currentPoints": { "type": "number" },
+        "totalVisits": { "type": "number" },
+        "completedCycles": { "type": "number" },
+        "availableRewards": { "type": "number" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "lastActivityAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "companyId", "name", "phone", "currentPoints"]
+    },
+    "PointRequest": {
+      "title": "PointRequest",
+      "description": "Point request created from NFC customer tap waiting for cashier approval.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128 },
+        "companyId": { "type": "string", "maxLength": 128 },
+        "customerId": { "type": "string", "maxLength": 128 },
+        "customerName": { "type": "string", "maxLength": 150 },
+        "customerPhone": { "type": "string", "maxLength": 30 },
+        "status": { "type": "string", "enum": ["pending", "approved", "rejected"] },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" },
+        "resolvedAt": { "type": "string", "format": "date-time" },
+        "resolvedBy": { "type": "string", "maxLength": 100 },
+        "approvedBy": { "type": "string", "maxLength": 100 },
+        "rejectedBy": { "type": "string", "maxLength": 100 }
+      },
+      "required": ["id", "companyId", "customerId", "customerName", "customerPhone", "status", "createdAt"]
+    },
+    "Feedback": {
+      "title": "Feedback",
+      "description": "Private feedback submitted by customers on the NFC page.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128 },
+        "companyId": { "type": "string", "maxLength": 128 },
+        "rating": { "type": "number" },
+        "comment": { "type": "string", "maxLength": 2000 },
+        "authorName": { "type": "string", "maxLength": 150 },
+        "authorPhone": { "type": "string", "maxLength": 30 },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "read": { "type": "boolean" }
+      },
+      "required": ["id", "companyId", "rating", "comment", "createdAt"]
+    },
+    "ActivityLog": {
+      "title": "ActivityLog",
+      "description": "Audit log for points, redemptions and registrations.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128 },
+        "companyId": { "type": "string", "maxLength": 128 },
+        "customerId": { "type": "string", "maxLength": 128 },
+        "customerName": { "type": "string", "maxLength": 150 },
+        "customerPhone": { "type": "string", "maxLength": 30 },
+        "type": { "type": "string", "maxLength": 50 },
+        "description": { "type": "string", "maxLength": 500 },
+        "pointsChange": { "type": "number" },
+        "rewardName": { "type": "string", "maxLength": 150 },
+        "approvedBy": { "type": "string", "maxLength": 100 },
+        "timestamp": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "companyId", "type", "description", "timestamp"]
+    }
+  },
+  "firestore": {
+    "/companies/{companyId}": {
+      "schema": "Company",
+      "description": "Stores company profiles and configurations."
+    },
+    "/customers/{customerId}": {
+      "schema": "Customer",
+      "description": "Stores customer loyalty cards mapped by companyId."
+    },
+    "/pointRequests/{requestId}": {
+      "schema": "PointRequest",
+      "description": "Pending and resolved point validation requests."
+    },
+    "/feedbacks/{feedbackId}": {
+      "schema": "Feedback",
+      "description": "Private customer feedback sent to company owners."
+    },
+    "/activityLogs/{logId}": {
+      "schema": "ActivityLog",
+      "description": "Audit and operational activity logs."
+    }
+  }
+}

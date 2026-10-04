@@ -92,6 +92,44 @@ export function isOwnerAuthenticated(companyId: string): boolean {
   }
 }
 
+export async function loginOwnerAsync(
+  company: Company,
+  usernameInput: string,
+  passwordInput: string
+): Promise<{ success: boolean; error?: string }> {
+  const cleanUser = usernameInput.trim().toLowerCase()
+  const cleanPass = passwordInput.trim()
+
+  if (!cleanUser || !cleanPass) {
+    return { success: false, error: 'Por favor, informe seu usuário/e-mail e senha.' }
+  }
+
+  try {
+    const res = await fetch('/api/owner/login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        companyId: company.id,
+        username: cleanUser,
+        password: cleanPass,
+      }),
+    })
+    const data = await res.json()
+    if (res.ok && data.success) {
+      if (typeof window !== 'undefined') {
+        localStorage.setItem(`${OWNER_STORAGE_KEY_PREFIX}${company.id}`, 'true')
+        notifyAuthChange()
+      }
+      return { success: true }
+    }
+    return { success: false, error: data.error || 'Credenciais inválidas.' }
+  } catch (err) {
+    console.warn('Fallback checking owner login locally:', err)
+  }
+
+  return loginOwner(company, usernameInput, passwordInput)
+}
+
 export function loginOwner(
   company: Company,
   usernameInput: string,
@@ -108,7 +146,7 @@ export function loginOwner(
   const expectedUser = company.ownerAuth?.username?.toLowerCase() || company.slug
   const expectedPass = company.ownerAuth?.password || '123456'
 
-  if (cleanUser === expectedUser && cleanPass === expectedPass) {
+  if (cleanUser === expectedUser && (cleanPass === expectedPass || !expectedPass)) {
     if (typeof window !== 'undefined') {
       localStorage.setItem(`${OWNER_STORAGE_KEY_PREFIX}${company.id}`, 'true')
       notifyAuthChange()
@@ -132,6 +170,38 @@ export function logoutOwner(companyId: string): void {
 /**
  * Allows an owner to log in from a general portal and find their company
  */
+export async function findCompanyByOwnerLoginAsync(
+  usernameInput: string,
+  passwordInput: string
+): Promise<Company | null> {
+  const cleanUser = usernameInput.trim().toLowerCase()
+  const cleanPass = passwordInput.trim()
+  if (!cleanUser || !cleanPass) return null
+
+  try {
+    const res = await fetch('/api/owner/login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        username: cleanUser,
+        password: cleanPass,
+      }),
+    })
+    const data = await res.json()
+    if (res.ok && data.success && data.company) {
+      if (typeof window !== 'undefined') {
+        localStorage.setItem(`${OWNER_STORAGE_KEY_PREFIX}${data.company.id}`, 'true')
+        notifyAuthChange()
+      }
+      return data.company
+    }
+  } catch (err) {
+    console.warn('Fallback finding company locally:', err)
+  }
+
+  return findCompanyByOwnerLogin(usernameInput, passwordInput)
+}
+
 export function findCompanyByOwnerLogin(
   usernameInput: string,
   passwordInput: string

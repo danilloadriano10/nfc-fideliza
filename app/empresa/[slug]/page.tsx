@@ -12,11 +12,11 @@ interface PageProps {
 
 export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
   const { slug } = await params
-  const company = getServerCompanyBySlug(slug)
+  const company = await getServerCompanyBySlug(slug)
 
   if (!company) {
     return {
-      title: 'Página NFC Oficial · NFC Fideliza',
+      title: 'Página NFC Oficial · TapHub',
     }
   }
 
@@ -34,6 +34,6 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
 
 export default async function EmpresaPage({ params }: PageProps) {
   const { slug } = await params
-  const company = getServerCompanyBySlug(slug)
+  const company = await getServerCompanyBySlug(slug)
   return <EmpresaClientPage slug={slug} initialCompany={company} />
 }

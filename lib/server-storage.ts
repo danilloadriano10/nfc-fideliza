@@ -1,188 +1,191 @@
-import fs from 'fs'
-import path from 'path'
-import { Company, Customer, PointRequest, ActivityLog, PrivateFeedback } from '@/types/platform'
+/**
+ * Server-Side Data Layer Powered by Firebase Cloud Firestore.
+ * Firestore is the STRICT and ONLY source of truth for TapHub.
+ * No local JSON, no server memory, no mocked arrays.
+ */
+
 import {
-  INITIAL_COMPANIES,
-  INITIAL_CUSTOMERS,
-  INITIAL_REQUESTS,
-  INITIAL_LOGS,
-  INITIAL_FEEDBACKS,
-} from '@/lib/initial-data'
+  getFirestoreCompanies,
+  getFirestoreCompanyBySlug,
+  getFirestoreCompanyById,
+  saveFirestoreCompany,
+  deleteFirestoreCompany,
+  toggleFirestoreCompanyStatus,
+  getFirestoreCompanyCustomers,
+  getFirestoreCustomerByPhone,
+  getFirestoreCustomerById,
+  registerFirestoreCustomer,
+  directAddPointInFirestore,
+  redeemRewardInFirestore,
+  getFirestorePointRequests,
+  getFirestorePointRequestById,
+  createPointRequestInFirestore,
+  approvePointRequestInFirestore,
+  rejectPointRequestInFirestore,
+  getFirestoreCompanyLogs,
+  addFirestoreActivityLog,
+  getFirestoreFeedbacks,
+  saveFirestoreFeedback,
+  ensureFirestoreInitialized,
+} from './firestore-service'
 
-interface PlatformDatabase {
-  companies: Company[]
-  customers: Customer[]
-  requests: PointRequest[]
-  logs: ActivityLog[]
-  feedbacks: PrivateFeedback[]
+import { Company, Customer, PointRequest, ActivityLog, PrivateFeedback } from '@/types/platform'
+
+// Ensure system migration is initialized on startup
+ensureFirestoreInitialized().catch((err) => {
+  console.error('Initialization error in Firestore service:', err)
+})
+
+// ==========================================
+// 1. COMPANIES (MULTI-TENANT FIRESTORE)
+// ==========================================
+
+export async function getServerCompanies(): Promise<Company[]> {
+  return await getFirestoreCompanies()
 }
 
-const DATA_DIR = path.join(process.cwd(), 'data')
-const DB_FILE = path.join(DATA_DIR, 'platform-db.json')
-
-// In-memory cache for fast access
-let memoryDb: PlatformDatabase | null = null
-
-function ensureDb(): PlatformDatabase {
-  if (memoryDb) return memoryDb
-
-  try {
-    if (!fs.existsSync(DATA_DIR)) {
-      fs.mkdirSync(DATA_DIR, { recursive: true })
-    }
-
-    if (fs.existsSync(DB_FILE)) {
-      const content = fs.readFileSync(DB_FILE, 'utf-8')
-      const parsed = JSON.parse(content)
-      memoryDb = {
-        companies: Array.isArray(parsed.companies) && parsed.companies.length > 0 ? parsed.companies : INITIAL_COMPANIES,
-        customers: Array.isArray(parsed.customers) ? parsed.customers : INITIAL_CUSTOMERS,
-        requests: Array.isArray(parsed.requests) ? parsed.requests : INITIAL_REQUESTS,
-        logs: Array.isArray(parsed.logs) ? parsed.logs : INITIAL_LOGS,
-        feedbacks: Array.isArray(parsed.feedbacks) ? parsed.feedbacks : INITIAL_FEEDBACKS,
-      }
-      return memoryDb
-    }
-  } catch (err) {
-    console.error('Error reading platform-db.json:', err)
-  }
-
-  // Fallback to initial seed
-  memoryDb = {
-    companies: INITIAL_COMPANIES,
-    customers: INITIAL_CUSTOMERS,
-    requests: INITIAL_REQUESTS,
-    logs: INITIAL_LOGS,
-    feedbacks: INITIAL_FEEDBACKS,
-  }
-
-  persistDb(memoryDb)
-  return memoryDb
+export async function getServerCompanyBySlug(slug: string): Promise<Company | null> {
+  return await getFirestoreCompanyBySlug(slug)
 }
 
-function persistDb(db: PlatformDatabase): void {
-  try {
-    if (!fs.existsSync(DATA_DIR)) {
-      fs.mkdirSync(DATA_DIR, { recursive: true })
-    }
-    fs.writeFileSync(DB_FILE, JSON.stringify(db, null, 2), 'utf-8')
-  } catch (err) {
-    console.error('Error saving platform-db.json:', err)
-  }
+export async function getServerCompanyById(id: string): Promise<Company | null> {
+  return await getFirestoreCompanyById(id)
+}
+
+export async function saveServerCompany(
+  company: Company
+): Promise<{ success: boolean; error?: string }> {
+  return await saveFirestoreCompany(company)
+}
+
+export async function deleteServerCompany(companyId: string): Promise<boolean> {
+  return await deleteFirestoreCompany(companyId)
+}
+
+export async function toggleServerCompanyStatus(companyId: string): Promise<boolean> {
+  return await toggleFirestoreCompanyStatus(companyId)
 }
 
 // ==========================================
-// COMPANIES
+// 2. CUSTOMERS (MULTI-TENANT & PERSISTENT)
 // ==========================================
 
-export function getServerCompanies(): Company[] {
-  const db = ensureDb()
-  return db.companies
+export async function getServerCompanyCustomers(companyId: string): Promise<Customer[]> {
+  return await getFirestoreCompanyCustomers(companyId)
 }
 
-export function getServerCompanyBySlug(slug: string): Company | null {
-  const clean = slug.toLowerCase().trim()
-  const companies = getServerCompanies()
-  return companies.find((c) => c.slug.toLowerCase() === clean) || null
+export async function getServerCustomerByPhone(
+  companyId: string,
+  rawPhone: string
+): Promise<Customer | null> {
+  return await getFirestoreCustomerByPhone(companyId, rawPhone)
 }
 
-export function getServerCompanyById(id: string): Company | null {
-  const companies = getServerCompanies()
-  return companies.find((c) => c.id === id) || null
+export async function getServerCustomerById(
+  companyId: string,
+  customerId: string
+): Promise<Customer | null> {
+  return await getFirestoreCustomerById(companyId, customerId)
 }
 
-export function saveServerCompany(company: Company): { success: boolean; error?: string } {
-  const db = ensureDb()
-  const cleanSlug = company.slug.toLowerCase().trim()
-
-  const existingWithSlug = db.companies.find(
-    (c) => c.slug.toLowerCase() === cleanSlug && c.id !== company.id
-  )
-  if (existingWithSlug) {
-    return { success: false, error: 'Já existe outro estabelecimento utilizando este slug.' }
-  }
-
-  const index = db.companies.findIndex((c) => c.id === company.id)
-  if (index >= 0) {
-    db.companies[index] = {
-      ...company,
-      updatedAt: new Date().toISOString(),
-    }
-  } else {
-    db.companies.push({
-      ...company,
-      createdAt: company.createdAt || new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-    })
-  }
-
-  persistDb(db)
-  return { success: true }
+export async function registerServerCustomer(
+  companyId: string,
+  data: { name: string; phone: string }
+): Promise<{ success: boolean; customer?: Customer; error?: string }> {
+  return await registerFirestoreCustomer(companyId, data)
 }
 
-export function deleteServerCompany(companyId: string): boolean {
-  const db = ensureDb()
-  const initialLength = db.companies.length
-  db.companies = db.companies.filter((c) => c.id !== companyId)
-  if (db.companies.length === initialLength) return false
-
-  // Cascade delete
-  db.customers = db.customers.filter((c) => c.companyId !== companyId)
-  db.requests = db.requests.filter((r) => r.companyId !== companyId)
-  db.logs = db.logs.filter((l) => l.companyId !== companyId)
-  db.feedbacks = db.feedbacks.filter((f) => f.companyId !== companyId)
-
-  persistDb(db)
-  return true
+export async function directAddPointOnServer(
+  companyId: string,
+  customerId: string,
+  operatorName: string = 'Caixa Balcão'
+): Promise<{ success: boolean; customer?: Customer; error?: string }> {
+  return await directAddPointInFirestore(companyId, customerId, operatorName)
 }
 
-export function toggleServerCompanyStatus(companyId: string): boolean {
-  const db = ensureDb()
-  const comp = db.companies.find((c) => c.id === companyId)
-  if (!comp) return false
-
-  comp.isActive = !comp.isActive
-  comp.updatedAt = new Date().toISOString()
-  persistDb(db)
-  return true
+export async function redeemRewardOnServer(
+  companyId: string,
+  customerId: string,
+  operatorName: string = 'Gerente / Caixa'
+): Promise<{ success: boolean; customer?: Customer; error?: string }> {
+  return await redeemRewardInFirestore(companyId, customerId, operatorName)
 }
 
 // ==========================================
-// FEEDBACKS (STRICT TENANT ISOLATION)
+// 3. POINT REQUESTS (CROSS-DEVICE ATOMIC)
 // ==========================================
 
-export function getServerFeedbacks(companyId: string): PrivateFeedback[] {
-  if (!companyId) return []
-  const db = ensureDb()
-  if (!Array.isArray(db.feedbacks)) {
-    db.feedbacks = []
-  }
-  return db.feedbacks.filter((f) => f && f.companyId === companyId)
+export async function getServerPointRequests(
+  companyId: string,
+  status?: 'pending' | 'approved' | 'rejected'
+): Promise<PointRequest[]> {
+  return await getFirestorePointRequests(companyId, status)
 }
 
-export function saveServerFeedback(data: {
+export async function getServerPointRequestById(requestId: string): Promise<PointRequest | null> {
+  return await getFirestorePointRequestById(requestId)
+}
+
+export async function createPointRequestOnServer(
+  companyId: string,
+  data: {
+    customerId?: string
+    name: string
+    phone: string
+  }
+): Promise<{ success: boolean; request?: PointRequest; customer?: Customer; error?: string }> {
+  return await createPointRequestInFirestore(companyId, data)
+}
+
+export async function approvePointRequestOnServer(
+  requestId: string,
+  operatorName: string = 'Caixa Balcão'
+): Promise<{ success: boolean; request?: PointRequest; customer?: Customer; error?: string }> {
+  return await approvePointRequestInFirestore(requestId, operatorName)
+}
+
+export async function rejectPointRequestOnServer(
+  requestId: string,
+  operatorName: string = 'Caixa Balcão'
+): Promise<{ success: boolean; request?: PointRequest; error?: string }> {
+  return await rejectPointRequestInFirestore(requestId, operatorName)
+}
+
+// ==========================================
+// 4. ACTIVITY LOGS
+// ==========================================
+
+export async function getServerCompanyLogs(companyId: string): Promise<ActivityLog[]> {
+  return await getFirestoreCompanyLogs(companyId)
+}
+
+export async function addServerActivityLog(logData: {
+  companyId: string
+  customerId?: string
+  type: ActivityLog['type']
+  customerName: string
+  customerPhone?: string
+  pointsChange?: number
+  description: string
+  operatorName?: string
+}): Promise<ActivityLog> {
+  return await addFirestoreActivityLog(logData)
+}
+
+// ==========================================
+// 5. FEEDBACKS (STRICT TENANT ISOLATION)
+// ==========================================
+
+export async function getServerFeedbacks(companyId: string): Promise<PrivateFeedback[]> {
+  return await getFirestoreFeedbacks(companyId)
+}
+
+export async function saveServerFeedback(data: {
   companyId: string
   rating?: number
   message: string
   customerName?: string
   customerPhone?: string
-}): { success: boolean; feedback?: PrivateFeedback; error?: string } {
-  if (!data.message || !data.message.trim()) {
-    return { success: false, error: 'Mensagem de feedback não informada.' }
-  }
-
-  const db = ensureDb()
-  const newFeedback: PrivateFeedback = {
-    id: `feed_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
-    companyId: data.companyId,
-    rating: data.rating,
-    message: data.message.trim(),
-    customerName: data.customerName?.trim() || undefined,
-    customerPhone: data.customerPhone?.trim() || undefined,
-    createdAt: new Date().toISOString(),
-  }
-
-  db.feedbacks.unshift(newFeedback)
-  persistDb(db)
-  return { success: true, feedback: newFeedback }
+}): Promise<{ success: boolean; feedback?: PrivateFeedback; error?: string }> {
+  return await saveFirestoreFeedback(data)
 }

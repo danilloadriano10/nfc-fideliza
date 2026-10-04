@@ -20,13 +20,14 @@ import confetti from 'canvas-confetti'
 import { Company, Customer, PointRequest } from '@/types/platform'
 import {
   getCustomerByPhone,
-  registerCustomer,
   saveLocalCustomerSession,
   clearLocalCustomerSession,
-  requestPoint,
   getCompanyPointRequests,
   DATA_CHANGE_EVENT,
-  getCompanyActivityLogs,
+  submitPointRequestToServer,
+  fetchPointRequestByIdFromServer,
+  fetchCustomerByPhoneFromServer,
+  registerCustomerOnServer,
 } from '@/lib/storage'
 import { formatPhone, normalizePhone } from '@/lib/utils'
 
@@ -80,21 +81,85 @@ export const LoyaltySheet: React.FC<LoyaltySheetProps> = ({
     if (!isOpen) return
     const phoneToFind = initialCustomerPhone
     if (phoneToFind) {
-      const found = getCustomerByPhone(company.id, phoneToFind)
-      if (found) {
-        setCustomer(found)
+      // 1. Check local cache first for instant render
+      const localFound = getCustomerByPhone(company.id, phoneToFind)
+      if (localFound) {
+        setCustomer(localFound)
         setIsRegistering(false)
         const requests = getCompanyPointRequests(company.id)
         const active = requests.find(
-          (r) => r.customerId === found.id && r.status === 'pending'
+          (r) => r.customerId === localFound.id && r.status === 'pending'
         )
         setPendingRequest(active || null)
       }
+
+      // 2. Fetch authoritative data from server
+      fetchCustomerByPhoneFromServer(company.id, phoneToFind).then((serverCust) => {
+        if (serverCust) {
+          setCustomer(serverCust)
+          setIsRegistering(false)
+        }
+      })
     }
   }, [isOpen, initialCustomerPhone, company.id])
 
-  // Listen to real-time updates from cashier
+  // Cross-device live polling: continuously listens to server approval
   useEffect(() => {
+    if (!isOpen || !customer) return
+
+    let isSubscribed = true
+
+    const pollInterval = setInterval(async () => {
+      if (!isSubscribed) return
+
+      // 1. If there is a pending request, check if cashier approved or rejected on another device
+      if (pendingRequest?.id) {
+        try {
+          const freshReq = await fetchPointRequestByIdFromServer(pendingRequest.id)
+          if (freshReq && isSubscribed) {
+            if (freshReq.status === 'approved') {
+              triggerCelebration()
+              setSuccessMessage('🎉 Ponto confirmado pelo caixa com sucesso!')
+              setPendingRequest(null)
+              setTimeout(() => setSuccessMessage(null), 5000)
+
+              // Fetch updated customer points
+              const updatedCust = await fetchCustomerByPhoneFromServer(company.id, customer.phone)
+              if (updatedCust && isSubscribed) {
+                setCustomer(updatedCust)
+              }
+              return
+            } else if (freshReq.status === 'rejected') {
+              setErrorMessage('A solicitação de ponto foi recusada pelo caixa.')
+              setPendingRequest(null)
+              return
+            }
+          }
+        } catch (err) {
+          console.warn('Silent polling error for pending request:', err)
+        }
+      }
+
+      // 2. Also check if points changed on the server
+      try {
+        const freshCust = await fetchCustomerByPhoneFromServer(company.id, customer.phone)
+        if (freshCust && isSubscribed) {
+          if (
+            freshCust.currentPoints > customer.currentPoints ||
+            freshCust.availableRewards > customer.availableRewards
+          ) {
+            triggerCelebration()
+            setSuccessMessage('🎉 Ponto creditado com sucesso!')
+            setTimeout(() => setSuccessMessage(null), 4000)
+            setCustomer(freshCust)
+            setPendingRequest(null)
+          }
+        }
+      } catch (err) {
+        console.warn('Silent polling error for customer:', err)
+      }
+    }, 2000)
+
     const handleSync = () => {
       if (isOpen && customer) {
         const updated = getCustomerByPhone(company.id, customer.phone)
@@ -120,12 +185,14 @@ export const LoyaltySheet: React.FC<LoyaltySheetProps> = ({
     window.addEventListener(DATA_CHANGE_EVENT, handleSync)
     window.addEventListener('storage', handleSync)
     return () => {
+      isSubscribed = false
+      clearInterval(pollInterval)
       window.removeEventListener(DATA_CHANGE_EVENT, handleSync)
       window.removeEventListener('storage', handleSync)
     }
-  }, [isOpen, customer, company.id, triggerCelebration])
+  }, [isOpen, customer, pendingRequest, company.id, triggerCelebration])
 
-  const handleRegister = (e: React.FormEvent) => {
+  const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault()
     setErrorMessage(null)
 
@@ -139,7 +206,7 @@ export const LoyaltySheet: React.FC<LoyaltySheetProps> = ({
       return
     }
 
-    const res = registerCustomer(company.id, {
+    const res = await registerCustomerOnServer(company.id, {
       name: nameInput,
       phone: phoneInput,
     })
@@ -158,7 +225,7 @@ export const LoyaltySheet: React.FC<LoyaltySheetProps> = ({
     }
   }
 
-  const handleSearchExisting = (e: React.FormEvent) => {
+  const handleSearchExisting = async (e: React.FormEvent) => {
     e.preventDefault()
     setErrorMessage(null)
     const normalized = normalizePhone(phoneInput)
@@ -167,7 +234,8 @@ export const LoyaltySheet: React.FC<LoyaltySheetProps> = ({
       return
     }
 
-    const found = getCustomerByPhone(company.id, normalized)
+    // Check server first for central cross-device truth
+    const found = await fetchCustomerByPhoneFromServer(company.id, normalized)
     if (found) {
       setCustomer(found)
       saveLocalCustomerSession(company.id, found.phone)
@@ -180,20 +248,27 @@ export const LoyaltySheet: React.FC<LoyaltySheetProps> = ({
     }
   }
 
-  const handleRequestPoint = () => {
+  const handleRequestPoint = async () => {
     if (!customer) return
     setIsRequestingPoint(true)
     setErrorMessage(null)
 
-    const res = requestPoint(company.id, customer.id)
+    // Call server API: validates company, customer, creates point request on DB
+    const res = await submitPointRequestToServer(company.id, {
+      customerId: customer.id,
+      name: customer.name,
+      phone: customer.phone,
+    })
     setIsRequestingPoint(false)
 
+    // ONLY show "aguardando aprovação" after the server/DB confirms!
     if (res.success && res.request) {
       setPendingRequest(res.request)
-      setSuccessMessage('Solicitação enviada! Apresente seu celular ao caixa para confirmar.')
+      setSuccessMessage('Solicitação enviada com sucesso! Apresente seu celular ao caixa para confirmar.')
       setTimeout(() => setSuccessMessage(null), 5000)
     } else {
-      setErrorMessage(res.error || 'Não foi possível solicitar o ponto.')
+      // NEVER show false success
+      setErrorMessage(res.error || 'Não foi possível solicitar o ponto no momento. Tente novamente.')
     }
   }
 
