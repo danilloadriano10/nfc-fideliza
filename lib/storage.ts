@@ -81,6 +81,16 @@ export function getAllCompanies(): Company[] {
   return getItem<Company[]>(STORAGE_KEYS.COMPANIES, INITIAL_COMPANIES)
 }
 
+export function getAllPointRequests(): PointRequest[] {
+  if (!isBrowser()) return memoryRequests
+  return getItem<PointRequest[]>(STORAGE_KEYS.REQUESTS, INITIAL_REQUESTS)
+}
+
+export function getAllPrivateFeedbacks(): PrivateFeedback[] {
+  if (!isBrowser()) return memoryFeedbacks
+  return getItem<PrivateFeedback[]>(STORAGE_KEYS.FEEDBACKS, INITIAL_FEEDBACKS)
+}
+
 export function getCompanyBySlug(slug: string): Company | null {
   const companies = getAllCompanies()
   const cleanSlug = slug.toLowerCase().trim()

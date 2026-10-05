@@ -1,6 +1,6 @@
 'use client'
 
-import React from 'react'
+import React, { useState } from 'react'
 import Link from 'next/link'
 import {
   Smartphone,
@@ -13,178 +13,288 @@ import {
   Sparkles,
   Award,
   CheckCircle,
+  Zap,
+  Radio,
+  Layers,
+  Menu,
+  X,
+  ChevronRight,
 } from 'lucide-react'
 
 export default function HomePage() {
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
+
   return (
-    <div className="min-h-screen bg-neutral-950 text-neutral-100 flex flex-col selection:bg-amber-400 selection:text-neutral-950">
+    <div className="min-h-screen bg-white text-neutral-900 flex flex-col selection:bg-violet-100 selection:text-violet-900 font-sans w-full max-w-full overflow-x-hidden">
       {/* Top Header */}
-      <header className="border-b border-neutral-800/80 px-4 sm:px-8 py-4 backdrop-blur-md bg-neutral-950/80 sticky top-0 z-40">
-        <div className="max-w-6xl mx-auto flex items-center justify-between">
+      <header className="border-b border-neutral-200/80 bg-white/95 backdrop-blur-md sticky top-0 z-40 w-full max-w-full overflow-x-hidden">
+        <div className="w-full max-w-6xl mx-auto flex items-center justify-between gap-2 px-3.5 sm:px-8 py-3.5 sm:py-4">
           {/* Brand */}
-          <Link href="/" className="text-base font-bold tracking-tight text-white flex items-center gap-2.5">
-            <span className="w-2.5 h-2.5 rounded-full bg-amber-400 shadow-sm shadow-amber-400/50" />
-            <span className="tracking-tight">NFC Fideliza</span>
+          <Link
+            href="/"
+            className="flex items-center gap-2 sm:gap-2.5 group shrink-0 min-w-0"
+            onClick={() => setMobileMenuOpen(false)}
+          >
+            <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-xl bg-violet-600 flex items-center justify-center text-white shadow-xs shrink-0">
+              <Radio className="w-3.5 h-3.5 sm:w-4 sm:h-4 stroke-[2.5]" />
+            </div>
+            <div className="flex flex-col min-w-0">
+              <span className="text-sm sm:text-base font-bold tracking-tight text-neutral-900 leading-tight truncate">
+                DiretoLink
+              </span>
+              <span className="hidden sm:block text-[10px] text-neutral-500 font-medium tracking-wide">
+                Aproxime. Conecte. Pronto.
+              </span>
+            </div>
           </Link>
 
-          {/* Actions */}
-          <div className="flex items-center gap-2 sm:gap-3">
+          {/* Desktop Navigation Links */}
+          <div className="hidden md:flex items-center gap-2 sm:gap-3 shrink-0">
             <Link
               href="/painel"
-              className="px-3.5 py-2 rounded-xl bg-neutral-900 border border-neutral-800 text-neutral-200 hover:text-white hover:bg-neutral-800 font-semibold text-xs transition-all shadow-sm flex items-center gap-1.5"
+              className="px-3.5 py-2 rounded-xl bg-white border border-neutral-200 text-neutral-700 hover:text-neutral-900 hover:border-neutral-300 font-semibold text-xs transition-all shadow-xs flex items-center gap-1.5"
             >
-              <Store className="w-3.5 h-3.5 text-amber-400" />
-              <span>Acesso do Proprietário</span>
+              <Store className="w-3.5 h-3.5 text-violet-600" />
+              <span>Painel do Estabelecimento</span>
             </Link>
 
             <Link
               href="/admin"
-              className="px-3.5 py-2 rounded-xl bg-emerald-500 text-neutral-950 hover:bg-emerald-400 font-bold text-xs transition-all shadow-sm flex items-center gap-1.5"
+              className="px-3.5 py-2 rounded-xl bg-violet-600 text-white hover:bg-violet-700 font-semibold text-xs transition-all shadow-xs flex items-center gap-1.5"
             >
               <ShieldCheck className="w-3.5 h-3.5 stroke-[2.5]" />
-              <span>Administrador Geral</span>
+              <span>Administração</span>
             </Link>
           </div>
+
+          {/* Mobile Navigation Controls */}
+          <div className="flex md:hidden items-center gap-1.5 shrink-0">
+            <Link
+              href="/painel"
+              className="px-2.5 py-1.5 rounded-lg bg-violet-50 text-violet-700 hover:bg-violet-100 font-semibold text-[11px] border border-violet-100 transition-colors flex items-center gap-1"
+            >
+              <Store className="w-3 h-3" />
+              <span>Painel</span>
+            </Link>
+
+            <button
+              type="button"
+              onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+              className="w-8 h-8 rounded-lg border border-neutral-200 bg-white hover:bg-neutral-50 flex items-center justify-center text-neutral-700 transition-colors shadow-2xs"
+              aria-label={mobileMenuOpen ? 'Fechar menu' : 'Abrir menu'}
+              aria-expanded={mobileMenuOpen}
+            >
+              {mobileMenuOpen ? (
+                <X className="w-4 h-4 text-neutral-900" />
+              ) : (
+                <Menu className="w-4 h-4 text-neutral-800" />
+              )}
+            </button>
+          </div>
         </div>
+
+        {/* Mobile Menu Dropdown Panel */}
+        {mobileMenuOpen && (
+          <div className="md:hidden border-t border-neutral-200 bg-white px-3.5 py-4 space-y-3 shadow-lg w-full max-w-full overflow-x-hidden animate-fade-in">
+            <div className="flex items-center justify-between text-[10px] font-bold uppercase tracking-wider text-neutral-400 px-1">
+              <span>Portais de Acesso</span>
+              <span className="text-violet-600">DiretoLink</span>
+            </div>
+
+            <div className="space-y-2">
+              <Link
+                href="/painel"
+                onClick={() => setMobileMenuOpen(false)}
+                className="flex items-center gap-3 p-3 rounded-2xl bg-neutral-50 hover:bg-violet-50/70 border border-neutral-200/90 active:scale-[0.99] transition-all"
+              >
+                <div className="w-9 h-9 rounded-xl bg-violet-600 text-white flex items-center justify-center shrink-0 shadow-xs">
+                  <Store className="w-4 h-4" />
+                </div>
+                <div className="min-w-0 flex-1">
+                  <span className="text-xs font-bold text-neutral-900 block truncate">
+                    Painel do Estabelecimento
+                  </span>
+                  <span className="text-[11px] text-neutral-500 block truncate">
+                    Acesso exclusivo de lojistas e caixas
+                  </span>
+                </div>
+                <ChevronRight className="w-4 h-4 text-neutral-400 shrink-0" />
+              </Link>
+
+              <Link
+                href="/admin"
+                onClick={() => setMobileMenuOpen(false)}
+                className="flex items-center gap-3 p-3 rounded-2xl bg-neutral-50 hover:bg-neutral-100 border border-neutral-200/90 active:scale-[0.99] transition-all"
+              >
+                <div className="w-9 h-9 rounded-xl bg-neutral-900 text-white flex items-center justify-center shrink-0 shadow-xs">
+                  <ShieldCheck className="w-4 h-4" />
+                </div>
+                <div className="min-w-0 flex-1">
+                  <span className="text-xs font-bold text-neutral-900 block truncate">
+                    Painel Administrativo Master
+                  </span>
+                  <span className="text-[11px] text-neutral-500 block truncate">
+                    Gestão central de empresas e módulos NFC
+                  </span>
+                </div>
+                <ChevronRight className="w-4 h-4 text-neutral-400 shrink-0" />
+              </Link>
+            </div>
+
+            <div className="pt-2 text-center text-[10px] text-neutral-400 border-t border-neutral-100">
+              Aproxime. Conecte. Pronto.
+            </div>
+          </div>
+        )}
       </header>
 
       {/* Hero Section */}
-      <section className="relative pt-16 pb-20 px-4 sm:px-8 overflow-hidden border-b border-neutral-800/60">
-        <div className="max-w-4xl mx-auto text-center space-y-6">
-          <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-neutral-900/90 border border-neutral-800 text-xs text-neutral-300 shadow-sm">
-            <Sparkles className="w-3.5 h-3.5 text-amber-400" />
-            <span>Plataforma Inteligente de Placas NFC & Fidelidade Digital</span>
+      <section className="relative pt-12 pb-14 sm:pt-16 sm:pb-20 px-3.5 sm:px-8 overflow-hidden bg-neutral-50/60 border-b border-neutral-200/60 w-full max-w-full">
+        <div className="w-full max-w-4xl mx-auto text-center space-y-5 sm:space-y-6">
+          <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-white border border-neutral-200 text-[11px] sm:text-xs text-neutral-700 shadow-xs max-w-full leading-snug">
+            <span className="w-2 h-2 rounded-full bg-violet-600 animate-pulse shrink-0" />
+            <span className="font-medium truncate">Plataforma SaaS de Presença Física e Fidelidade NFC</span>
           </div>
 
-          <h1 className="text-3xl sm:text-5xl font-extrabold text-white tracking-tight leading-[1.18] text-balance">
-            A presença digital e o programa de fidelidade do seu negócio em um único toque.
+          <h1 className="text-2xl sm:text-4xl md:text-5xl lg:text-6xl font-extrabold text-neutral-900 tracking-tight leading-[1.18] break-words text-balance px-1">
+            Um toque conecta o cliente à empresa.
           </h1>
 
-          <p className="text-sm sm:text-base text-neutral-400 max-w-2xl mx-auto font-normal leading-relaxed">
-            Placas físicas com aproximação NFC instantânea. O consumidor encosta o celular e acessa o cartão de fidelidade, avalia no Google, conecta no Wi-Fi e confere o cardápio sem precisar instalar nenhum aplicativo.
+          <p className="text-sm sm:text-base md:text-lg text-neutral-600 max-w-2xl mx-auto font-normal leading-relaxed break-words px-1">
+            Placas inteligentes com aproximação NFC instantânea. Seu cliente encosta o smartphone e acessa cartão de fidelidade, avaliações no Google, Wi-Fi e cardápio sem instalar nada.
+          </p>
+
+          <p className="text-xs sm:text-sm font-semibold text-violet-700 tracking-wider uppercase">
+            Aproxime. Conecte. Pronto.
           </p>
 
           {/* Action CTAs */}
-          <div className="flex flex-col sm:flex-row items-center justify-center gap-3.5 pt-4">
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-center gap-2.5 sm:gap-3.5 pt-3 w-full max-w-md sm:max-w-none mx-auto">
             <Link
               href="/painel"
-              className="w-full sm:w-auto px-7 py-3.5 rounded-xl bg-amber-400 hover:bg-amber-300 text-neutral-950 font-bold text-xs shadow-lg shadow-amber-400/10 transition-all flex items-center justify-center gap-2"
+              className="w-full sm:w-auto px-6 py-3.5 rounded-xl bg-violet-600 hover:bg-violet-700 text-white font-semibold text-xs shadow-xs transition-all flex items-center justify-center gap-2"
             >
-              <Store className="w-4 h-4" />
-              <span>Acessar Painel do Proprietário</span>
-              <ArrowRight className="w-4 h-4" />
+              <Store className="w-4 h-4 shrink-0" />
+              <span>Acessar Painel do Estabelecimento</span>
+              <ArrowRight className="w-4 h-4 shrink-0" />
             </Link>
 
             <Link
               href="/admin"
-              className="w-full sm:w-auto px-7 py-3.5 rounded-xl bg-neutral-900 hover:bg-neutral-800 text-white font-semibold text-xs border border-neutral-800 transition-all flex items-center justify-center gap-2"
+              className="w-full sm:w-auto px-6 py-3.5 rounded-xl bg-white hover:bg-neutral-50 text-neutral-800 font-semibold text-xs border border-neutral-200 shadow-xs transition-all flex items-center justify-center gap-2"
             >
-              <ShieldCheck className="w-4 h-4 text-emerald-400" />
-              <span>Acesso do Administrador</span>
+              <ShieldCheck className="w-4 h-4 text-violet-600 shrink-0" />
+              <span>Painel Administrativo Master</span>
             </Link>
           </div>
         </div>
       </section>
 
       {/* Benefits Overview */}
-      <section className="py-16 px-4 sm:px-8 max-w-5xl mx-auto w-full space-y-12">
-        <div className="text-center space-y-1.5">
-          <span className="text-[11px] font-bold text-amber-400 uppercase tracking-widest block">
-            Vantagens da Solução
+      <section className="py-12 sm:py-16 px-3.5 sm:px-8 max-w-5xl mx-auto w-full max-w-full space-y-10 sm:space-y-12 overflow-x-hidden">
+        <div className="text-center space-y-2 px-1">
+          <span className="text-[10px] sm:text-[11px] font-bold text-violet-600 uppercase tracking-widest block">
+            Diferenciais DiretoLink
           </span>
-          <h2 className="text-2xl font-bold text-white tracking-tight">
-            Como o NFC Fideliza Impulsiona Estabelecimentos
+          <h2 className="text-xl sm:text-2xl md:text-3xl font-bold text-neutral-900 tracking-tight break-words">
+            Tecnologia de aproximação que gera resultados reais
           </h2>
-          <p className="text-xs text-neutral-400 max-w-xl mx-auto">
-            Projetado para cafeterias, barbearias, pizzarias, restaurantes e clínicas que buscam fidelizar clientes de forma simples e moderna.
+          <p className="text-xs sm:text-sm text-neutral-500 max-w-xl mx-auto break-words">
+            Projetada para cafeterias, barbearias, restaurantes, consultórios e varejo local que buscam conexões diretas e recorrentes com seus clientes.
           </p>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          <div className="p-6 rounded-2xl bg-neutral-900/60 border border-neutral-800/80 space-y-3">
-            <div className="w-10 h-10 rounded-xl bg-amber-500/10 text-amber-400 flex items-center justify-center border border-amber-500/20">
-              <Smartphone className="w-5 h-5" />
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 sm:gap-6 w-full max-w-full">
+          <div className="p-5 sm:p-6 rounded-2xl bg-white border border-neutral-200/80 shadow-xs space-y-2.5 break-words">
+            <div className="w-9 h-9 rounded-xl bg-violet-50 text-violet-600 flex items-center justify-center border border-violet-100">
+              <Smartphone className="w-4 h-4 sm:w-5 sm:h-5" />
             </div>
-            <h3 className="font-bold text-white text-sm">Sem Aplicativos para Baixar</h3>
-            <p className="text-xs text-neutral-400 leading-relaxed">
-              O cliente apenas aproxima o smartphone ou escaneia o QR Code na mesa/balcão para abrir a página oficial permanente da empresa.
+            <h3 className="font-bold text-neutral-900 text-sm">Sem Aplicativos para Baixar</h3>
+            <p className="text-xs text-neutral-600 leading-relaxed">
+              O cliente apenas aproxima o smartphone na placa ou escaneia o QR Code no balcão para abrir instantaneamente a página oficial da empresa.
             </p>
           </div>
 
-          <div className="p-6 rounded-2xl bg-neutral-900/60 border border-neutral-800/80 space-y-3">
-            <div className="w-10 h-10 rounded-xl bg-emerald-500/10 text-emerald-400 flex items-center justify-center border border-emerald-500/20">
-              <Gift className="w-5 h-5" />
+          <div className="p-5 sm:p-6 rounded-2xl bg-white border border-neutral-200/80 shadow-xs space-y-2.5 break-words">
+            <div className="w-9 h-9 rounded-xl bg-violet-50 text-violet-600 flex items-center justify-center border border-violet-100">
+              <Gift className="w-4 h-4 sm:w-5 sm:h-5" />
             </div>
-            <h3 className="font-bold text-white text-sm">Cartão Fidelidade por WhatsApp</h3>
-            <p className="text-xs text-neutral-400 leading-relaxed">
-              Cadastro único e ágil por WhatsApp. Pontuações acumuladas de forma segura com validação direta do estabelecimento.
+            <h3 className="font-bold text-neutral-900 text-sm">Cartão Fidelidade Digital</h3>
+            <p className="text-xs text-neutral-600 leading-relaxed">
+              Cadastro ágil via WhatsApp. Pontuação com validação antifraude diretamente pela equipe de caixa, sem atrito ou cartões de papel perdidos.
             </p>
           </div>
 
-          <div className="p-6 rounded-2xl bg-neutral-900/60 border border-neutral-800/80 space-y-3">
-            <div className="w-10 h-10 rounded-xl bg-blue-500/10 text-blue-400 flex items-center justify-center border border-blue-500/20">
-              <Award className="w-5 h-5" />
+          <div className="p-5 sm:p-6 rounded-2xl bg-white border border-neutral-200/80 shadow-xs space-y-2.5 break-words">
+            <div className="w-9 h-9 rounded-xl bg-violet-50 text-violet-600 flex items-center justify-center border border-violet-100">
+              <Award className="w-4 h-4 sm:w-5 sm:h-5" />
             </div>
-            <h3 className="font-bold text-white text-sm">Avaliações e Presença Local</h3>
-            <p className="text-xs text-neutral-400 leading-relaxed">
-              Incentivo direto para o cliente avaliar 5 estrelas no Google, conectar ao Wi-Fi sem digitar senhas e compartilhar pelo WhatsApp.
+            <h3 className="font-bold text-neutral-900 text-sm">Avaliações 5 Estrelas no Google</h3>
+            <p className="text-xs text-neutral-600 leading-relaxed">
+              Direcione clientes satisfeitos diretamente para a tela de avaliação do Google, conecte ao Wi-Fi em 1 clique e canalize feedbacks privados.
             </p>
           </div>
         </div>
 
         {/* Portais de Acesso */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-5 pt-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6 pt-2 w-full max-w-full">
           {/* Card 1: Proprietário */}
-          <div className="p-6 rounded-2xl bg-gradient-to-b from-neutral-900 to-neutral-950 border border-neutral-800 space-y-4 flex flex-col justify-between">
-            <div className="space-y-2.5">
-              <div className="w-10 h-10 rounded-xl bg-amber-500/10 text-amber-400 flex items-center justify-center border border-amber-500/20">
-                <Store className="w-5 h-5" />
+          <div className="p-5 sm:p-8 rounded-3xl bg-neutral-50 border border-neutral-200/80 space-y-4 sm:space-y-5 flex flex-col justify-between break-words">
+            <div className="space-y-2.5 sm:space-y-3">
+              <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-white text-violet-600 flex items-center justify-center border border-neutral-200 shadow-xs">
+                <Store className="w-4 h-4 sm:w-5 sm:h-5" />
               </div>
-              <h3 className="text-base font-bold text-white">Portal do Proprietário</h3>
-              <p className="text-xs text-neutral-400 leading-relaxed">
-                Área exclusiva para lojistas e gestores de cada estabelecimento comercial. Acesse com seu usuário e senha para gerenciar seus clientes, validar pontos e acompanhar feedbacks.
+              <h3 className="text-base sm:text-lg font-bold text-neutral-900">Portal do Estabelecimento</h3>
+              <p className="text-xs text-neutral-600 leading-relaxed">
+                Área exclusiva para lojistas e gestores de cada estabelecimento. Acesse com seu usuário e senha para gerenciar clientes, aprovar pontos de fidelidade, responder feedbacks e atualizar horários.
               </p>
             </div>
             <Link
               href="/painel"
-              className="py-2.5 px-4 rounded-xl bg-amber-400 hover:bg-amber-300 text-neutral-950 font-bold text-xs text-center transition-all flex items-center justify-center gap-1.5"
+              className="py-3 px-5 rounded-xl bg-violet-600 hover:bg-violet-700 text-white font-semibold text-xs text-center transition-all shadow-xs flex items-center justify-center gap-2"
             >
-              <span>Entrar como Proprietário</span>
-              <ArrowRight className="w-3.5 h-3.5" />
+              <span>Entrar no Painel do Estabelecimento</span>
+              <ArrowRight className="w-4 h-4 shrink-0" />
             </Link>
           </div>
 
           {/* Card 2: Administrador */}
-          <div className="p-6 rounded-2xl bg-gradient-to-b from-neutral-900 to-neutral-950 border border-neutral-800 space-y-4 flex flex-col justify-between">
-            <div className="space-y-2.5">
-              <div className="w-10 h-10 rounded-xl bg-emerald-500/10 text-emerald-400 flex items-center justify-center border border-emerald-500/20">
-                <ShieldCheck className="w-5 h-5" />
+          <div className="p-5 sm:p-8 rounded-3xl bg-neutral-50 border border-neutral-200/80 space-y-4 sm:space-y-5 flex flex-col justify-between break-words">
+            <div className="space-y-2.5 sm:space-y-3">
+              <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-white text-neutral-800 flex items-center justify-center border border-neutral-200 shadow-xs">
+                <ShieldCheck className="w-4 h-4 sm:w-5 sm:h-5" />
               </div>
-              <h3 className="text-base font-bold text-white">Administrador Geral</h3>
-              <p className="text-xs text-neutral-400 leading-relaxed">
-                Área central da gerência da plataforma para cadastrar novos estabelecimentos, definir módulos, criar credenciais dos proprietários e acompanhar a atividade global.
+              <h3 className="text-base sm:text-lg font-bold text-neutral-900">Painel Administrativo Master</h3>
+              <p className="text-xs text-neutral-600 leading-relaxed">
+                Área central da gerência da DiretoLink para cadastrar novos estabelecimentos, definir módulos, configurar acessos de proprietários e monitorar a métrica global da plataforma.
               </p>
             </div>
             <Link
               href="/admin"
-              className="py-2.5 px-4 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-neutral-950 font-bold text-xs text-center transition-all flex items-center justify-center gap-1.5"
+              className="py-3 px-5 rounded-xl bg-neutral-900 hover:bg-neutral-800 text-white font-semibold text-xs text-center transition-all shadow-xs flex items-center justify-center gap-2"
             >
-              <span>Entrar como Administrador</span>
-              <ArrowRight className="w-3.5 h-3.5" />
+              <span>Entrar no Painel Administrativo</span>
+              <ArrowRight className="w-4 h-4 shrink-0" />
             </Link>
           </div>
         </div>
       </section>
 
       {/* Footer */}
-      <footer className="mt-auto border-t border-neutral-800/80 py-8 px-4 text-center text-xs text-neutral-500">
-        <div className="max-w-6xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-4">
-          <p>© {new Date().getFullYear()} NFC Fideliza · Plataforma Multiempresa de Placas Inteligentes.</p>
-          <div className="flex items-center gap-5">
-            <Link href="/painel" className="hover:text-neutral-300 transition-colors">
-              Portal do Proprietário
+      <footer className="mt-auto border-t border-neutral-200/80 py-6 sm:py-8 px-3.5 sm:px-4 text-center text-xs text-neutral-500 bg-white w-full max-w-full overflow-x-hidden">
+        <div className="w-full max-w-6xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-3 sm:gap-4">
+          <div className="flex items-center gap-2">
+            <div className="w-5 h-5 rounded-md bg-violet-600 flex items-center justify-center text-white text-[10px] shrink-0">
+              <Radio className="w-3 h-3" />
+            </div>
+            <span className="font-semibold text-neutral-800">DiretoLink</span>
+            <span className="text-neutral-400">· Aproxime. Conecte. Pronto.</span>
+          </div>
+          <div className="flex items-center gap-4 sm:gap-5 text-[11px] sm:text-xs">
+            <Link href="/painel" className="hover:text-neutral-900 transition-colors">
+              Portal do Estabelecimento
             </Link>
-            <Link href="/admin" className="hover:text-neutral-300 transition-colors">
+            <Link href="/admin" className="hover:text-neutral-900 transition-colors">
               Administrador Geral
             </Link>
           </div>

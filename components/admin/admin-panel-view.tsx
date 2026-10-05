@@ -28,13 +28,19 @@ import {
   Lock,
   ArrowLeft,
   Gift,
+  Award,
+  MessageSquare,
+  Radio,
+  Clock,
 } from 'lucide-react'
-import { Company, Customer, ActivityLog, GlobalStats } from '@/types/platform'
+import { Company, Customer, ActivityLog, GlobalStats, PointRequest, PrivateFeedback } from '@/types/platform'
 import {
   getAllCompanies,
   syncCompaniesFromServer,
   getGlobalPlatformStats,
   getAllActivityLogs,
+  getAllPointRequests,
+  getAllPrivateFeedbacks,
   toggleCompanyStatus,
   deleteCompany,
   deleteCompanyAsync,
@@ -51,6 +57,8 @@ type AdminTab = 'dashboard' | 'companies' | 'customers' | 'activity' | 'delete_c
 export const AdminPanelView: React.FC = () => {
   const [activeTab, setActiveTab] = useState<AdminTab>('dashboard')
   const [companies, setCompanies] = useState<Company[]>([])
+  const [requests, setRequests] = useState<PointRequest[]>([])
+  const [feedbacks, setFeedbacks] = useState<PrivateFeedback[]>([])
   const [stats, setStats] = useState<GlobalStats>({
     totalCompanies: 0,
     activeCompanies: 0,
@@ -70,9 +78,11 @@ export const AdminPanelView: React.FC = () => {
   })
 
   const loadData = () => {
-    setCompanies(getAllCompanies())
+    setCompanies(getAllCompanies() || [])
     setStats(getGlobalPlatformStats())
-    setLogs(getAllActivityLogs())
+    setLogs(getAllActivityLogs() || [])
+    setRequests(getAllPointRequests() || [])
+    setFeedbacks(getAllPrivateFeedbacks() || [])
   }
 
   useEffect(() => {
@@ -106,15 +116,19 @@ export const AdminPanelView: React.FC = () => {
   const handleToggleStatus = (id: string, name: string) => {
     toggleCompanyStatus(id)
     loadData()
-    notify(`Status de ${name} alterado com sucesso.`)
+    notify(`Status de ${name || 'empresa'} alterado com sucesso.`)
   }
 
   const handleDeleteCompany = async (id: string, name: string) => {
-    if (confirm(`Atenção: Tem certeza que deseja EXCLUIR a empresa "${name}"? Esta ação removerá a empresa e todos os seus registros de clientes e fidelidade do banco central permanentemente.`)) {
+    if (
+      confirm(
+        `Atenção: Tem certeza que deseja EXCLUIR a empresa "${name}"? Esta ação removerá a empresa e seus registros de clientes e fidelidade permanentemente.`
+      )
+    ) {
       const res = await deleteCompanyAsync(id)
       if (res) {
         loadData()
-        notify(`Empresa "${name}" excluída do sistema com sucesso.`)
+        notify(`Empresa "${name}" excluída com sucesso.`)
       }
     }
   }
@@ -132,7 +146,7 @@ export const AdminPanelView: React.FC = () => {
   const handleCopyNfcUrl = (slug: string, name: string) => {
     const url = `${window.location.origin}/empresa/${slug}`
     navigator.clipboard.writeText(url)
-    notify(`URL NFC de "${name}" copiada com sucesso!`)
+    notify(`URL pública de "${name}" copiada com sucesso!`)
   }
 
   const handleResetData = () => {
@@ -144,10 +158,16 @@ export const AdminPanelView: React.FC = () => {
   }
 
   const filteredCompanies = companies.filter((c) => {
+    if (!c) return false
     if (!searchFilter.trim()) return true
     const term = searchFilter.toLowerCase().trim()
-    return c.name.toLowerCase().includes(term) || c.slug.toLowerCase().includes(term)
+    const name = (c.name || '').toLowerCase()
+    const slug = (c.slug || '').toLowerCase()
+    return name.includes(term) || slug.includes(term)
   })
+
+  const pendingRequestsCount = requests.filter((r) => r && r.status === 'pending').length
+  const activeCompaniesCount = companies.filter((c) => c && c.isActive !== false).length
 
   if (!isAuthenticated) {
     return (
@@ -162,96 +182,119 @@ export const AdminPanelView: React.FC = () => {
   }
 
   return (
-    <div className="min-h-screen bg-neutral-100 flex flex-col selection:bg-neutral-900 selection:text-white">
-      {/* Toast */}
+    <div className="min-h-screen bg-neutral-50/70 flex flex-col selection:bg-violet-100 selection:text-violet-900 font-sans text-neutral-900 w-full max-w-full overflow-x-hidden">
+      {/* Toast Notification */}
       {toastText && (
-        <div className="fixed top-4 right-4 z-50">
-          <div className="bg-neutral-900 text-white text-xs font-semibold px-4 py-2.5 rounded-2xl shadow-xl border border-neutral-700 flex items-center gap-2">
-            <CheckCircle2 className="w-4 h-4 text-emerald-400" />
+        <div className="fixed top-4 right-4 z-50 animate-fade-in">
+          <div className="bg-neutral-900 text-white text-xs font-semibold px-4 py-2.5 rounded-2xl shadow-xl border border-neutral-800 flex items-center gap-2">
+            <CheckCircle2 className="w-4 h-4 text-violet-400" />
             <span>{toastText}</span>
           </div>
         </div>
       )}
 
-      {/* Top Bar Contract (1-row 3-zones) */}
-      <header className="bg-white border-b border-neutral-200/80 px-4 sm:px-6 py-3.5 sticky top-0 z-30">
-        <div className="max-w-7xl mx-auto flex items-center justify-between">
-          {/* Zone 1: Back to home + Brand title */}
+      {/* Top Header Bar */}
+      <header className="bg-white border-b border-neutral-200/80 px-4 sm:px-6 py-3.5 sticky top-0 z-30 shadow-xs">
+        <div className="max-w-7xl mx-auto flex items-center justify-between gap-4">
+          {/* Zone 1: DiretoLink Logo & Subtitle */}
           <div className="flex items-center gap-3">
             <Link
               href="/"
-              className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-xl bg-neutral-100 hover:bg-neutral-200 text-neutral-700 text-xs font-semibold transition-colors shrink-0"
-              title="Voltar à página inicial"
+              className="inline-flex items-center justify-center w-8 h-8 rounded-xl bg-neutral-100 hover:bg-neutral-200 text-neutral-600 hover:text-neutral-900 text-xs font-semibold transition-colors shrink-0"
+              title="Voltar ao site"
             >
-              <ArrowLeft className="w-3.5 h-3.5" />
-              <span className="hidden sm:inline">← Voltar</span>
+              <ArrowLeft className="w-4 h-4" />
             </Link>
 
-            <Link href="/admin" className="text-base font-bold tracking-tight text-neutral-900 flex items-center gap-2">
-              <span className="w-2.5 h-2.5 rounded-full bg-emerald-500" />
-              <span>NFC Fideliza Admin</span>
+            <Link href="/admin" className="flex items-center gap-2.5">
+              <div className="w-8 h-8 rounded-xl bg-violet-600 flex items-center justify-center text-white shadow-xs">
+                <Radio className="w-4 h-4 stroke-[2.5]" />
+              </div>
+              <div className="flex flex-col">
+                <span className="text-sm font-bold tracking-tight text-neutral-900 leading-tight">
+                  DiretoLink
+                </span>
+                <span className="text-[10px] text-neutral-500 font-medium">
+                  Painel Administrativo
+                </span>
+              </div>
             </Link>
           </div>
 
-          {/* Zone 2: Nav links */}
-          <nav className="hidden md:flex items-center gap-6 text-xs font-semibold text-neutral-600">
+          {/* Zone 2: Navigation Areas */}
+          <nav className="hidden lg:flex items-center gap-1 bg-neutral-100/80 p-1 rounded-2xl border border-neutral-200/70 text-xs font-medium text-neutral-600">
             <button
               onClick={() => setActiveTab('dashboard')}
-              className={`hover:text-neutral-900 transition-colors ${activeTab === 'dashboard' ? 'text-neutral-900 underline underline-offset-8 font-bold' : ''}`}
+              className={`px-3 py-1.5 rounded-xl transition-all ${
+                activeTab === 'dashboard'
+                  ? 'bg-white text-neutral-900 font-semibold shadow-xs'
+                  : 'hover:text-neutral-900'
+              }`}
             >
-              Dashboard
+              Visão Geral
             </button>
             <button
               onClick={() => setActiveTab('companies')}
-              className={`hover:text-neutral-900 transition-colors ${activeTab === 'companies' ? 'text-neutral-900 underline underline-offset-8 font-bold' : ''}`}
+              className={`px-3 py-1.5 rounded-xl transition-all ${
+                activeTab === 'companies'
+                  ? 'bg-white text-neutral-900 font-semibold shadow-xs'
+                  : 'hover:text-neutral-900'
+              }`}
             >
               Empresas ({companies.length})
             </button>
             <button
+              onClick={handleOpenCreate}
+              className="px-3 py-1.5 rounded-xl hover:text-violet-700 hover:bg-white/60 transition-all flex items-center gap-1 text-violet-600 font-semibold"
+            >
+              <Plus className="w-3.5 h-3.5 stroke-[2.5]" />
+              <span>Criar Empresa</span>
+            </button>
+            <button
               onClick={() => setActiveTab('customers')}
-              className={`hover:text-neutral-900 transition-colors ${activeTab === 'customers' ? 'text-neutral-900 underline underline-offset-8 font-bold' : ''}`}
+              className={`px-3 py-1.5 rounded-xl transition-all ${
+                activeTab === 'customers'
+                  ? 'bg-white text-neutral-900 font-semibold shadow-xs'
+                  : 'hover:text-neutral-900'
+              }`}
             >
               Clientes ({stats.totalCustomers})
             </button>
             <button
               onClick={() => setActiveTab('activity')}
-              className={`hover:text-neutral-900 transition-colors ${activeTab === 'activity' ? 'text-neutral-900 underline underline-offset-8 font-bold' : ''}`}
+              className={`px-3 py-1.5 rounded-xl transition-all ${
+                activeTab === 'activity'
+                  ? 'bg-white text-neutral-900 font-semibold shadow-xs'
+                  : 'hover:text-neutral-900'
+              }`}
             >
-              Atividade Global
-            </button>
-            <button
-              onClick={() => setActiveTab('delete_company')}
-              className={`hover:text-red-600 transition-colors flex items-center gap-1.5 ${activeTab === 'delete_company' ? 'text-red-600 underline underline-offset-8 font-bold' : 'text-neutral-600'}`}
-            >
-              <Trash2 className="w-3.5 h-3.5 text-red-500" />
-              <span>Excluir Empresa</span>
+              Atividades ({logs.length})
             </button>
             <button
               onClick={() => setActiveTab('settings')}
-              className={`hover:text-neutral-900 transition-colors ${activeTab === 'settings' ? 'text-neutral-900 underline underline-offset-8 font-bold' : ''}`}
+              className={`px-3 py-1.5 rounded-xl transition-all ${
+                activeTab === 'settings'
+                  ? 'bg-white text-neutral-900 font-semibold shadow-xs'
+                  : 'hover:text-neutral-900'
+              }`}
             >
               Configurações
             </button>
           </nav>
 
-          {/* Zone 3: Primary Action & Logout */}
+          {/* Zone 3: Actions & Logout */}
           <div className="flex items-center gap-2">
-            <div className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-emerald-50 text-emerald-800 text-xs font-semibold border border-emerald-200">
-              <ShieldCheck className="w-3.5 h-3.5 text-emerald-600" />
-              <span>Admin Geral</span>
-            </div>
-
             <button
               onClick={handleOpenCreate}
-              className="px-3.5 py-2 rounded-xl bg-neutral-900 hover:bg-neutral-800 text-white font-semibold text-xs shadow-sm transition-all flex items-center gap-1.5 whitespace-nowrap"
+              className="px-3.5 py-2 rounded-xl bg-violet-600 hover:bg-violet-700 text-white font-semibold text-xs shadow-xs transition-all flex items-center gap-1.5 whitespace-nowrap"
             >
               <Plus className="w-3.5 h-3.5 stroke-[2.5]" />
-              <span>+ Nova Empresa</span>
+              <span>Nova Empresa</span>
             </button>
 
             <button
               onClick={handleLogout}
-              className="px-3 py-2 rounded-xl bg-neutral-100 hover:bg-red-50 hover:text-red-700 text-neutral-600 font-semibold text-xs transition-all flex items-center gap-1.5 border border-neutral-200"
+              className="px-3 py-2 rounded-xl bg-white hover:bg-red-50 hover:text-red-700 text-neutral-600 font-medium text-xs transition-all flex items-center gap-1.5 border border-neutral-200 shadow-xs"
               title="Sair do painel administrativo"
             >
               <LogOut className="w-3.5 h-3.5" />
@@ -260,230 +303,309 @@ export const AdminPanelView: React.FC = () => {
           </div>
         </div>
 
-        {/* Mobile secondary tab strip */}
-        <div className="flex md:hidden items-center gap-1 overflow-x-auto pt-3 border-t border-neutral-100 mt-2">
-          {[
-            { id: 'dashboard', label: 'Dashboard' },
-            { id: 'companies', label: `Empresas (${companies.length})` },
-            { id: 'customers', label: `Clientes (${stats.totalCustomers})` },
-            { id: 'activity', label: 'Atividade' },
-            { id: 'delete_company', label: 'Excluir Empresa' },
-            { id: 'settings', label: 'Configurações' },
-          ].map((t) => (
-            <button
-              key={t.id}
-              onClick={() => setActiveTab(t.id as AdminTab)}
-              className={`px-3 py-1.5 rounded-lg text-xs font-semibold whitespace-nowrap transition-colors ${
-                activeTab === t.id ? 'bg-neutral-900 text-white' : 'text-neutral-600 hover:bg-neutral-100'
-              }`}
-            >
-              {t.label}
-            </button>
-          ))}
+        {/* Mobile Sub-Navigation Bar */}
+        <div className="lg:hidden flex items-center gap-1 overflow-x-auto pt-2.5 max-w-7xl mx-auto border-t border-neutral-100 mt-2 text-xs">
+          <button
+            onClick={() => setActiveTab('dashboard')}
+            className={`px-2.5 py-1 rounded-lg shrink-0 ${
+              activeTab === 'dashboard' ? 'bg-violet-600 text-white font-medium' : 'text-neutral-600'
+            }`}
+          >
+            Visão Geral
+          </button>
+          <button
+            onClick={() => setActiveTab('companies')}
+            className={`px-2.5 py-1 rounded-lg shrink-0 ${
+              activeTab === 'companies' ? 'bg-violet-600 text-white font-medium' : 'text-neutral-600'
+            }`}
+          >
+            Empresas ({companies.length})
+          </button>
+          <button
+            onClick={handleOpenCreate}
+            className="px-2.5 py-1 rounded-lg shrink-0 text-violet-700 font-medium bg-violet-50"
+          >
+            + Criar
+          </button>
+          <button
+            onClick={() => setActiveTab('customers')}
+            className={`px-2.5 py-1 rounded-lg shrink-0 ${
+              activeTab === 'customers' ? 'bg-violet-600 text-white font-medium' : 'text-neutral-600'
+            }`}
+          >
+            Clientes
+          </button>
+          <button
+            onClick={() => setActiveTab('activity')}
+            className={`px-2.5 py-1 rounded-lg shrink-0 ${
+              activeTab === 'activity' ? 'bg-violet-600 text-white font-medium' : 'text-neutral-600'
+            }`}
+          >
+            Atividades
+          </button>
+          <button
+            onClick={() => setActiveTab('settings')}
+            className={`px-2.5 py-1 rounded-lg shrink-0 ${
+              activeTab === 'settings' ? 'bg-violet-600 text-white font-medium' : 'text-neutral-600'
+            }`}
+          >
+            Configurações
+          </button>
         </div>
       </header>
 
       {/* Main Container */}
       <main className="max-w-7xl w-full mx-auto p-4 sm:p-6 flex-1 space-y-6">
         {/* ============================================== */}
-        {/* 1. DASHBOARD */}
+        {/* 1. VISÃO GERAL (DASHBOARD) */}
         {/* ============================================== */}
         {activeTab === 'dashboard' && (
           <div className="space-y-6">
-            {/* Top Metric Cards */}
+            {/* Top Metric Cards - Professional SaaS Layout */}
             <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 sm:gap-4">
-              <div className="bg-white p-4 rounded-2xl border border-neutral-200/80 shadow-sm">
-                <span className="text-[11px] text-neutral-500 font-medium">Total de Empresas</span>
-                <p className="text-2xl font-bold text-neutral-900 font-mono mt-1">{stats.totalCompanies}</p>
+              {/* 1. Total de Empresas */}
+              <div className="bg-white p-4 rounded-2xl border border-neutral-200/80 shadow-xs space-y-1">
+                <div className="flex items-center justify-between text-neutral-500">
+                  <span className="text-[11px] font-medium">Total de Empresas</span>
+                  <Building2 className="w-3.5 h-3.5 text-violet-600" />
+                </div>
+                <p className="text-2xl font-bold text-neutral-900 font-mono">{companies.length}</p>
+                <span className="text-[10px] text-neutral-400">Cadastradas no sistema</span>
               </div>
 
-              <div className="bg-white p-4 rounded-2xl border border-neutral-200/80 shadow-sm">
-                <span className="text-[11px] text-neutral-500 font-medium">Empresas Ativas</span>
-                <p className="text-2xl font-bold text-emerald-600 font-mono mt-1">{stats.activeCompanies}</p>
+              {/* 2. Empresas Ativas */}
+              <div className="bg-white p-4 rounded-2xl border border-neutral-200/80 shadow-xs space-y-1">
+                <div className="flex items-center justify-between text-neutral-500">
+                  <span className="text-[11px] font-medium">Empresas Ativas</span>
+                  <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
+                </div>
+                <p className="text-2xl font-bold text-emerald-600 font-mono">{activeCompaniesCount}</p>
+                <span className="text-[10px] text-emerald-600 font-medium">Placas operando</span>
               </div>
 
-              <div className="bg-white p-4 rounded-2xl border border-neutral-200/80 shadow-sm">
-                <span className="text-[11px] text-neutral-500 font-medium">Total de Clientes</span>
-                <p className="text-2xl font-bold text-neutral-900 font-mono mt-1">{stats.totalCustomers}</p>
+              {/* 3. Clientes Cadastrados */}
+              <div className="bg-white p-4 rounded-2xl border border-neutral-200/80 shadow-xs space-y-1">
+                <div className="flex items-center justify-between text-neutral-500">
+                  <span className="text-[11px] font-medium">Clientes Cadastrados</span>
+                  <Users className="w-3.5 h-3.5 text-blue-600" />
+                </div>
+                <p className="text-2xl font-bold text-neutral-900 font-mono">{stats.totalCustomers}</p>
+                <span className="text-[10px] text-neutral-400">Base total de fidelidade</span>
               </div>
 
-              <div className="bg-white p-4 rounded-2xl border border-neutral-200/80 shadow-sm">
-                <span className="text-[11px] text-neutral-500 font-medium">Total de Pontos</span>
-                <p className="text-2xl font-bold text-amber-600 font-mono mt-1">{stats.totalPointsDistributed}</p>
+              {/* 4. Solicitações de Pontos */}
+              <div className="bg-white p-4 rounded-2xl border border-neutral-200/80 shadow-xs space-y-1">
+                <div className="flex items-center justify-between text-neutral-500">
+                  <span className="text-[11px] font-medium">Solicitações de Pontos</span>
+                  <Award className="w-3.5 h-3.5 text-amber-600" />
+                </div>
+                <p className="text-2xl font-bold text-neutral-900 font-mono">{requests.length}</p>
+                <span className={`text-[10px] font-medium ${pendingRequestsCount > 0 ? 'text-amber-600' : 'text-neutral-400'}`}>
+                  {pendingRequestsCount} aguardando caixa
+                </span>
               </div>
 
-              <div className="bg-white p-4 rounded-2xl border border-neutral-200/80 shadow-sm">
-                <span className="text-[11px] text-neutral-500 font-medium">Recompensas Liberadas</span>
-                <p className="text-2xl font-bold text-emerald-600 font-mono mt-1">{stats.totalRewardsEarned}</p>
+              {/* 5. Feedbacks */}
+              <div className="bg-white p-4 rounded-2xl border border-neutral-200/80 shadow-xs space-y-1">
+                <div className="flex items-center justify-between text-neutral-500">
+                  <span className="text-[11px] font-medium">Feedbacks</span>
+                  <MessageSquare className="w-3.5 h-3.5 text-violet-600" />
+                </div>
+                <p className="text-2xl font-bold text-neutral-900 font-mono">{feedbacks.length}</p>
+                <span className="text-[10px] text-neutral-400">Avaliações privadas</span>
               </div>
 
-              <div className="bg-white p-4 rounded-2xl border border-neutral-200/80 shadow-sm">
-                <span className="text-[11px] text-neutral-500 font-medium">Recompensas Resgatadas</span>
-                <p className="text-2xl font-bold text-purple-600 font-mono mt-1">{stats.totalRewardsRedeemed}</p>
+              {/* 6. Atividades Recentes */}
+              <div className="bg-white p-4 rounded-2xl border border-neutral-200/80 shadow-xs space-y-1">
+                <div className="flex items-center justify-between text-neutral-500">
+                  <span className="text-[11px] font-medium">Atividades</span>
+                  <Activity className="w-3.5 h-3.5 text-neutral-600" />
+                </div>
+                <p className="text-2xl font-bold text-neutral-900 font-mono">{logs.length}</p>
+                <span className="text-[10px] text-neutral-400">Registros em auditoria</span>
               </div>
             </div>
 
-            {/* Quick Companies Grid Showcase */}
-            <div className="bg-white p-6 rounded-3xl border border-neutral-200/80 shadow-sm space-y-4">
-              <div>
-                <h2 className="text-base font-bold text-neutral-900">
-                  Estabelecimentos Cadastrados na Plataforma
-                </h2>
-                <p className="text-xs text-neutral-500">
-                  Cada estabelecimento possui uma URL pública permanente programada no chip NFC.
-                </p>
+            {/* Quick Companies Showcase */}
+            <div className="bg-white p-6 rounded-3xl border border-neutral-200/80 shadow-xs space-y-4">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                <div>
+                  <h2 className="text-base font-bold text-neutral-900">
+                    Estabelecimentos Conectados na DiretoLink
+                  </h2>
+                  <p className="text-xs text-neutral-500">
+                    Cada estabelecimento possui uma URL pública permanente programada em suas placas inteligentes NFC.
+                  </p>
+                </div>
+                <button
+                  onClick={handleOpenCreate}
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-violet-50 text-violet-700 hover:bg-violet-100 font-semibold text-xs border border-violet-100 transition-colors w-fit"
+                >
+                  <Plus className="w-3.5 h-3.5 stroke-[2.5]" />
+                  <span>Cadastrar Empresa</span>
+                </button>
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4 pt-2">
-                {companies.map((comp) => (
-                  <div
-                    key={comp.id}
-                    className="p-4 rounded-2xl border border-neutral-200 bg-neutral-50/50 hover:bg-white hover:shadow-md transition-all space-y-3"
-                  >
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-2.5 min-w-0">
-                        <div
-                          className="w-8 h-8 rounded-xl flex items-center justify-center text-white font-bold text-xs shrink-0 shadow-sm"
-                          style={{ backgroundColor: comp.primaryColor }}
-                        >
-                          {comp.name.slice(0, 2).toUpperCase()}
+                {companies.map((comp) => {
+                  if (!comp) return null
+                  const compName = comp.name || 'Estabelecimento'
+                  const compSlug = comp.slug || comp.id
+                  const primaryColor = comp.primaryColor || '#6D28D9'
+                  const isActive = comp.isActive !== false
+
+                  return (
+                    <div
+                      key={comp.id}
+                      className="p-4 rounded-2xl border border-neutral-200 bg-neutral-50/40 hover:bg-white hover:shadow-xs transition-all space-y-3"
+                    >
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2.5 min-w-0">
+                          <div
+                            className="w-9 h-9 rounded-xl flex items-center justify-center text-white font-bold text-xs shrink-0 shadow-xs overflow-hidden"
+                            style={{ backgroundColor: primaryColor }}
+                          >
+                            {comp.logoUrl ? (
+                              // eslint-disable-next-line @next/next/no-img-element
+                              <img src={comp.logoUrl} alt={compName} className="w-full h-full object-cover" />
+                            ) : (
+                              compName.slice(0, 2).toUpperCase()
+                            )}
+                          </div>
+                          <div className="min-w-0">
+                            <h3 className="font-bold text-neutral-900 text-sm truncate">
+                              {compName}
+                            </h3>
+                            <span className="text-[11px] text-neutral-400 font-mono block truncate">
+                              /empresa/{compSlug}
+                            </span>
+                          </div>
                         </div>
-                        <div className="min-w-0">
-                          <h3 className="font-bold text-neutral-900 text-sm truncate">
-                            {comp.name}
-                          </h3>
-                          <span className="text-[11px] text-neutral-400 font-mono block truncate">
-                            /empresa/{comp.slug}
+
+                        <button
+                          onClick={() => handleToggleStatus(comp.id, compName)}
+                          className={`text-[10px] font-semibold px-2 py-0.5 rounded-full shrink-0 transition-colors ${
+                            isActive
+                              ? 'bg-emerald-50 text-emerald-700 border border-emerald-200 hover:bg-emerald-100'
+                              : 'bg-neutral-100 text-neutral-600 border border-neutral-200 hover:bg-neutral-200'
+                          }`}
+                          title="Clique para alternar entre Ativo e Pausado"
+                        >
+                          {isActive ? 'Ativo' : 'Pausado'}
+                        </button>
+                      </div>
+
+                      <div className="text-xs text-neutral-600 space-y-1 pt-1 border-t border-neutral-200/60">
+                        <div className="flex justify-between">
+                          <span className="text-neutral-400 text-[11px]">Campanha:</span>
+                          <span className="font-medium truncate max-w-[150px]">
+                            {comp.loyaltyProgram?.campaignName || 'Cartão Fidelidade'}
+                          </span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="text-neutral-400 text-[11px]">Meta de Pontos:</span>
+                          <span className="font-bold font-mono text-neutral-800">
+                            {comp.loyaltyProgram?.goalPoints ?? 10} pontos
                           </span>
                         </div>
                       </div>
 
-                      <button
-                        onClick={() => handleToggleStatus(comp.id, comp.name)}
-                        className={`text-[10px] font-bold px-2 py-0.5 rounded-full shrink-0 transition-colors ${
-                          comp.isActive ? 'bg-emerald-100 text-emerald-800 hover:bg-emerald-200' : 'bg-neutral-200 text-neutral-600 hover:bg-neutral-300'
-                        }`}
-                        title="Clique para alternar entre Ativo e Pausado"
-                      >
-                        {comp.isActive ? 'Ativo' : 'Pausado'}
-                      </button>
+                      {/* Action buttons */}
+                      <div className="space-y-1.5 pt-1 border-t border-neutral-200/60">
+                        <div className="grid grid-cols-2 gap-1.5">
+                          <button
+                            onClick={() => handleOpenEdit(comp)}
+                            className="py-1.5 px-2 text-center rounded-lg bg-white border border-neutral-200 hover:bg-neutral-50 text-neutral-800 text-[11px] font-medium transition-all flex items-center justify-center gap-1 shadow-xs"
+                            title="Editar dados"
+                          >
+                            <Edit className="w-3 h-3 text-neutral-500" />
+                            <span>Editar</span>
+                          </button>
+
+                          <Link
+                            href={`/empresa/${compSlug}`}
+                            target="_blank"
+                            className="py-1.5 px-2 text-center rounded-lg bg-white border border-neutral-200 hover:bg-neutral-50 text-neutral-800 text-[11px] font-medium transition-all flex items-center justify-center gap-1 shadow-xs"
+                            title="Ver página pública NFC"
+                          >
+                            <ExternalLink className="w-3 h-3 text-neutral-500" />
+                            <span>Página NFC</span>
+                          </Link>
+                        </div>
+
+                        <div className="grid grid-cols-2 gap-1.5">
+                          <button
+                            onClick={() => handleCopyNfcUrl(compSlug, compName)}
+                            className="py-1.5 px-2 text-center rounded-lg bg-white border border-neutral-200 hover:bg-neutral-50 text-neutral-800 text-[11px] font-medium transition-all flex items-center justify-center gap-1 shadow-xs"
+                            title="Copiar URL"
+                          >
+                            <Copy className="w-3 h-3 text-neutral-500" />
+                            <span>Copiar Link</span>
+                          </button>
+
+                          <Link
+                            href={`/painel/${compSlug}`}
+                            className="py-1.5 px-2 text-center rounded-lg bg-violet-600 hover:bg-violet-700 text-white text-[11px] font-semibold transition-all flex items-center justify-center gap-1 shadow-xs"
+                            title="Acessar painel do proprietário"
+                          >
+                            <Store className="w-3 h-3" />
+                            <span>Painel</span>
+                          </Link>
+                        </div>
+                      </div>
                     </div>
-
-                    <div className="text-xs text-neutral-600 space-y-1 pt-1 border-t border-neutral-200/60">
-                      <div className="flex justify-between">
-                        <span className="text-neutral-400 text-[11px]">Campanha:</span>
-                        <span className="font-medium truncate max-w-[150px]">
-                          {comp.loyaltyProgram?.campaignName || 'Cartão Fidelidade'}
-                        </span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span className="text-neutral-400 text-[11px]">Meta:</span>
-                        <span className="font-bold font-mono text-neutral-800">
-                          {comp.loyaltyProgram?.goalPoints ?? 10} pontos
-                        </span>
-                      </div>
-                    </div>
-
-                    {/* 5 required actions */}
-                    <div className="space-y-1.5 pt-1 border-t border-neutral-200/60">
-                      <div className="grid grid-cols-2 gap-1.5">
-                        <button
-                          onClick={() => handleOpenEdit(comp)}
-                          className="py-1.5 px-2 text-center rounded-lg bg-neutral-100 hover:bg-neutral-200 text-neutral-800 text-[11px] font-semibold transition-all flex items-center justify-center gap-1"
-                          title="Editar estabelecimento"
-                        >
-                          <Edit className="w-3 h-3 text-neutral-600" />
-                          <span>Editar</span>
-                        </button>
-
-                        <Link
-                          href={`/empresa/${comp.slug}`}
-                          target="_blank"
-                          className="py-1.5 px-2 text-center rounded-lg bg-neutral-100 hover:bg-neutral-200 text-neutral-800 text-[11px] font-semibold transition-all flex items-center justify-center gap-1"
-                          title="Ver página pública NFC"
-                        >
-                          <ExternalLink className="w-3 h-3 text-neutral-600" />
-                          <span>Página NFC</span>
-                        </Link>
-                      </div>
-
-                      <div className="grid grid-cols-2 gap-1.5">
-                        <button
-                          onClick={() => handleCopyNfcUrl(comp.slug, comp.name)}
-                          className="py-1.5 px-2 text-center rounded-lg bg-neutral-100 hover:bg-neutral-200 text-neutral-800 text-[11px] font-semibold transition-all flex items-center justify-center gap-1"
-                          title="Copiar URL permanente da placa NFC"
-                        >
-                          <Copy className="w-3 h-3 text-neutral-600" />
-                          <span>Copiar URL</span>
-                        </button>
-
-                        <button
-                          onClick={() => handleToggleStatus(comp.id, comp.name)}
-                          className={`py-1.5 px-2 text-center rounded-lg text-[11px] font-semibold transition-all flex items-center justify-center gap-1 ${
-                            comp.isActive ? 'bg-amber-50 hover:bg-amber-100 text-amber-900 border border-amber-200' : 'bg-emerald-50 hover:bg-emerald-100 text-emerald-900 border border-emerald-200'
-                          }`}
-                          title="Ativar ou pausar empresa"
-                        >
-                          <span>{comp.isActive ? 'Pausar' : 'Ativar'}</span>
-                        </button>
-                      </div>
-
-                      <Link
-                        href={`/painel/${comp.slug}`}
-                        className="w-full py-1.5 px-2 text-center rounded-lg bg-neutral-900 text-white text-[11px] font-semibold hover:bg-neutral-800 transition-all flex items-center justify-center gap-1.5"
-                        title="Acessar gestão de fidelidade e clientes da empresa"
-                      >
-                        <Gift className="w-3 h-3 text-amber-400" />
-                        <span>Gerenciar Fidelidade</span>
-                      </Link>
-                    </div>
-                  </div>
-                ))}
+                  )
+                })}
               </div>
             </div>
 
             {/* Recent Global Activity Feed */}
-            <div className="bg-white p-6 rounded-3xl border border-neutral-200/80 shadow-sm space-y-4">
+            <div className="bg-white p-6 rounded-3xl border border-neutral-200/80 shadow-xs space-y-4">
               <div className="flex items-center justify-between">
-                <h3 className="font-bold text-neutral-900 text-sm">
-                  Atividade Recente em Todas as Empresas
-                </h3>
-                <span className="text-xs text-neutral-400 font-mono">Auditoria multi-tenant</span>
+                <div>
+                  <h3 className="font-bold text-neutral-900 text-sm">
+                    Atividades Recentes na Plataforma
+                  </h3>
+                  <p className="text-xs text-neutral-500">
+                    Histórico de movimentações em tempo real dos cartões de fidelidade e resgates.
+                  </p>
+                </div>
+                <button
+                  onClick={() => setActiveTab('activity')}
+                  className="text-xs text-violet-700 font-semibold hover:underline"
+                >
+                  Ver todas as atividades →
+                </button>
               </div>
 
-              <div className="space-y-2 max-h-[300px] overflow-y-auto pr-1">
-                {logs.length === 0 ? (
-                  <p className="text-xs text-neutral-400 py-6 text-center">Nenhum evento registrado.</p>
-                ) : (
-                  logs.slice(0, 15).map((log) => {
-                    const comp = companies.find((c) => c.id === log.companyId)
-
-                    return (
-                      <div
-                        key={log.id}
-                        className="p-3 rounded-xl bg-neutral-50 border border-neutral-200/60 flex items-center justify-between text-xs gap-3"
-                      >
-                        <div className="min-w-0 space-y-0.5">
-                          <div className="flex items-center gap-2">
-                            <span className="font-bold text-neutral-900">{log.customerName}</span>
-                            <span className="text-[10px] text-neutral-400 font-mono">{formatPhone(log.customerPhone)}</span>
-                            {comp && (
-                              <span className="text-[10px] font-semibold px-2 py-0.5 rounded bg-neutral-200 text-neutral-700">
-                                {comp.name}
-                              </span>
-                            )}
-                          </div>
-                          <p className="text-neutral-600 text-[11px] truncate">{log.description}</p>
-                        </div>
-                        <div className="text-right shrink-0">
-                          <span className="text-[10px] text-neutral-400 font-mono block">
-                            {new Date(log.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                          </span>
-                          <span className="text-[10px] text-neutral-500 font-medium">{log.approvedBy}</span>
-                        </div>
+              <div className="space-y-2">
+                {logs.slice(0, 5).map((log) => (
+                  <div
+                    key={log.id}
+                    className="p-3 rounded-xl bg-neutral-50 border border-neutral-200/70 flex items-center justify-between text-xs"
+                  >
+                    <div className="flex items-center gap-3">
+                      <div className="w-8 h-8 rounded-lg bg-violet-50 text-violet-700 flex items-center justify-center font-bold text-xs shrink-0">
+                        <Clock className="w-4 h-4" />
                       </div>
-                    )
-                  })
+                      <div>
+                        <span className="font-semibold text-neutral-900">{log.customerName || 'Cliente'}</span>
+                        <p className="text-neutral-500 text-[11px]">{log.description || 'Movimentação'}</p>
+                      </div>
+                    </div>
+                    <div className="text-right">
+                      <span className="text-[10px] text-neutral-400 font-mono block">
+                        {log.timestamp ? new Date(log.timestamp).toLocaleString('pt-BR') : '-'}
+                      </span>
+                      <span className="text-[10px] text-neutral-500 font-medium">{log.approvedBy || 'Sistema'}</span>
+                    </div>
+                  </div>
+                ))}
+
+                {logs.length === 0 && (
+                  <div className="text-center py-8 text-neutral-400 text-xs">
+                    Nenhuma atividade registrada até o momento.
+                  </div>
                 )}
               </div>
             </div>
@@ -491,31 +613,39 @@ export const AdminPanelView: React.FC = () => {
         )}
 
         {/* ============================================== */}
-        {/* 2. EMPRESAS (TABELA COMPLETA) */}
+        {/* 2. TABELA DE EMPRESAS */}
         {/* ============================================== */}
         {activeTab === 'companies' && (
-          <div className="bg-white rounded-3xl border border-neutral-200/80 shadow-sm p-6 space-y-5">
+          <div className="bg-white rounded-3xl border border-neutral-200/80 shadow-xs p-6 space-y-4">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
               <div>
                 <h2 className="text-base font-bold text-neutral-900">
-                  Gerenciamento de Estabelecimentos
+                  Gerenciamento de Empresas
                 </h2>
                 <p className="text-xs text-neutral-500">
-                  Controle total sobre as empresas parceiras e suas páginas NFC.
+                  Lista completa dos estabelecimentos parceiros com acesso a links e credenciais.
                 </p>
               </div>
 
               <div className="flex items-center gap-3">
-                <div className="relative w-64">
+                <div className="relative w-full sm:w-64">
                   <Search className="w-4 h-4 text-neutral-400 absolute left-3 top-2.5" />
                   <input
                     type="text"
                     value={searchFilter}
                     onChange={(e) => setSearchFilter(e.target.value)}
                     placeholder="Filtrar por nome ou slug..."
-                    className="w-full pl-9 pr-3 py-2 rounded-xl border border-neutral-300 text-xs focus:outline-none focus:ring-2 focus:ring-neutral-900"
+                    className="w-full pl-9 pr-3 py-2 rounded-xl border border-neutral-300 text-xs focus:outline-none focus:ring-1 focus:ring-violet-600 bg-white"
                   />
                 </div>
+
+                <button
+                  onClick={handleOpenCreate}
+                  className="px-3.5 py-2 rounded-xl bg-violet-600 hover:bg-violet-700 text-white font-semibold text-xs shadow-xs transition-all flex items-center gap-1.5 shrink-0"
+                >
+                  <Plus className="w-3.5 h-3.5 stroke-[2.5]" />
+                  <span className="hidden sm:inline">Criar Empresa</span>
+                </button>
               </div>
             </div>
 
@@ -524,127 +654,131 @@ export const AdminPanelView: React.FC = () => {
                 <thead>
                   <tr className="border-b border-neutral-200 text-neutral-400 uppercase tracking-wider text-[10px]">
                     <th className="py-3 px-3">Empresa</th>
-                    <th className="py-3 px-3">URL Slug (NFC)</th>
+                    <th className="py-3 px-3">URL Pública (NFC)</th>
                     <th className="py-3 px-3">Login do Proprietário</th>
                     <th className="py-3 px-3">Fidelidade</th>
                     <th className="py-3 px-3">Status</th>
-                    <th className="py-3 px-3 text-right">Ações do Administrador</th>
+                    <th className="py-3 px-3 text-right">Ações</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-neutral-100">
-                  {filteredCompanies.map((c) => (
-                    <tr key={c.id} className="hover:bg-neutral-50/80 transition-colors">
-                      <td className="py-3 px-3">
-                        <div className="flex items-center gap-2.5">
-                          <div
-                            className="w-7 h-7 rounded-lg flex items-center justify-center text-white font-bold text-[10px] shrink-0 shadow-sm"
-                            style={{ backgroundColor: c.primaryColor }}
-                          >
-                            {c.name.slice(0, 2).toUpperCase()}
-                          </div>
-                          <div>
-                            <span className="font-bold text-neutral-900 block">{c.name}</span>
-                            <span className="text-[10px] text-neutral-400">{formatPhone(c.whatsapp)}</span>
-                          </div>
-                        </div>
-                      </td>
-                      <td className="py-3 px-3 font-mono text-neutral-600">
-                        <div className="flex items-center gap-1.5">
-                          <span className="text-neutral-700">/empresa/{c.slug}</span>
-                          <button
-                            onClick={() => handleCopyNfcUrl(c.slug, c.name)}
-                            className="p-1 rounded hover:bg-neutral-200 text-neutral-500 hover:text-neutral-800 transition-colors"
-                            title="Copiar URL NFC"
-                          >
-                            <Copy className="w-3 h-3" />
-                          </button>
-                        </div>
-                      </td>
-                      <td className="py-3 px-3">
-                        <div className="bg-amber-50/80 px-2.5 py-1.5 rounded-lg border border-amber-200/80 font-mono text-[11px] space-y-0.5 max-w-[200px]">
-                          <div className="text-amber-900 flex items-center gap-1">
-                            <span className="text-[9px] text-neutral-500 uppercase font-medium">User:</span>
-                            <span className="font-bold truncate">{c.ownerAuth?.username || c.slug}</span>
-                          </div>
-                          <div className="text-amber-900 flex items-center gap-1">
-                            <span className="text-[9px] text-neutral-500 uppercase font-medium">Senha:</span>
-                            <span className="font-semibold">{c.ownerAuth?.password || 'empresa123'}</span>
-                          </div>
-                        </div>
-                      </td>
-                      <td className="py-3 px-3 text-neutral-600">
-                        {c.loyaltyProgram?.isActive ? (
-                          <span>
-                            {c.loyaltyProgram?.goalPoints ?? 10} pts · {c.loyaltyProgram?.rewardDescription || 'Recompensa'}
-                          </span>
-                        ) : (
-                          <span className="text-neutral-400">Desativada</span>
-                        )}
-                      </td>
-                      <td className="py-3 px-3">
-                        <button
-                          onClick={() => handleToggleStatus(c.id, c.name)}
-                          className={`text-[10px] font-bold px-2.5 py-1 rounded-full transition-colors flex items-center gap-1 ${
-                            c.isActive
-                              ? 'bg-emerald-100 text-emerald-800 hover:bg-emerald-200'
-                              : 'bg-neutral-200 text-neutral-600 hover:bg-neutral-300'
-                          }`}
-                          title="Clique para pausar ou ativar"
-                        >
-                          <span className={`w-1.5 h-1.5 rounded-full ${c.isActive ? 'bg-emerald-500' : 'bg-neutral-500'}`} />
-                          <span>{c.isActive ? 'Ativo' : 'Pausado'}</span>
-                        </button>
-                      </td>
-                      <td className="py-3 px-3 text-right">
-                        <div className="flex items-center justify-end gap-1.5">
-                          <button
-                            onClick={() => handleOpenEdit(c)}
-                            className="px-2.5 py-1 rounded-lg bg-neutral-100 hover:bg-neutral-200 text-neutral-800 text-[11px] font-semibold transition-colors flex items-center gap-1"
-                            title="Editar dados da empresa, fotos ou credenciais"
-                          >
-                            <Edit className="w-3 h-3 text-neutral-600" />
-                            <span>Editar</span>
-                          </button>
+                  {filteredCompanies.map((c) => {
+                    if (!c) return null
+                    const compName = c.name || 'Sem Nome'
+                    const compSlug = c.slug || c.id
+                    const primaryColor = c.primaryColor || '#6D28D9'
+                    const isActive = c.isActive !== false
 
-                          <Link
-                            href={`/empresa/${c.slug}`}
-                            target="_blank"
-                            className="px-2.5 py-1 rounded-lg bg-neutral-100 hover:bg-neutral-200 text-neutral-800 text-[11px] font-semibold transition-colors flex items-center gap-1"
-                            title="Ver página pública aberta pelo chip NFC"
-                          >
-                            <ExternalLink className="w-3 h-3 text-neutral-600" />
-                            <span>Ver Página</span>
-                          </Link>
-
+                    return (
+                      <tr key={c.id} className="hover:bg-neutral-50/80 transition-colors">
+                        <td className="py-3 px-3">
+                          <div className="flex items-center gap-2.5">
+                            <div
+                              className="w-8 h-8 rounded-lg flex items-center justify-center text-white font-bold text-[10px] shrink-0 shadow-xs overflow-hidden"
+                              style={{ backgroundColor: primaryColor }}
+                            >
+                              {c.logoUrl ? (
+                                // eslint-disable-next-line @next/next/no-img-element
+                                <img src={c.logoUrl} alt={compName} className="w-full h-full object-cover" />
+                              ) : (
+                                compName.slice(0, 2).toUpperCase()
+                              )}
+                            </div>
+                            <div>
+                              <span className="font-bold text-neutral-900 block">{compName}</span>
+                              <span className="text-[10px] text-neutral-400">{formatPhone(c.whatsapp) || 'Sem telefone'}</span>
+                            </div>
+                          </div>
+                        </td>
+                        <td className="py-3 px-3 font-mono text-neutral-600">
+                          <div className="flex items-center gap-1.5">
+                            <span className="text-neutral-700">/empresa/{compSlug}</span>
+                            <button
+                              onClick={() => handleCopyNfcUrl(compSlug, compName)}
+                              className="p-1 rounded hover:bg-neutral-200 text-neutral-500 hover:text-neutral-800 transition-colors"
+                              title="Copiar URL NFC"
+                            >
+                              <Copy className="w-3 h-3" />
+                            </button>
+                          </div>
+                        </td>
+                        <td className="py-3 px-3">
+                          <div className="bg-neutral-100/70 px-2.5 py-1.5 rounded-lg border border-neutral-200 font-mono text-[11px] space-y-0.5 max-w-[200px]">
+                            <div className="text-neutral-800 flex items-center gap-1">
+                              <span className="text-[9px] text-neutral-400 uppercase font-medium">User:</span>
+                              <span className="font-bold truncate">{c.ownerAuth?.username || compSlug}</span>
+                            </div>
+                            <div className="text-neutral-800 flex items-center gap-1">
+                              <span className="text-[9px] text-neutral-400 uppercase font-medium">Senha:</span>
+                              <span className="font-semibold">{c.ownerAuth?.password || '••••••'}</span>
+                            </div>
+                          </div>
+                        </td>
+                        <td className="py-3 px-3 text-neutral-600">
+                          {c.loyaltyProgram?.isActive ? (
+                            <span>
+                              {c.loyaltyProgram?.goalPoints ?? 10} pts · {c.loyaltyProgram?.rewardDescription || 'Recompensa'}
+                            </span>
+                          ) : (
+                            <span className="text-neutral-400">Desativada</span>
+                          )}
+                        </td>
+                        <td className="py-3 px-3">
                           <button
-                            onClick={() => handleCopyNfcUrl(c.slug, c.name)}
-                            className="px-2.5 py-1 rounded-lg bg-neutral-100 hover:bg-neutral-200 text-neutral-800 text-[11px] font-semibold transition-colors flex items-center gap-1"
-                            title="Copiar link permanente da placa NFC"
+                            onClick={() => handleToggleStatus(c.id, compName)}
+                            className={`text-[10px] font-semibold px-2.5 py-1 rounded-full transition-colors flex items-center gap-1 ${
+                              isActive
+                                ? 'bg-emerald-50 text-emerald-800 border border-emerald-200'
+                                : 'bg-neutral-100 text-neutral-600 border border-neutral-200'
+                            }`}
+                            title="Alternar status"
                           >
-                            <Copy className="w-3 h-3 text-neutral-600" />
-                            <span>Copiar NFC</span>
+                            <span className={`w-1.5 h-1.5 rounded-full ${isActive ? 'bg-emerald-500' : 'bg-neutral-400'}`} />
+                            <span>{isActive ? 'Ativo' : 'Pausado'}</span>
                           </button>
+                        </td>
+                        <td className="py-3 px-3 text-right">
+                          <div className="flex items-center justify-end gap-1.5">
+                            <button
+                              onClick={() => handleOpenEdit(c)}
+                              className="px-2 py-1 rounded-lg bg-white border border-neutral-200 hover:bg-neutral-50 text-neutral-800 text-[11px] font-medium transition-colors flex items-center gap-1 shadow-xs"
+                              title="Editar"
+                            >
+                              <Edit className="w-3 h-3 text-neutral-500" />
+                              <span>Editar</span>
+                            </button>
 
-                          <Link
-                            href={`/painel/${c.slug}`}
-                            className="px-2.5 py-1 rounded-lg bg-neutral-900 hover:bg-neutral-800 text-white text-[11px] font-semibold transition-colors flex items-center gap-1"
-                            title="Gerenciar programa de fidelidade e clientes da empresa"
-                          >
-                            <Gift className="w-3 h-3 text-amber-400" />
-                            <span>Fidelidade</span>
-                          </Link>
+                            <Link
+                              href={`/empresa/${compSlug}`}
+                              target="_blank"
+                              className="px-2 py-1 rounded-lg bg-white border border-neutral-200 hover:bg-neutral-50 text-neutral-800 text-[11px] font-medium transition-colors flex items-center gap-1 shadow-xs"
+                              title="Ver página pública"
+                            >
+                              <ExternalLink className="w-3 h-3 text-neutral-500" />
+                              <span>Página</span>
+                            </Link>
 
-                          <button
-                            onClick={() => handleDeleteCompany(c.id, c.name)}
-                            className="p-1.5 rounded-lg bg-red-50 hover:bg-red-100 text-red-600 transition-colors"
-                            title="Excluir empresa permanentemente"
-                          >
-                            <Trash2 className="w-3.5 h-3.5" />
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
+                            <Link
+                              href={`/painel/${compSlug}`}
+                              className="px-2.5 py-1 rounded-lg bg-violet-600 hover:bg-violet-700 text-white text-[11px] font-semibold transition-colors flex items-center gap-1 shadow-xs"
+                              title="Painel do Proprietário"
+                            >
+                              <Store className="w-3 h-3" />
+                              <span>Painel</span>
+                            </Link>
+
+                            <button
+                              onClick={() => handleDeleteCompany(c.id, compName)}
+                              className="p-1 rounded-lg bg-red-50 hover:bg-red-100 text-red-600 border border-red-100 transition-colors"
+                              title="Excluir empresa"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    )
+                  })}
                 </tbody>
               </table>
             </div>
@@ -655,192 +789,151 @@ export const AdminPanelView: React.FC = () => {
         {/* 3. CLIENTES CONSOLIDADOS */}
         {/* ============================================== */}
         {activeTab === 'customers' && (
-          <div className="bg-white rounded-3xl border border-neutral-200/80 shadow-sm p-6 space-y-4">
+          <div className="bg-white rounded-3xl border border-neutral-200/80 shadow-xs p-6 space-y-4">
             <div>
               <h2 className="text-base font-bold text-neutral-900">
-                Visão Geral dos Clientes no Sistema
+                Gestão Consolidada de Clientes
               </h2>
               <p className="text-xs text-neutral-500">
-                Lembrete da Regra de Negócio: O mesmo número de WhatsApp pode ter cadastros independentes em empresas distintas, mas jamais duplicado dentro do mesmo estabelecimento.
+                Cada empresa possui sua base independente de clientes cadastrados por WhatsApp.
               </p>
             </div>
 
-            <div className="space-y-3">
-              {companies.map((comp) => (
-                <div key={comp.id} className="p-4 rounded-2xl bg-neutral-50 border border-neutral-200/70 space-y-2">
-                  <div className="flex items-center justify-between">
-                    <span className="font-bold text-neutral-900 text-xs">
-                      {comp.name}
-                    </span>
-                    <Link
-                      href={`/painel/${comp.slug}`}
-                      className="text-[11px] text-neutral-600 hover:text-neutral-900 underline"
-                    >
-                      Gerenciar clientes desta empresa →
-                    </Link>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {companies.map((comp) => {
+                if (!comp) return null
+                const compName = comp.name || 'Empresa'
+                const compSlug = comp.slug || comp.id
+                const primaryColor = comp.primaryColor || '#6D28D9'
+
+                return (
+                  <div key={comp.id} className="p-4 rounded-2xl bg-neutral-50 border border-neutral-200/80 space-y-3">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <div
+                          className="w-7 h-7 rounded-lg flex items-center justify-center text-white font-bold text-[10px]"
+                          style={{ backgroundColor: primaryColor }}
+                        >
+                          {compName.slice(0, 2).toUpperCase()}
+                        </div>
+                        <span className="font-bold text-neutral-900 text-xs">
+                          {compName}
+                        </span>
+                      </div>
+                      <Link
+                        href={`/painel/${compSlug}`}
+                        className="text-xs text-violet-700 hover:text-violet-800 font-semibold flex items-center gap-1"
+                      >
+                        <span>Acessar Painel</span>
+                        <ChevronRight className="w-3.5 h-3.5" />
+                      </Link>
+                    </div>
+                    <p className="text-xs text-neutral-500">
+                      Gerencie a lista de clientes, saldo de pontos e histórico de validações no painel individual da empresa.
+                    </p>
                   </div>
-                  <p className="text-xs text-neutral-500">
-                    Acesse o painel individual da empresa para visualizar e buscar todos os clientes com isolamento seguro de dados.
-                  </p>
-                </div>
-              ))}
+                )
+              })}
             </div>
           </div>
         )}
 
         {/* ============================================== */}
-        {/* 4. ATIVIDADE GLOBAL */}
+        {/* 4. ATIVIDADES GLOBAIS */}
         {/* ============================================== */}
         {activeTab === 'activity' && (
-          <div className="bg-white rounded-3xl border border-neutral-200/80 shadow-sm p-6 space-y-4">
-            <h2 className="text-base font-bold text-neutral-900">
-              Trilha de Auditoria e Atividades Globais
-            </h2>
-            <div className="space-y-2.5">
+          <div className="bg-white rounded-3xl border border-neutral-200/80 shadow-xs p-6 space-y-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <h2 className="text-base font-bold text-neutral-900">
+                  Trilha de Auditoria e Atividades
+                </h2>
+                <p className="text-xs text-neutral-500">
+                  Histórico completo de pontos adicionados, resgates e ações de caixa registradas no sistema.
+                </p>
+              </div>
+              <span className="text-xs font-semibold text-neutral-500 bg-neutral-100 px-3 py-1 rounded-xl">
+                {logs.length} registros
+              </span>
+            </div>
+
+            <div className="space-y-2">
               {logs.map((log) => (
                 <div
                   key={log.id}
-                  className="p-3 rounded-xl bg-neutral-50 border border-neutral-200/60 flex items-center justify-between text-xs"
+                  className="p-3 rounded-xl bg-neutral-50 border border-neutral-200/70 flex items-center justify-between text-xs"
                 >
-                  <div>
-                    <span className="font-bold text-neutral-900">{log.customerName}</span>
-                    <p className="text-neutral-600 text-[11px]">{log.description}</p>
+                  <div className="flex items-center gap-3">
+                    <div className="w-8 h-8 rounded-lg bg-violet-50 text-violet-700 flex items-center justify-center font-bold text-xs shrink-0">
+                      <Clock className="w-4 h-4" />
+                    </div>
+                    <div>
+                      <span className="font-semibold text-neutral-900">{log.customerName || 'Cliente'}</span>
+                      <p className="text-neutral-600 text-[11px]">{log.description}</p>
+                    </div>
                   </div>
                   <div className="text-right">
                     <span className="text-[10px] text-neutral-400 font-mono block">
-                      {new Date(log.timestamp).toLocaleString('pt-BR')}
+                      {log.timestamp ? new Date(log.timestamp).toLocaleString('pt-BR') : '-'}
                     </span>
-                    <span className="text-[10px] text-neutral-500">{log.approvedBy}</span>
+                    <span className="text-[10px] text-neutral-500 font-medium">{log.approvedBy || 'Sistema'}</span>
                   </div>
                 </div>
               ))}
+
+              {logs.length === 0 && (
+                <div className="text-center py-8 text-neutral-400 text-xs">
+                  Nenhuma atividade registrada até o momento.
+                </div>
+              )}
             </div>
           </div>
         )}
 
         {/* ============================================== */}
-        {/* 5. ABA EXCLUIR EMPRESA */}
-        {/* ============================================== */}
-        {activeTab === 'delete_company' && (
-          <div className="bg-white rounded-3xl border border-red-200/80 shadow-sm p-6 space-y-6">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-neutral-100 pb-5">
-              <div>
-                <div className="flex items-center gap-2 text-red-600 mb-1">
-                  <Trash2 className="w-5 h-5" />
-                  <h2 className="text-base font-bold text-neutral-900">
-                    Excluir Estabelecimentos do Sistema
-                  </h2>
-                </div>
-                <p className="text-xs text-neutral-500 max-w-2xl">
-                  Selecione a empresa que deseja excluir permanentemente. A exclusão remove a empresa, seus clientes cadastrados, solicitações de ponto, históricos e feedbacks do banco de dados central com persistência garantida.
-                </p>
-              </div>
-
-              {/* Search filter */}
-              <div className="relative w-full sm:w-72">
-                <Search className="w-4 h-4 text-neutral-400 absolute left-3 top-2.5" />
-                <input
-                  type="text"
-                  value={searchFilter}
-                  onChange={(e) => setSearchFilter(e.target.value)}
-                  placeholder="Buscar por nome ou slug..."
-                  className="w-full pl-9 pr-3 py-2 rounded-xl border border-neutral-300 text-xs focus:outline-none focus:ring-2 focus:ring-red-500"
-                />
-              </div>
-            </div>
-
-            {/* List of Companies to Delete */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {filteredCompanies.map((c) => (
-                <div
-                  key={c.id}
-                  className="p-5 rounded-2xl border border-neutral-200 bg-neutral-50/50 space-y-3 hover:border-red-300 transition-colors shadow-sm flex flex-col justify-between"
-                >
-                  <div className="space-y-3">
-                    <div className="flex items-start justify-between gap-2">
-                      <div className="flex items-center gap-2.5">
-                        <div
-                          className="w-10 h-10 rounded-xl flex items-center justify-center text-white font-bold text-sm shrink-0 shadow-sm"
-                          style={{ backgroundColor: c.primaryColor }}
-                        >
-                          {c.name.slice(0, 2).toUpperCase()}
-                        </div>
-                        <div>
-                          <h4 className="font-bold text-neutral-900 text-sm leading-tight">{c.name}</h4>
-                          <span className="text-[11px] font-mono text-neutral-500">/empresa/{c.slug}</span>
-                        </div>
-                      </div>
-                      <span
-                        className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
-                          c.isActive ? 'bg-emerald-100 text-emerald-800' : 'bg-neutral-200 text-neutral-600'
-                        }`}
-                      >
-                        {c.isActive ? 'Ativo' : 'Pausado'}
-                      </span>
-                    </div>
-
-                    <div className="text-xs text-neutral-600 space-y-1 bg-white p-3 rounded-xl border border-neutral-200/60 font-mono">
-                      <p className="flex justify-between">
-                        <span className="text-neutral-400">ID Interno:</span>
-                        <span className="font-semibold truncate max-w-[150px]">{c.id}</span>
-                      </p>
-                      <p className="flex justify-between">
-                        <span className="text-neutral-400">WhatsApp:</span>
-                        <span>{formatPhone(c.whatsapp) || 'Não informado'}</span>
-                      </p>
-                      <p className="flex justify-between">
-                        <span className="text-neutral-400">Data de Criação:</span>
-                        <span>{new Date(c.createdAt).toLocaleDateString('pt-BR')}</span>
-                      </p>
-                    </div>
-                  </div>
-
-                  <button
-                    onClick={() => handleDeleteCompany(c.id, c.name)}
-                    className="w-full py-2.5 px-3 rounded-xl bg-red-50 hover:bg-red-600 text-red-600 hover:text-white font-bold text-xs border border-red-200 hover:border-red-600 transition-all flex items-center justify-center gap-1.5 shadow-sm active:scale-[0.98]"
-                  >
-                    <Trash2 className="w-3.5 h-3.5" />
-                    <span>Excluir Empresa Definitivamente</span>
-                  </button>
-                </div>
-              ))}
-            </div>
-
-            {filteredCompanies.length === 0 && (
-              <div className="text-center py-12 text-neutral-400 text-xs">
-                Nenhum estabelecimento encontrado com o filtro aplicado.
-              </div>
-            )}
-          </div>
-        )}
-
-        {/* ============================================== */}
-        {/* 6. CONFIGURAÇÕES DA PLATAFORMA */}
+        {/* 5. CONFIGURAÇÕES DA PLATAFORMA */}
         {/* ============================================== */}
         {activeTab === 'settings' && (
-          <div className="bg-white rounded-3xl border border-neutral-200/80 shadow-sm p-6 space-y-6 max-w-2xl">
+          <div className="bg-white rounded-3xl border border-neutral-200/80 shadow-xs p-6 space-y-6 max-w-3xl">
             <div>
               <h2 className="text-base font-bold text-neutral-900">
-                Configurações da Plataforma Multi-Tenant
+                Configurações da Plataforma DiretoLink
               </h2>
               <p className="text-xs text-neutral-500">
-                Gerencie parâmetros centrais e restaure os dados de demonstração a qualquer momento.
+                Gerencie parâmetros centrais e dados de demonstração da plataforma multiempresa.
               </p>
             </div>
 
-            <div className="p-4 bg-amber-50 rounded-2xl border border-amber-200 space-y-3">
+            {/* Informações da Plataforma */}
+            <div className="p-4 bg-neutral-50 rounded-2xl border border-neutral-200/80 space-y-2">
+              <h4 className="text-xs font-bold text-neutral-900">Sobre o DiretoLink</h4>
+              <p className="text-xs text-neutral-600 leading-relaxed">
+                Plataforma SaaS que conecta estabelecimentos comerciais aos seus clientes por aproximação física NFC e QR Code inteligente, com fidelização, avaliações Google 5 estrelas e conexão Wi-Fi.
+              </p>
+              <div className="flex items-center gap-2 pt-1 text-[11px] text-neutral-500">
+                <span className="font-semibold text-violet-700">Conceito:</span>
+                <span>Um toque conecta o cliente à empresa.</span>
+              </div>
+              <div className="flex items-center gap-2 text-[11px] text-neutral-500">
+                <span className="font-semibold text-violet-700">Assinatura:</span>
+                <span>Aproxime. Conecte. Pronto.</span>
+              </div>
+            </div>
+
+            {/* Reset Demo Data */}
+            <div className="p-4 bg-amber-50/70 rounded-2xl border border-amber-200/80 space-y-3">
               <div>
                 <h4 className="font-bold text-xs text-amber-900">
-                  Restaurar Dados de Demonstração
+                  Restaurar Estabelecimentos de Demonstração
                 </h4>
                 <p className="text-xs text-amber-800 mt-0.5">
-                  Recarrega os 3 estabelecimentos padrão (Café Central, Barbearia Júnior, Pizzaria Bella Italia) e os clientes com pontos e recompensas para testes.
+                  Recarrega os 3 estabelecimentos padrão (Café Central, Barbearia Júnior, Pizzaria Bella Italia) e clientes de teste para demonstrações comerciais.
                 </p>
               </div>
 
               <button
                 onClick={handleResetData}
-                className="px-4 py-2 rounded-xl bg-amber-600 hover:bg-amber-700 text-white font-semibold text-xs shadow-sm flex items-center gap-1.5 transition-all"
+                className="px-4 py-2 rounded-xl bg-amber-600 hover:bg-amber-700 text-white font-semibold text-xs shadow-xs flex items-center gap-1.5 transition-all"
               >
                 <RotateCcw className="w-3.5 h-3.5" />
                 <span>Restaurar Dados Iniciais de Demonstração</span>

@@ -374,19 +374,19 @@ export const CompanyPanelView: React.FC<CompanyPanelViewProps> = ({
   }
 
   return (
-    <div className="min-h-screen bg-neutral-100 flex flex-col selection:bg-neutral-900 selection:text-white">
+    <div className="min-h-screen bg-neutral-50/70 flex flex-col selection:bg-violet-100 selection:text-violet-900 font-sans text-neutral-900 w-full max-w-full overflow-x-hidden">
       {/* Toast Notification */}
       {toastMessage && (
-        <div className="fixed top-4 right-4 z-50 animate-bounce">
+        <div className="fixed top-4 right-4 z-50 animate-fade-in">
           <div
-            className={`px-4 py-3 rounded-2xl shadow-xl text-xs font-semibold flex items-center gap-2 border ${
+            className={`px-4 py-2.5 rounded-2xl shadow-xl text-xs font-semibold flex items-center gap-2 border ${
               toastMessage.type === 'success'
-                ? 'bg-emerald-900 text-white border-emerald-700'
-                : 'bg-red-900 text-white border-red-700'
+                ? 'bg-neutral-900 text-white border-neutral-800'
+                : 'bg-red-900 text-white border-red-800'
             }`}
           >
             {toastMessage.type === 'success' ? (
-              <CheckCircle2 className="w-4 h-4 text-emerald-400" />
+              <CheckCircle2 className="w-4 h-4 text-violet-400" />
             ) : (
               <AlertCircle className="w-4 h-4 text-red-400" />
             )}
@@ -396,47 +396,54 @@ export const CompanyPanelView: React.FC<CompanyPanelViewProps> = ({
       )}
 
       {/* Top Header */}
-      <header className="bg-white border-b border-neutral-200/80 px-4 sm:px-6 py-3.5 sticky top-0 z-30">
+      <header className="bg-white border-b border-neutral-200/80 px-4 sm:px-6 py-3.5 sticky top-0 z-30 shadow-xs">
         <div className="max-w-7xl mx-auto flex flex-col sm:flex-row sm:items-center justify-between gap-3">
           <div className="flex items-center gap-3">
             <Link
               href="/painel"
-              className="px-2.5 py-1.5 rounded-xl bg-neutral-100 hover:bg-neutral-200 text-neutral-700 text-xs font-semibold flex items-center gap-1 transition-colors shrink-0"
-              title="Voltar ao portal de login / seleção"
+              className="inline-flex items-center justify-center w-8 h-8 rounded-xl bg-neutral-100 hover:bg-neutral-200 text-neutral-600 hover:text-neutral-900 text-xs font-semibold transition-colors shrink-0"
+              title="Voltar ao portal de seleção"
             >
-              <ArrowLeft className="w-3.5 h-3.5" />
-              <span className="hidden sm:inline">← Voltar</span>
+              <ArrowLeft className="w-4 h-4" />
             </Link>
 
-            <div className="flex items-center gap-2.5">
+            <div className="flex items-center gap-3">
               <div
-                className="w-10 h-10 rounded-2xl flex items-center justify-center text-white font-bold text-sm shadow-md shrink-0"
-                style={{ backgroundColor: company.primaryColor }}
+                className="w-10 h-10 rounded-2xl flex items-center justify-center text-white font-bold text-sm shadow-xs shrink-0 overflow-hidden"
+                style={{ backgroundColor: company.primaryColor || '#6D28D9' }}
               >
-                {company.name.slice(0, 2).toUpperCase()}
+                {company.logoUrl ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img src={company.logoUrl} alt={company.name} className="w-full h-full object-cover" />
+                ) : (
+                  company.name.slice(0, 2).toUpperCase()
+                )}
               </div>
               <div>
                 <div className="flex items-center gap-2">
+                  <span className="text-[10px] text-violet-700 font-bold uppercase tracking-wider bg-violet-50 px-2 py-0.5 rounded-full border border-violet-100">
+                    DiretoLink
+                  </span>
                   <h1 className="font-bold text-neutral-900 text-base leading-tight">
                     {company.name}
                   </h1>
                   <span
-                    className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
+                    className={`text-[10px] font-semibold px-2 py-0.5 rounded-full ${
                       company.isActive
-                        ? 'bg-emerald-100 text-emerald-800'
-                        : 'bg-neutral-200 text-neutral-600'
+                        ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+                        : 'bg-neutral-100 text-neutral-600 border border-neutral-200'
                     }`}
                   >
                     {company.isActive ? 'Ativo' : 'Inativo'}
                   </span>
                 </div>
-                <div className="flex items-center gap-2 text-xs text-neutral-500 font-mono">
+                <div className="flex items-center gap-2 text-xs text-neutral-500 font-mono mt-0.5">
                   <span>/empresa/{company.slug}</span>
                   <button
                     onClick={handleCopyNfcUrl}
                     className="hover:text-neutral-900 flex items-center gap-1 text-[11px] underline underline-offset-2"
                   >
-                    {copiedLink ? 'Copiado!' : 'Copiar URL NFC'}
+                    {copiedLink ? 'Copiado!' : 'Copiar URL'}
                   </button>
                 </div>
               </div>
@@ -445,14 +452,9 @@ export const CompanyPanelView: React.FC<CompanyPanelViewProps> = ({
 
           {/* Quick Actions */}
           <div className="flex items-center gap-2">
-            <div className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-neutral-100 text-neutral-700 text-xs font-semibold">
-              <ShieldCheck className="w-3.5 h-3.5 text-emerald-600" />
-              <span>Proprietário</span>
-            </div>
-
             <Link
               href={`/empresa/${company.slug}/caixa`}
-              className="px-3.5 py-2 rounded-xl bg-amber-500 hover:bg-amber-400 text-neutral-950 font-bold text-xs shadow-sm transition-all flex items-center gap-1.5"
+              className="px-3.5 py-2 rounded-xl bg-violet-600 hover:bg-violet-700 text-white font-semibold text-xs shadow-xs transition-all flex items-center gap-1.5"
             >
               <SlidersHorizontal className="w-3.5 h-3.5 stroke-[2.5]" />
               <span>Modo Caixa</span>
@@ -461,7 +463,7 @@ export const CompanyPanelView: React.FC<CompanyPanelViewProps> = ({
             <Link
               href={`/empresa/${company.slug}`}
               target="_blank"
-              className="px-3.5 py-2 rounded-xl bg-neutral-900 hover:bg-neutral-800 text-white font-semibold text-xs shadow-sm transition-all flex items-center gap-1.5"
+              className="px-3.5 py-2 rounded-xl bg-white border border-neutral-200 hover:bg-neutral-50 text-neutral-800 font-semibold text-xs shadow-xs transition-all flex items-center gap-1.5"
             >
               <ExternalLink className="w-3.5 h-3.5" />
               <span>Ver Página NFC</span>
@@ -469,7 +471,7 @@ export const CompanyPanelView: React.FC<CompanyPanelViewProps> = ({
 
             <button
               onClick={handleLogout}
-              className="px-3 py-2 rounded-xl bg-neutral-100 hover:bg-red-50 hover:text-red-700 text-neutral-600 font-semibold text-xs transition-all flex items-center gap-1.5 border border-neutral-200"
+              className="px-3 py-2 rounded-xl bg-white hover:bg-red-50 hover:text-red-700 text-neutral-600 font-medium text-xs transition-all flex items-center gap-1.5 border border-neutral-200 shadow-xs"
               title="Sair do Painel"
             >
               <LogOut className="w-3.5 h-3.5" />
@@ -481,10 +483,15 @@ export const CompanyPanelView: React.FC<CompanyPanelViewProps> = ({
         {/* Navigation Tabs Bar */}
         <div className="max-w-7xl mx-auto flex items-center gap-1 overflow-x-auto pt-3 mt-1 border-t border-neutral-100">
           {[
-            { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
+            { id: 'dashboard', label: 'Visão Geral', icon: LayoutDashboard },
             { id: 'customers', label: 'Clientes', count: totalCustomers, icon: Users },
             { id: 'loyalty', label: 'Fidelidade', icon: Gift },
-            { id: 'rewards', label: 'Recompensas', count: rewardsAvailable, icon: Award },
+            {
+              id: 'rewards',
+              label: 'Solicitações de Pontos',
+              count: pendingRequests.length > 0 ? pendingRequests.length : undefined,
+              icon: Award,
+            },
             { id: 'feedbacks', label: 'Feedbacks', count: totalFeedbacks, icon: MessageSquare },
             { id: 'settings', label: 'Configurações', icon: Settings },
           ].map((tab) => {
@@ -496,8 +503,8 @@ export const CompanyPanelView: React.FC<CompanyPanelViewProps> = ({
                 onClick={() => setActiveTab(tab.id as TabType)}
                 className={`px-3 py-2 rounded-xl text-xs font-semibold flex items-center gap-2 whitespace-nowrap transition-all ${
                   isActive
-                    ? 'bg-neutral-900 text-white shadow-sm'
-                    : 'text-neutral-600 hover:text-neutral-900 hover:bg-neutral-100'
+                    ? 'bg-violet-600 text-white shadow-xs'
+                    : 'text-neutral-600 hover:text-neutral-900 hover:bg-neutral-100/80'
                 }`}
               >
                 <Icon className="w-3.5 h-3.5" />
@@ -505,7 +512,7 @@ export const CompanyPanelView: React.FC<CompanyPanelViewProps> = ({
                 {tab.count !== undefined && tab.count > 0 && (
                   <span
                     className={`text-[10px] font-bold px-1.5 py-0.2 rounded-full ${
-                      isActive ? 'bg-white/20 text-white' : 'bg-neutral-200 text-neutral-700'
+                      isActive ? 'bg-white/20 text-white' : 'bg-violet-100 text-violet-800'
                     }`}
                   >
                     {tab.count}
@@ -514,6 +521,15 @@ export const CompanyPanelView: React.FC<CompanyPanelViewProps> = ({
               </button>
             )
           })}
+
+          <Link
+            href={`/empresa/${company.slug}`}
+            target="_blank"
+            className="px-3 py-2 rounded-xl text-xs font-medium text-neutral-500 hover:text-neutral-900 hover:bg-neutral-100/80 flex items-center gap-1.5 whitespace-nowrap transition-all ml-auto"
+          >
+            <ExternalLink className="w-3.5 h-3.5" />
+            <span>Página Pública</span>
+          </Link>
         </div>
       </header>
 

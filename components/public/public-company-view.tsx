@@ -333,9 +333,14 @@ export const PublicCompanyView: React.FC<PublicCompanyViewProps> = ({ company })
           )}
         </div>
 
-        {/* Quiet Footer */}
-        <footer className="mt-4 pt-4 border-t border-neutral-100 text-center text-[10px] text-neutral-400 px-6">
-          <p>© {company.name} · Alimentado por Placa Inteligente NFC</p>
+        {/* DiretoLink Quiet Signature Footer */}
+        <footer className="mt-6 pt-5 pb-6 border-t border-neutral-100 text-center text-[11px] text-neutral-400 px-6 space-y-1">
+          <p className="font-medium text-neutral-600">© {company.name}</p>
+          <div className="flex items-center justify-center gap-1.5 text-[10px] text-neutral-400">
+            <span className="w-1.5 h-1.5 rounded-full bg-violet-600" />
+            <span className="font-semibold text-neutral-600">DiretoLink</span>
+            <span>· Aproxime. Conecte. Pronto.</span>
+          </div>
         </footer>
 
         {/* MODALS / SHEETS */}

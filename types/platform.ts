@@ -33,6 +33,7 @@ export interface Company {
   id: string
   slug: string
   name: string
+  category?: string
   tagline?: string
   logoUrl: string
   coverUrl: string
