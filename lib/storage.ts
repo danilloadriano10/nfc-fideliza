@@ -435,8 +435,8 @@ export function approvePointRequest(
 
   // Credit customer points safely
   const company = getCompanyById(request.companyId)
-  const goal = company?.loyaltyProgram.goalPoints || 10
-  const rewardName = company?.loyaltyProgram.rewardDescription || 'Recompensa de Fidelidade'
+  const goal = company?.loyaltyProgram?.goalPoints || 10
+  const rewardName = company?.loyaltyProgram?.rewardDescription || 'Recompensa de Fidelidade'
 
   const allCustomers = getItem<Customer[]>(STORAGE_KEYS.CUSTOMERS, INITIAL_CUSTOMERS)
   const custIndex = allCustomers.findIndex(
@@ -861,8 +861,8 @@ export function directAddPoint(
   const company = getCompanyById(companyId)
   if (!company) return { success: false, error: 'Empresa não encontrada.' }
 
-  const goal = company.loyaltyProgram.goalPoints || 10
-  const rewardName = company.loyaltyProgram.rewardDescription || 'Recompensa de Fidelidade'
+  const goal = company.loyaltyProgram?.goalPoints || 10
+  const rewardName = company.loyaltyProgram?.rewardDescription || 'Recompensa de Fidelidade'
 
   const allCustomers = getItem<Customer[]>(STORAGE_KEYS.CUSTOMERS, INITIAL_CUSTOMERS)
   const custIndex = allCustomers.findIndex(
@@ -956,7 +956,7 @@ export function redeemReward(
     return { success: false, error: 'O cliente não possui nenhuma recompensa disponível para resgate.' }
   }
 
-  const rewardName = company.loyaltyProgram.rewardDescription
+  const rewardName = company.loyaltyProgram?.rewardDescription || 'Recompensa de Fidelidade'
 
   // After redemption, decrease available reward and restart loyalty points cycle smoothly
   const updatedCustomer: Customer = {

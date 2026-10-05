@@ -372,11 +372,15 @@ export const AdminPanelView: React.FC = () => {
                     <div className="text-xs text-neutral-600 space-y-1 pt-1 border-t border-neutral-200/60">
                       <div className="flex justify-between">
                         <span className="text-neutral-400 text-[11px]">Campanha:</span>
-                        <span className="font-medium truncate max-w-[150px]">{comp.loyaltyProgram.campaignName}</span>
+                        <span className="font-medium truncate max-w-[150px]">
+                          {comp.loyaltyProgram?.campaignName || 'Cartão Fidelidade'}
+                        </span>
                       </div>
                       <div className="flex justify-between">
                         <span className="text-neutral-400 text-[11px]">Meta:</span>
-                        <span className="font-bold font-mono text-neutral-800">{comp.loyaltyProgram.goalPoints} pontos</span>
+                        <span className="font-bold font-mono text-neutral-800">
+                          {comp.loyaltyProgram?.goalPoints ?? 10} pontos
+                        </span>
                       </div>
                     </div>
 
@@ -569,8 +573,10 @@ export const AdminPanelView: React.FC = () => {
                         </div>
                       </td>
                       <td className="py-3 px-3 text-neutral-600">
-                        {c.loyaltyProgram.isActive ? (
-                          <span>{c.loyaltyProgram.goalPoints} pts · {c.loyaltyProgram.rewardDescription}</span>
+                        {c.loyaltyProgram?.isActive ? (
+                          <span>
+                            {c.loyaltyProgram?.goalPoints ?? 10} pts · {c.loyaltyProgram?.rewardDescription || 'Recompensa'}
+                          </span>
                         ) : (
                           <span className="text-neutral-400">Desativada</span>
                         )}

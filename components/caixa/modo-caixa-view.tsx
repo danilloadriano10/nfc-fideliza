@@ -179,7 +179,7 @@ export const ModoCaixaView: React.FC<ModoCaixaViewProps> = ({ company }) => {
     )
   })
 
-  const goal = company.loyaltyProgram.goalPoints || 10
+  const goal = company.loyaltyProgram?.goalPoints || 10
 
   return (
     <div className="min-h-screen bg-neutral-900 text-neutral-100 flex flex-col selection:bg-amber-500 selection:text-neutral-900">
@@ -433,7 +433,7 @@ export const ModoCaixaView: React.FC<ModoCaixaViewProps> = ({ company }) => {
             <div className="space-y-2 text-xs">
               <div className="flex justify-between py-1 border-b border-neutral-900">
                 <span className="text-neutral-400">Campanha:</span>
-                <span className="font-semibold text-white">{company.loyaltyProgram.campaignName}</span>
+                <span className="font-semibold text-white">{company.loyaltyProgram?.campaignName || 'Cartão Fidelidade'}</span>
               </div>
               <div className="flex justify-between py-1 border-b border-neutral-900">
                 <span className="text-neutral-400">Meta para Resgate:</span>
@@ -442,7 +442,7 @@ export const ModoCaixaView: React.FC<ModoCaixaViewProps> = ({ company }) => {
               <div className="py-1">
                 <span className="text-neutral-400 block mb-1">Recompensa:</span>
                 <span className="font-bold text-white bg-neutral-900 p-2 rounded-xl block border border-neutral-800">
-                  🎁 {company.loyaltyProgram.rewardDescription}
+                  🎁 {company.loyaltyProgram?.rewardDescription || 'Recompensa de Fidelidade'}
                 </span>
               </div>
             </div>

@@ -147,11 +147,8 @@ export async function uploadCompanyFileServer(
   const baseName = sanitizeFileName(path.basename(originalName, ext)) || type
   const fileName = `${Date.now()}_${baseName}${ext}`
 
-  // 1. Try ImgBB if key is available
-  const imgbbApiKey =
-    process.env.IMGBB_API_KEY ||
-    process.env.NEXT_PUBLIC_IMGBB_API_KEY ||
-    ''
+  // 1. Try ImgBB if key is available (Server-only secret variable)
+  const imgbbApiKey = process.env.IMGBB_API_KEY || ''
 
   if (imgbbApiKey) {
     try {
@@ -166,10 +163,7 @@ export async function uploadCompanyFileServer(
   }
 
   // 2. Try Cloudinary if cloud name is available
-  const cloudinaryCloudName =
-    process.env.CLOUDINARY_CLOUD_NAME ||
-    process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME ||
-    ''
+  const cloudinaryCloudName = process.env.CLOUDINARY_CLOUD_NAME || ''
   const cloudinaryPreset = process.env.CLOUDINARY_UPLOAD_PRESET || ''
   const cloudinaryApiKey = process.env.CLOUDINARY_API_KEY || ''
   const cloudinaryApiSecret = process.env.CLOUDINARY_API_SECRET || ''

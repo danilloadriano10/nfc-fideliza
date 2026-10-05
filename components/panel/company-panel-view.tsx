@@ -87,7 +87,15 @@ export const CompanyPanelView: React.FC<CompanyPanelViewProps> = ({
   const [copiedLink, setCopiedLink] = useState(false)
 
   // Settings form state
-  const [formData, setFormData] = useState<Company>(initialCompany)
+  const [formData, setFormData] = useState<Company>(() => ({
+    ...initialCompany,
+    loyaltyProgram: initialCompany.loyaltyProgram || {
+      isActive: true,
+      goalPoints: 10,
+      rewardDescription: 'Recompensa de Fidelidade',
+      campaignName: 'Cartão Fidelidade',
+    },
+  }))
   const [isSaving, setIsSaving] = useState(false)
 
   const [isAuthenticated, setIsAuthenticated] = useState<boolean>(() => {
@@ -265,7 +273,7 @@ export const CompanyPanelView: React.FC<CompanyPanelViewProps> = ({
   const rewardsAvailable = customers.reduce((acc, c) => acc + c.availableRewards, 0)
   const rewardsRedeemed = logs.filter((l) => l.type === 'reward_redeemed').length
   const totalFeedbacks = feedbacks.length
-  const goal = company.loyaltyProgram.goalPoints || 10
+  const goal = company.loyaltyProgram?.goalPoints || 10
 
   // Filter customers
   const filteredCustomers = customers.filter((c) => {
@@ -752,100 +760,113 @@ export const CompanyPanelView: React.FC<CompanyPanelViewProps> = ({
             </div>
 
             <form onSubmit={handleSaveSettings} className="space-y-4">
-              <div className="flex items-center justify-between p-4 bg-neutral-50 rounded-2xl border border-neutral-200">
-                <div>
-                  <span className="font-bold text-sm text-neutral-900 block">
-                    Programa de Fidelidade Ativo
-                  </span>
-                  <p className="text-xs text-neutral-500">
-                    Exibe o cartão fidelidade na página pública NFC.
-                  </p>
-                </div>
-                <input
-                  type="checkbox"
-                  checked={formData.loyaltyProgram.isActive}
-                  onChange={(e) =>
-                    setFormData({
-                      ...formData,
-                      loyaltyProgram: {
-                        ...formData.loyaltyProgram,
-                        isActive: e.target.checked,
-                      },
-                    })
-                  }
-                  className="w-5 h-5 accent-neutral-900 rounded"
-                />
-              </div>
+              {(() => {
+                const lp = formData.loyaltyProgram
+                const currentLoyalty = {
+                  isActive: lp?.isActive ?? true,
+                  goalPoints: lp?.goalPoints ?? 10,
+                  rewardDescription: lp?.rewardDescription || 'Recompensa de Fidelidade',
+                  campaignName: lp?.campaignName || 'Cartão Fidelidade',
+                }
+                return (
+                  <>
+                    <div className="flex items-center justify-between p-4 bg-neutral-50 rounded-2xl border border-neutral-200">
+                      <div>
+                        <span className="font-bold text-sm text-neutral-900 block">
+                          Programa de Fidelidade Ativo
+                        </span>
+                        <p className="text-xs text-neutral-500">
+                          Exibe o cartão fidelidade na página pública NFC.
+                        </p>
+                      </div>
+                      <input
+                        type="checkbox"
+                        checked={currentLoyalty.isActive}
+                        onChange={(e) =>
+                          setFormData({
+                            ...formData,
+                            loyaltyProgram: {
+                              ...currentLoyalty,
+                              isActive: e.target.checked,
+                            },
+                          })
+                        }
+                        className="w-5 h-5 accent-neutral-900 rounded"
+                      />
+                    </div>
 
-              <div>
-                <label className="block text-xs font-semibold text-neutral-700 mb-1">
-                  Nome da Campanha
-                </label>
-                <input
-                  type="text"
-                  required
-                  value={formData.loyaltyProgram.campaignName}
-                  onChange={(e) =>
-                    setFormData({
-                      ...formData,
-                      loyaltyProgram: {
-                        ...formData.loyaltyProgram,
-                        campaignName: e.target.value,
-                      },
-                    })
-                  }
-                  placeholder="Ex: Clube do Café, VIP Barber Club..."
-                  className="w-full px-3 py-2.5 rounded-xl border border-neutral-300 text-sm focus:outline-none focus:ring-2 focus:ring-neutral-900"
-                />
-              </div>
+                    <div>
+                      <label className="block text-xs font-semibold text-neutral-700 mb-1">
+                        Nome da Campanha
+                      </label>
+                      <input
+                        type="text"
+                        required
+                        value={currentLoyalty.campaignName}
+                        onChange={(e) =>
+                          setFormData({
+                            ...formData,
+                            loyaltyProgram: {
+                              ...currentLoyalty,
+                              campaignName: e.target.value,
+                            },
+                          })
+                        }
+                        placeholder="Ex: Clube do Café, VIP Barber Club..."
+                        className="w-full px-3 py-2.5 rounded-xl border border-neutral-300 text-sm focus:outline-none focus:ring-2 focus:ring-neutral-900"
+                      />
+                    </div>
 
-              <div>
-                <label className="block text-xs font-semibold text-neutral-700 mb-1">
-                  Meta de Pontos para Resgate
-                </label>
-                <input
-                  type="number"
-                  min="2"
-                  max="50"
-                  required
-                  value={formData.loyaltyProgram.goalPoints}
-                  onChange={(e) =>
-                    setFormData({
-                      ...formData,
-                      loyaltyProgram: {
-                        ...formData.loyaltyProgram,
-                        goalPoints: parseInt(e.target.value) || 10,
-                      },
-                    })
-                  }
-                  className="w-full px-3 py-2.5 rounded-xl border border-neutral-300 text-sm font-mono font-bold focus:outline-none focus:ring-2 focus:ring-neutral-900"
-                />
-                <p className="text-[11px] text-neutral-500 mt-1">
-                  Quantidade de visitas/pontos necessários para liberar o prêmio.
-                </p>
-              </div>
+                    <div>
+                      <label className="block text-xs font-semibold text-neutral-700 mb-1">
+                        Meta de Pontos para Resgate
+                      </label>
+                      <input
+                        type="number"
+                        min="2"
+                        max="50"
+                        required
+                        value={currentLoyalty.goalPoints}
+                        onChange={(e) =>
+                          setFormData({
+                            ...formData,
+                            loyaltyProgram: {
+                              ...currentLoyalty,
+                              goalPoints: parseInt(e.target.value) || 10,
+                            },
+                          })
+                        }
+                        className="w-full px-3 py-2.5 rounded-xl border border-neutral-300 text-sm font-mono font-bold focus:outline-none focus:ring-2 focus:ring-neutral-900"
+                      />
+                      <p className="text-[11px] text-neutral-500 mt-1">
+                        Quantidade de visitas/pontos necessários para liberar o prêmio.
+                      </p>
+                    </div>
 
-              <div>
-                <label className="block text-xs font-semibold text-neutral-700 mb-1">
-                  Descrição da Recompensa
-                </label>
-                <input
-                  type="text"
-                  required
-                  value={formData.loyaltyProgram.rewardDescription}
-                  onChange={(e) =>
-                    setFormData({
-                      ...formData,
-                      loyaltyProgram: {
-                        ...formData.loyaltyProgram,
-                        rewardDescription: e.target.value,
-                      },
-                    })
-                  }
-                  placeholder="Ex: 1 Café Especial grátis, 1 Corte de Cabelo..."
-                  className="w-full px-3 py-2.5 rounded-xl border border-neutral-300 text-sm focus:outline-none focus:ring-2 focus:ring-neutral-900"
-                />
-              </div>
+                    <div>
+                      <label className="block text-xs font-semibold text-neutral-700 mb-1">
+                        Descrição da Recompensa
+                      </label>
+                      <input
+                        type="text"
+                        required
+                        value={currentLoyalty.rewardDescription}
+                        onChange={(e) =>
+                          setFormData({
+                            ...formData,
+                            loyaltyProgram: {
+                              ...currentLoyalty,
+                              rewardDescription: e.target.value,
+                            },
+                          })
+                        }
+                        placeholder="Ex: 1 Café Especial grátis, 1 Corte de Cabelo..."
+                        className="w-full px-3 py-2.5 rounded-xl border border-neutral-300 text-sm focus:outline-none focus:ring-2 focus:ring-neutral-900"
+                      />
+                    </div>
+                  </>
+                )
+              })()}
 
               <div className="pt-3">
                 <button
@@ -882,7 +903,7 @@ export const CompanyPanelView: React.FC<CompanyPanelViewProps> = ({
               <div className="bg-white p-5 rounded-2xl border border-neutral-200/80 shadow-sm">
                 <span className="text-xs text-neutral-500 font-medium">Recompensa Vigente</span>
                 <p className="text-sm font-bold text-neutral-900 mt-1 truncate">
-                  🎁 {company.loyaltyProgram.rewardDescription}
+                  🎁 {company.loyaltyProgram?.rewardDescription || 'Recompensa de Fidelidade'}
                 </p>
                 <p className="text-[11px] text-neutral-400 mt-1">Ao atingir {goal} pontos</p>
               </div>

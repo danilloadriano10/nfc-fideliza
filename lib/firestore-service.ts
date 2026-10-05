@@ -16,9 +16,7 @@ import { Company, Customer, PointRequest, ActivityLog, PrivateFeedback } from '@
 import { normalizePhone } from '@/lib/utils'
 import { hashPassword } from '@/lib/auth-crypto'
 import { handleFirestoreError, OperationType } from '@/lib/firestore-errors'
-import { isBase64Image, uploadCompanyFileServer } from '@/lib/storage-service'
-import fs from 'fs'
-import path from 'path'
+import { isBase64Image } from '@/lib/storage-client'
 import {
   INITIAL_COMPANIES,
   INITIAL_CUSTOMERS,
@@ -74,25 +72,6 @@ export async function ensureFirestoreInitialized(): Promise<void> {
         requests: INITIAL_REQUESTS,
         logs: INITIAL_LOGS,
         feedbacks: INITIAL_FEEDBACKS,
-      }
-
-      try {
-        const dbFile = path.join(process.cwd(), 'data', 'platform-db.json')
-        if (fs.existsSync(dbFile)) {
-          const content = fs.readFileSync(dbFile, 'utf-8')
-          const parsed = JSON.parse(content)
-          if (Array.isArray(parsed.companies) && parsed.companies.length > 0) {
-            legacyData = {
-              companies: parsed.companies,
-              customers: Array.isArray(parsed.customers) ? parsed.customers : INITIAL_CUSTOMERS,
-              requests: Array.isArray(parsed.requests) ? parsed.requests : INITIAL_REQUESTS,
-              logs: Array.isArray(parsed.logs) ? parsed.logs : INITIAL_LOGS,
-              feedbacks: Array.isArray(parsed.feedbacks) ? parsed.feedbacks : INITIAL_FEEDBACKS,
-            }
-          }
-        }
-      } catch (readErr) {
-        console.warn('Notice reading local legacy file, using default seeds:', readErr)
       }
 
       // 3. Migrate Companies to Firestore
@@ -269,27 +248,11 @@ export async function saveFirestoreCompany(
 
   // 3. Strict Base64 Defense: Never persist raw Base64 in Firestore documents
   if (isBase64Image(finalCompany.logoUrl)) {
-    const matches = finalCompany.logoUrl.match(/^data:([A-Za-z-+\/]+);base64,(.+)$/)
-    if (matches && matches[2]) {
-      const mime = matches[1]
-      const buf = Buffer.from(matches[2], 'base64')
-      const up = await uploadCompanyFileServer(finalCompany.id, 'logo', buf, 'logo.png', mime)
-      finalCompany.logoUrl = up.url || ''
-    } else {
-      finalCompany.logoUrl = ''
-    }
+    finalCompany.logoUrl = ''
   }
 
   if (isBase64Image(finalCompany.coverUrl)) {
-    const matches = finalCompany.coverUrl.match(/^data:([A-Za-z-+\/]+);base64,(.+)$/)
-    if (matches && matches[2]) {
-      const mime = matches[1]
-      const buf = Buffer.from(matches[2], 'base64')
-      const up = await uploadCompanyFileServer(finalCompany.id, 'cover', buf, 'cover.jpg', mime)
-      finalCompany.coverUrl = up.url || ''
-    } else {
-      finalCompany.coverUrl = '/images/cafe_central_banner_1791003956057.jpg'
-    }
+    finalCompany.coverUrl = '/images/cafe_central_banner_1791003956057.jpg'
   }
 
   try {

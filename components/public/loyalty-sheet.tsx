@@ -284,7 +284,7 @@ export const LoyaltySheet: React.FC<LoyaltySheetProps> = ({
 
   if (!isOpen) return null
 
-  const goal = company.loyaltyProgram.goalPoints || 10
+  const goal = company.loyaltyProgram?.goalPoints || 10
   const points = customer?.currentPoints || 0
   const remaining = Math.max(0, goal - points)
   const isGoalReached = points >= goal || (customer?.availableRewards || 0) > 0
@@ -322,7 +322,7 @@ export const LoyaltySheet: React.FC<LoyaltySheetProps> = ({
             </div>
             <div>
               <h2 className="font-bold text-neutral-900 text-base leading-tight">
-                {company.loyaltyProgram.campaignName || 'Cartão Fidelidade'}
+                {company.loyaltyProgram?.campaignName || 'Cartão Fidelidade'}
               </h2>
               <p className="text-xs text-neutral-500">{company.name}</p>
             </div>
@@ -483,7 +483,7 @@ export const LoyaltySheet: React.FC<LoyaltySheetProps> = ({
                     Recompensa do Programa
                   </span>
                   <p className="text-xs font-bold text-neutral-900">
-                    {company.loyaltyProgram.rewardDescription}
+                    {company.loyaltyProgram?.rewardDescription || 'Recompensa de Fidelidade'}
                   </p>
                   <p className="text-[11px] text-neutral-500">
                     Ao completar {goal} pontos
@@ -540,7 +540,7 @@ export const LoyaltySheet: React.FC<LoyaltySheetProps> = ({
                   </div>
                   <div>
                     <h4 className="text-base font-extrabold flex items-center gap-2">
-                      🎁 {company.loyaltyProgram.rewardDescription}
+                      🎁 {company.loyaltyProgram?.rewardDescription || 'Recompensa de Fidelidade'}
                     </h4>
                     <p className="text-xs text-amber-100 mt-1">
                       Apresente seu telefone no caixa para resgatar sua recompensa agora mesmo!
@@ -620,7 +620,7 @@ export const LoyaltySheet: React.FC<LoyaltySheetProps> = ({
                     ) : (
                       <>
                         Faltam <strong className="text-amber-300">{remaining}</strong> {remaining === 1 ? 'ponto' : 'pontos'} para ganhar:{' '}
-                        <strong className="text-white">{company.loyaltyProgram.rewardDescription}</strong>
+                        <strong className="text-white">{company.loyaltyProgram?.rewardDescription || 'Recompensa de Fidelidade'}</strong>
                       </>
                     )}
                   </p>
