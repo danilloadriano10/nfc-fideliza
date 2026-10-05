@@ -17,6 +17,8 @@ import {
   User,
   Image as ImageIcon,
   KeyRound,
+  Trash2,
+  RefreshCw,
 } from 'lucide-react'
 import { Company, WifiSecurity } from '@/types/platform'
 import { saveCompany, saveCompanyAsync, getAllCompanies } from '@/lib/storage'
@@ -60,6 +62,8 @@ export const NewCompanyModal: React.FC<NewCompanyModalProps> = ({
   const [coverUrl, setCoverUrl] = useState('/images/cafe_central_banner_1791003956057.jpg')
   const [coverFile, setCoverFile] = useState<File | null>(null)
   const [coverPreview, setCoverPreview] = useState<string>('/images/cafe_central_banner_1791003956057.jpg')
+  const [logoMode, setLogoMode] = useState<'upload' | 'url'>('upload')
+  const [coverMode, setCoverMode] = useState<'upload' | 'presets' | 'url'>('upload')
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false)
   const [uploadStatus, setUploadStatus] = useState<string>('')
   const [primaryColor, setPrimaryColor] = useState('#18181B')
@@ -230,6 +234,18 @@ export const NewCompanyModal: React.FC<NewCompanyModalProps> = ({
     setErrorMessage(null)
   }
 
+  const handleRemoveLogo = () => {
+    setLogoFile(null)
+    setLogoUrl('')
+    setLogoPreview('')
+  }
+
+  const handleResetCover = () => {
+    setCoverFile(null)
+    setCoverUrl('/images/cafe_central_banner_1791003956057.jpg')
+    setCoverPreview('/images/cafe_central_banner_1791003956057.jpg')
+  }
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setErrorMessage(null)
@@ -267,30 +283,30 @@ export const NewCompanyModal: React.FC<NewCompanyModalProps> = ({
     if (logoFile) {
       setUploadStatus('Enviando logo do estabelecimento...')
       const logoRes = await uploadCompanyImageFromClient(targetCompanyId, 'logo', logoFile)
-      if (!logoRes.success) {
-        setIsSubmitting(false)
-        setUploadStatus('')
-        const errorMsg = logoRes.error || 'Erro ao enviar logo.'
-        setErrorMessage(errorMsg)
-        console.error('[Erro ao enviar logo]:', logoRes.error)
-        return
+      if (logoRes.success && logoRes.url) {
+        finalLogoUrl = logoRes.url
+      } else {
+        console.warn('[Aviso upload logo]:', logoRes.error)
+        // Fallback to text url or empty, preserving all other company data
+        if (!finalLogoUrl) {
+          finalLogoUrl = logoUrl.trim() || ''
+        }
       }
-      finalLogoUrl = logoRes.url || ''
     }
 
     // 2. Upload Cover to Cloud Storage if a new file was chosen
     if (coverFile) {
       setUploadStatus('Enviando foto de capa do estabelecimento...')
       const coverRes = await uploadCompanyImageFromClient(targetCompanyId, 'cover', coverFile)
-      if (!coverRes.success) {
-        setIsSubmitting(false)
-        setUploadStatus('')
-        const errorMsg = coverRes.error || 'Erro ao enviar capa.'
-        setErrorMessage(errorMsg)
-        console.error('[Erro ao enviar capa]:', coverRes.error)
-        return
+      if (coverRes.success && coverRes.url) {
+        finalCoverUrl = coverRes.url
+      } else {
+        console.warn('[Aviso upload capa]:', coverRes.error)
+        // Fallback to text url or default banner, preserving all other company data
+        if (!finalCoverUrl || isBase64Image(finalCoverUrl)) {
+          finalCoverUrl = coverUrl.trim() || '/images/cafe_central_banner_1791003956057.jpg'
+        }
       }
-      finalCoverUrl = coverRes.url || '/images/cafe_central_banner_1791003956057.jpg'
     }
 
     // 3. Strict Defense: Never persist raw Base64 data strings in Firestore
@@ -615,20 +631,52 @@ export const NewCompanyModal: React.FC<NewCompanyModalProps> = ({
               </div>
 
               {/* 2. Upload de LOGO e FOTO DE CAPA */}
-              <div className="space-y-3 pt-2 border-t border-neutral-100">
-                <h3 className="text-xs font-bold text-neutral-400 uppercase tracking-wider flex items-center gap-1.5">
-                  <ImageIcon className="w-3.5 h-3.5" />
-                  2. Upload da Logo e Foto de Capa
-                </h3>
+              <div className="space-y-4 pt-3 border-t border-neutral-100">
+                <div className="flex items-center justify-between">
+                  <h3 className="text-xs font-bold text-neutral-800 uppercase tracking-wider flex items-center gap-1.5">
+                    <ImageIcon className="w-4 h-4 text-neutral-600" />
+                    2. Foto da Logo e Foto de Capa
+                  </h3>
+                  <span className="text-[11px] text-neutral-400">
+                    Upload de arquivo ou Link direto
+                  </span>
+                </div>
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  {/* Upload Logo */}
-                  <div className="space-y-2">
-                    <label className="block text-xs font-medium text-neutral-700">
-                      Logo do Estabelecimento (Quadrada)
-                    </label>
+                  {/* Foto da Logo */}
+                  <div className="bg-neutral-50/80 rounded-2xl p-3.5 border border-neutral-200/80 space-y-3">
+                    <div className="flex items-center justify-between">
+                      <label className="block text-xs font-semibold text-neutral-800">
+                        Foto da Logo (Quadrada)
+                      </label>
+                      <div className="flex bg-neutral-200/70 p-0.5 rounded-lg text-[10px] font-medium">
+                        <button
+                          type="button"
+                          onClick={() => setLogoMode('upload')}
+                          className={`px-2 py-0.5 rounded-md transition-all ${
+                            logoMode === 'upload'
+                              ? 'bg-white text-neutral-900 shadow-xs'
+                              : 'text-neutral-600 hover:text-neutral-900'
+                          }`}
+                        >
+                          Upload
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setLogoMode('url')}
+                          className={`px-2 py-0.5 rounded-md transition-all ${
+                            logoMode === 'url'
+                              ? 'bg-white text-neutral-900 shadow-xs'
+                              : 'text-neutral-600 hover:text-neutral-900'
+                          }`}
+                        >
+                          Link / URL
+                        </button>
+                      </div>
+                    </div>
+
                     <div className="flex items-center gap-3">
-                      <div className="w-16 h-16 rounded-2xl bg-neutral-100 border border-neutral-200 overflow-hidden flex items-center justify-center shrink-0">
+                      <div className="w-16 h-16 rounded-2xl bg-white border border-neutral-200 overflow-hidden flex items-center justify-center shrink-0 shadow-xs">
                         {logoPreview ? (
                           // eslint-disable-next-line @next/next/no-img-element
                           <img src={logoPreview} alt="Logo" className="w-full h-full object-cover" />
@@ -637,78 +685,173 @@ export const NewCompanyModal: React.FC<NewCompanyModalProps> = ({
                         )}
                       </div>
                       <div className="flex-1 space-y-1.5">
-                        <label className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-neutral-900 hover:bg-neutral-800 text-white text-xs font-medium cursor-pointer transition-colors shadow-sm">
-                          <Upload className="w-3.5 h-3.5" />
-                          <span>Fazer Upload da Logo</span>
-                          <input
-                            type="file"
-                            accept="image/*"
-                            onChange={handleLogoUpload}
-                            className="hidden"
-                          />
-                        </label>
-                        <p className="text-[10px] text-neutral-400">PNG, JPG ou WebP até 5MB</p>
+                        {logoMode === 'upload' ? (
+                          <div>
+                            <label className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-neutral-900 hover:bg-neutral-800 text-white text-xs font-medium cursor-pointer transition-colors shadow-xs">
+                              <Upload className="w-3.5 h-3.5" />
+                              <span>{logoPreview ? 'Trocar Foto da Logo' : 'Escolher Foto da Logo'}</span>
+                              <input
+                                type="file"
+                                accept="image/*"
+                                onChange={handleLogoUpload}
+                                className="hidden"
+                              />
+                            </label>
+                            <p className="text-[10px] text-neutral-400 mt-1">PNG, JPG ou WebP até 5MB</p>
+                          </div>
+                        ) : (
+                          <div>
+                            <input
+                              type="url"
+                              placeholder="https://exemplo.com/logo.png"
+                              value={logoUrl}
+                              onChange={(e) => {
+                                const val = e.target.value
+                                setLogoUrl(val)
+                                setLogoPreview(val)
+                                setLogoFile(null)
+                              }}
+                              className="w-full px-2.5 py-1.5 text-xs rounded-lg border border-neutral-300 bg-white focus:outline-none focus:ring-1 focus:ring-neutral-900"
+                            />
+                            <p className="text-[10px] text-neutral-400 mt-0.5">Cole o link direto da imagem</p>
+                          </div>
+                        )}
+
+                        {logoPreview && (
+                          <button
+                            type="button"
+                            onClick={handleRemoveLogo}
+                            className="inline-flex items-center gap-1 text-[11px] text-red-600 hover:text-red-700 font-medium"
+                          >
+                            <Trash2 className="w-3 h-3" />
+                            <span>Remover foto</span>
+                          </button>
+                        )}
                       </div>
                     </div>
-                    <input
-                      type="text"
-                      placeholder="Ou cole o link direto da imagem"
-                      value={logoUrl}
-                      onChange={(e) => {
-                        const val = e.target.value
-                        setLogoUrl(val)
-                        setLogoPreview(val)
-                        setLogoFile(null)
-                      }}
-                      className="w-full px-2.5 py-1.5 text-[11px] rounded-lg border border-neutral-200 text-neutral-600 focus:outline-none focus:ring-1 focus:ring-neutral-900"
-                    />
                   </div>
 
-                  {/* Upload Capa */}
-                  <div className="space-y-2">
-                    <label className="block text-xs font-medium text-neutral-700">
-                      Foto de Capa (Banner Superior)
-                    </label>
-                    <div className="relative h-16 rounded-xl bg-neutral-100 border border-neutral-200 overflow-hidden">
+                  {/* Foto de Capa */}
+                  <div className="bg-neutral-50/80 rounded-2xl p-3.5 border border-neutral-200/80 space-y-3">
+                    <div className="flex items-center justify-between">
+                      <label className="block text-xs font-semibold text-neutral-800">
+                        Foto de Capa (Banner)
+                      </label>
+                      <div className="flex bg-neutral-200/70 p-0.5 rounded-lg text-[10px] font-medium">
+                        <button
+                          type="button"
+                          onClick={() => setCoverMode('upload')}
+                          className={`px-2 py-0.5 rounded-md transition-all ${
+                            coverMode === 'upload'
+                              ? 'bg-white text-neutral-900 shadow-xs'
+                              : 'text-neutral-600 hover:text-neutral-900'
+                          }`}
+                        >
+                          Upload
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setCoverMode('presets')}
+                          className={`px-2 py-0.5 rounded-md transition-all ${
+                            coverMode === 'presets'
+                              ? 'bg-white text-neutral-900 shadow-xs'
+                              : 'text-neutral-600 hover:text-neutral-900'
+                          }`}
+                        >
+                          Prontas
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setCoverMode('url')}
+                          className={`px-2 py-0.5 rounded-md transition-all ${
+                            coverMode === 'url'
+                              ? 'bg-white text-neutral-900 shadow-xs'
+                              : 'text-neutral-600 hover:text-neutral-900'
+                          }`}
+                        >
+                          Link / URL
+                        </button>
+                      </div>
+                    </div>
+
+                    <div className="relative h-20 rounded-xl bg-white border border-neutral-200 overflow-hidden shadow-xs">
                       {coverPreview ? (
                         // eslint-disable-next-line @next/next/no-img-element
                         <img src={coverPreview} alt="Capa" className="w-full h-full object-cover" />
                       ) : (
                         <div className="w-full h-full flex items-center justify-center text-neutral-400 text-xs">
-                          Sem capa
+                          Sem capa selecionada
                         </div>
                       )}
-                      <label className="absolute inset-0 bg-black/40 hover:bg-black/60 flex items-center justify-center text-white text-xs font-medium cursor-pointer transition-all gap-1.5">
-                        <Upload className="w-3.5 h-3.5" />
-                        <span>Fazer Upload de Capa</span>
-                        <input
-                          type="file"
-                          accept="image/*"
-                          onChange={handleCoverUpload}
-                          className="hidden"
-                        />
-                      </label>
                     </div>
 
-                    <div className="flex gap-1.5 pt-1">
-                      {PRESET_BANNERS.map((preset) => (
+                    <div className="space-y-1.5">
+                      {coverMode === 'upload' && (
+                        <div className="flex items-center justify-between">
+                          <label className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-neutral-900 hover:bg-neutral-800 text-white text-xs font-medium cursor-pointer transition-colors shadow-xs">
+                            <Upload className="w-3.5 h-3.5" />
+                            <span>{coverPreview ? 'Trocar Foto de Capa' : 'Escolher Foto de Capa'}</span>
+                            <input
+                              type="file"
+                              accept="image/*"
+                              onChange={handleCoverUpload}
+                              className="hidden"
+                            />
+                          </label>
+                          <span className="text-[10px] text-neutral-400">1200×600 px recomendado</span>
+                        </div>
+                      )}
+
+                      {coverMode === 'presets' && (
+                        <div className="flex flex-wrap gap-1">
+                          {PRESET_BANNERS.map((preset) => (
+                            <button
+                              key={preset.label}
+                              type="button"
+                              onClick={() => {
+                                setCoverFile(null)
+                                setCoverUrl(preset.url)
+                                setCoverPreview(preset.url)
+                              }}
+                              className={`text-[10px] px-2.5 py-1 rounded-lg border transition-all ${
+                                coverPreview === preset.url
+                                  ? 'border-neutral-900 bg-neutral-900 text-white font-medium shadow-xs'
+                                  : 'border-neutral-200 bg-white text-neutral-600 hover:bg-neutral-100'
+                              }`}
+                            >
+                              {preset.label}
+                            </button>
+                          ))}
+                        </div>
+                      )}
+
+                      {coverMode === 'url' && (
+                        <div>
+                          <input
+                            type="url"
+                            placeholder="https://exemplo.com/minha-capa.jpg"
+                            value={coverUrl}
+                            onChange={(e) => {
+                              const val = e.target.value
+                              setCoverUrl(val)
+                              setCoverPreview(val)
+                              setCoverFile(null)
+                            }}
+                            className="w-full px-2.5 py-1.5 text-xs rounded-lg border border-neutral-300 bg-white focus:outline-none focus:ring-1 focus:ring-neutral-900"
+                          />
+                        </div>
+                      )}
+
+                      <div className="flex items-center justify-end pt-0.5">
                         <button
-                          key={preset.label}
                           type="button"
-                          onClick={() => {
-                            setCoverFile(null)
-                            setCoverUrl(preset.url)
-                            setCoverPreview(preset.url)
-                          }}
-                          className={`text-[10px] px-2 py-1 rounded-md border transition-all ${
-                            coverPreview === preset.url
-                              ? 'border-neutral-900 bg-neutral-900 text-white'
-                              : 'border-neutral-200 bg-white text-neutral-600 hover:bg-neutral-50'
-                          }`}
+                          onClick={handleResetCover}
+                          className="inline-flex items-center gap-1 text-[10px] text-neutral-500 hover:text-neutral-800"
                         >
-                          {preset.label}
+                          <RefreshCw className="w-2.5 h-2.5" />
+                          <span>Restaurar capa padrão</span>
                         </button>
-                      ))}
+                      </div>
                     </div>
                   </div>
                 </div>

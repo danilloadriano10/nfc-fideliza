@@ -31,6 +31,10 @@ import {
   RefreshCw,
   LogOut,
   ShieldCheck,
+  Upload,
+  ImageIcon,
+  Trash2,
+  Sparkles,
 } from 'lucide-react'
 import confetti from 'canvas-confetti'
 import {
@@ -56,10 +60,17 @@ import {
   approvePointRequestOnServerApi,
   rejectPointRequestOnServerApi,
 } from '@/lib/storage'
+import { uploadCompanyImageFromClient } from '@/lib/storage-client'
 import { formatPhone, normalizePhone } from '@/lib/utils'
 import { QRCodeView } from '@/components/common/qr-code'
 import { isOwnerAuthenticated, logoutOwner, AUTH_CHANGE_EVENT } from '@/lib/auth'
 import { CompanyLoginView } from './company-login-view'
+
+const PRESET_BANNERS = [
+  { label: '☕ Cafeteria / Café', url: '/images/cafe_central_banner_1791003956057.jpg' },
+  { label: '✂️ Barbearia / Estilo', url: '/images/barbearia_banner_1791003968071.jpg' },
+  { label: '🍕 Pizzaria / Restaurante', url: '/images/pizzaria_banner_1791003982257.jpg' },
+]
 
 interface CompanyPanelViewProps {
   initialCompany: Company
@@ -97,6 +108,71 @@ export const CompanyPanelView: React.FC<CompanyPanelViewProps> = ({
     },
   }))
   const [isSaving, setIsSaving] = useState(false)
+
+  // Visual identity (Logo & Cover) states
+  const [logoPreview, setLogoPreview] = useState<string>(initialCompany.logoUrl || '')
+  const [coverPreview, setCoverPreview] = useState<string>(
+    initialCompany.coverUrl || '/images/cafe_central_banner_1791003956057.jpg'
+  )
+  const [isUploadingLogo, setIsUploadingLogo] = useState(false)
+  const [isUploadingCover, setIsUploadingCover] = useState(false)
+  const [logoMode, setLogoMode] = useState<'upload' | 'url'>('upload')
+  const [coverMode, setCoverMode] = useState<'upload' | 'presets' | 'url'>('upload')
+
+  const handleLogoFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+
+    const tempUrl = URL.createObjectURL(file)
+    setLogoPreview(tempUrl)
+    setIsUploadingLogo(true)
+
+    const res = await uploadCompanyImageFromClient(company.id, 'logo', file)
+    setIsUploadingLogo(false)
+
+    if (res.success && res.url) {
+      const validUrl = res.url
+      setFormData((prev) => ({ ...prev, logoUrl: validUrl }))
+      setLogoPreview(validUrl)
+      showToast('success', 'Foto da logo atualizada com sucesso!')
+    } else {
+      showToast('error', res.error || 'Erro ao enviar foto da logo.')
+    }
+  }
+
+  const handleCoverFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+
+    const tempUrl = URL.createObjectURL(file)
+    setCoverPreview(tempUrl)
+    setIsUploadingCover(true)
+
+    const res = await uploadCompanyImageFromClient(company.id, 'cover', file)
+    setIsUploadingCover(false)
+
+    if (res.success && res.url) {
+      const validUrl = res.url
+      setFormData((prev) => ({ ...prev, coverUrl: validUrl }))
+      setCoverPreview(validUrl)
+      showToast('success', 'Foto de capa atualizada com sucesso!')
+    } else {
+      showToast('error', res.error || 'Erro ao enviar foto de capa.')
+    }
+  }
+
+  const handleRemoveLogo = () => {
+    setFormData((prev) => ({ ...prev, logoUrl: '' }))
+    setLogoPreview('')
+    showToast('success', 'Foto da logo removida.')
+  }
+
+  const handleResetCover = () => {
+    const defaultCover = '/images/cafe_central_banner_1791003956057.jpg'
+    setFormData((prev) => ({ ...prev, coverUrl: defaultCover }))
+    setCoverPreview(defaultCover)
+    showToast('success', 'Foto de capa redefinida para o padrão.')
+  }
 
   const [isAuthenticated, setIsAuthenticated] = useState<boolean>(() => {
     return typeof window !== 'undefined' ? isOwnerAuthenticated(initialCompany.id) : false
@@ -1110,17 +1186,294 @@ export const CompanyPanelView: React.FC<CompanyPanelViewProps> = ({
                     />
                   </div>
                 </div>
+              </div>
+            </div>
 
-                <div>
-                  <label className="block text-xs font-semibold text-neutral-700 mb-1">
-                    Foto de Capa (URL)
-                  </label>
-                  <input
-                    type="text"
-                    value={formData.coverUrl}
-                    onChange={(e) => setFormData({ ...formData, coverUrl: e.target.value })}
-                    className="w-full px-3 py-2 rounded-xl border border-neutral-300 text-xs focus:outline-none"
-                  />
+            {/* Foto da Logo e Foto de Capa (Identidade Visual) */}
+            <div className="bg-white rounded-3xl border border-neutral-200/80 shadow-sm p-6 space-y-6">
+              <div className="flex items-center justify-between pb-3 border-b border-neutral-100">
+                <div className="flex items-center gap-2.5">
+                  <div className="p-2 rounded-xl bg-neutral-900 text-white shadow-sm">
+                    <ImageIcon className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <h3 className="font-bold text-neutral-900 text-sm">
+                      Identidade Visual: Foto da Logo e Foto de Capa
+                    </h3>
+                    <p className="text-xs text-neutral-500">
+                      Personalize as fotos que aparecem na tela do smartphone quando o cliente aproxima na placa NFC.
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                {/* 1. SEÇÃO DE FOTO DA LOGO */}
+                <div className="rounded-2xl border border-neutral-200 bg-neutral-50/50 p-4 space-y-4">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <h4 className="text-xs font-bold text-neutral-900 uppercase tracking-wider flex items-center gap-1.5">
+                        <Store className="w-4 h-4 text-neutral-700" />
+                        Foto da Logo (Avatar)
+                      </h4>
+                      <p className="text-[11px] text-neutral-500">
+                        Foto quadrada do estabelecimento ou marca.
+                      </p>
+                    </div>
+
+                    {/* Modos: Upload ou URL */}
+                    <div className="flex bg-neutral-200/70 p-0.5 rounded-lg text-[10px] font-medium">
+                      <button
+                        type="button"
+                        onClick={() => setLogoMode('upload')}
+                        className={`px-2.5 py-1 rounded-md transition-all ${
+                          logoMode === 'upload'
+                            ? 'bg-white text-neutral-900 shadow-xs'
+                            : 'text-neutral-600 hover:text-neutral-900'
+                        }`}
+                      >
+                        Enviar Foto
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setLogoMode('url')}
+                        className={`px-2.5 py-1 rounded-md transition-all ${
+                          logoMode === 'url'
+                            ? 'bg-white text-neutral-900 shadow-xs'
+                            : 'text-neutral-600 hover:text-neutral-900'
+                        }`}
+                      >
+                        Link / URL
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Preview da Logo */}
+                  <div className="flex items-center gap-4 bg-white p-3.5 rounded-xl border border-neutral-200/80 shadow-xs">
+                    <div className="relative w-20 h-20 rounded-2xl bg-neutral-100 border border-neutral-200 overflow-hidden flex items-center justify-center shrink-0 shadow-inner">
+                      {logoPreview ? (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img
+                          src={logoPreview}
+                          alt="Logo Preview"
+                          className="w-full h-full object-cover"
+                        />
+                      ) : (
+                        <Store className="w-8 h-8 text-neutral-400" />
+                      )}
+                      {isUploadingLogo && (
+                        <div className="absolute inset-0 bg-black/60 flex flex-col items-center justify-center text-white text-[10px] font-medium">
+                          <RefreshCw className="w-4 h-4 animate-spin mb-1" />
+                          <span>Enviando...</span>
+                        </div>
+                      )}
+                    </div>
+
+                    <div className="flex-1 space-y-2">
+                      {logoMode === 'upload' ? (
+                        <div>
+                          <label className="inline-flex items-center gap-2 px-3.5 py-2 rounded-xl bg-neutral-900 hover:bg-neutral-800 text-white text-xs font-semibold cursor-pointer transition-colors shadow-sm">
+                            <Upload className="w-3.5 h-3.5" />
+                            <span>{logoPreview ? 'Trocar Foto da Logo' : 'Escolher Foto da Logo'}</span>
+                            <input
+                              type="file"
+                              accept="image/*"
+                              disabled={isUploadingLogo}
+                              onChange={handleLogoFileChange}
+                              className="hidden"
+                            />
+                          </label>
+                          <p className="text-[10px] text-neutral-400 mt-1">
+                            Formatos PNG, JPG ou WebP (compressão automática).
+                          </p>
+                        </div>
+                      ) : (
+                        <div>
+                          <label className="block text-[11px] font-medium text-neutral-700 mb-1">
+                            Cole o Link direto da imagem da logo:
+                          </label>
+                          <input
+                            type="url"
+                            placeholder="https://exemplo.com/minha-logo.png"
+                            value={formData.logoUrl || ''}
+                            onChange={(e) => {
+                              const val = e.target.value
+                              setFormData({ ...formData, logoUrl: val })
+                              setLogoPreview(val)
+                            }}
+                            className="w-full px-2.5 py-1.5 text-xs rounded-lg border border-neutral-300 focus:outline-none focus:ring-1 focus:ring-neutral-900"
+                          />
+                        </div>
+                      )}
+
+                      {logoPreview && (
+                        <button
+                          type="button"
+                          onClick={handleRemoveLogo}
+                          className="inline-flex items-center gap-1 text-[11px] text-red-600 hover:text-red-700 font-medium"
+                        >
+                          <Trash2 className="w-3 h-3" />
+                          <span>Remover foto da logo</span>
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                </div>
+
+                {/* 2. SEÇÃO DE FOTO DE CAPA */}
+                <div className="rounded-2xl border border-neutral-200 bg-neutral-50/50 p-4 space-y-4">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <h4 className="text-xs font-bold text-neutral-900 uppercase tracking-wider flex items-center gap-1.5">
+                        <ImageIcon className="w-4 h-4 text-neutral-700" />
+                        Foto de Capa (Banner Superior)
+                      </h4>
+                      <p className="text-[11px] text-neutral-500">
+                        Banner de destaque no topo da página de aproximação.
+                      </p>
+                    </div>
+
+                    {/* Modos: Upload, Capas Prontas ou URL */}
+                    <div className="flex bg-neutral-200/70 p-0.5 rounded-lg text-[10px] font-medium">
+                      <button
+                        type="button"
+                        onClick={() => setCoverMode('upload')}
+                        className={`px-2 py-1 rounded-md transition-all ${
+                          coverMode === 'upload'
+                            ? 'bg-white text-neutral-900 shadow-xs'
+                            : 'text-neutral-600 hover:text-neutral-900'
+                        }`}
+                      >
+                        Enviar Foto
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setCoverMode('presets')}
+                        className={`px-2 py-1 rounded-md transition-all ${
+                          coverMode === 'presets'
+                            ? 'bg-white text-neutral-900 shadow-xs'
+                            : 'text-neutral-600 hover:text-neutral-900'
+                        }`}
+                      >
+                        Prontas
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setCoverMode('url')}
+                        className={`px-2 py-1 rounded-md transition-all ${
+                          coverMode === 'url'
+                            ? 'bg-white text-neutral-900 shadow-xs'
+                            : 'text-neutral-600 hover:text-neutral-900'
+                        }`}
+                      >
+                        Link / URL
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Preview da Capa */}
+                  <div className="space-y-3 bg-white p-3.5 rounded-xl border border-neutral-200/80 shadow-xs">
+                    <div className="relative h-24 sm:h-28 rounded-xl bg-neutral-100 border border-neutral-200 overflow-hidden flex items-center justify-center shadow-inner">
+                      {coverPreview ? (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img
+                          src={coverPreview}
+                          alt="Cover Preview"
+                          className="w-full h-full object-cover"
+                        />
+                      ) : (
+                        <div className="text-neutral-400 text-xs flex items-center gap-1.5">
+                          <ImageIcon className="w-4 h-4" /> Sem capa selecionada
+                        </div>
+                      )}
+                      {isUploadingCover && (
+                        <div className="absolute inset-0 bg-black/60 flex flex-col items-center justify-center text-white text-xs font-medium">
+                          <RefreshCw className="w-5 h-5 animate-spin mb-1" />
+                          <span>Enviando foto de capa...</span>
+                        </div>
+                      )}
+                    </div>
+
+                    {coverMode === 'upload' && (
+                      <div className="flex items-center justify-between gap-3">
+                        <label className="inline-flex items-center gap-2 px-3.5 py-2 rounded-xl bg-neutral-900 hover:bg-neutral-800 text-white text-xs font-semibold cursor-pointer transition-colors shadow-sm">
+                          <Upload className="w-3.5 h-3.5" />
+                          <span>{coverPreview ? 'Trocar Foto de Capa' : 'Escolher Foto de Capa'}</span>
+                          <input
+                            type="file"
+                            accept="image/*"
+                            disabled={isUploadingCover}
+                            onChange={handleCoverFileChange}
+                            className="hidden"
+                          />
+                        </label>
+                        <p className="text-[10px] text-neutral-400">
+                          Resolução recomendada: 1200×600 px.
+                        </p>
+                      </div>
+                    )}
+
+                    {coverMode === 'presets' && (
+                      <div className="space-y-1.5">
+                        <span className="text-[10px] font-semibold text-neutral-500 uppercase">
+                          Escolha um banner temático pronto:
+                        </span>
+                        <div className="flex flex-wrap gap-1.5">
+                          {PRESET_BANNERS.map((preset) => (
+                            <button
+                              key={preset.label}
+                              type="button"
+                              onClick={() => {
+                                setFormData((prev) => ({ ...prev, coverUrl: preset.url }))
+                                setCoverPreview(preset.url)
+                                showToast('success', `Capa definida: ${preset.label}`)
+                              }}
+                              className={`text-xs px-3 py-1.5 rounded-lg border font-medium transition-all ${
+                                coverPreview === preset.url
+                                  ? 'border-neutral-900 bg-neutral-900 text-white shadow-xs'
+                                  : 'border-neutral-200 bg-neutral-50 text-neutral-700 hover:bg-white'
+                              }`}
+                            >
+                              {preset.label}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {coverMode === 'url' && (
+                      <div>
+                        <label className="block text-[11px] font-medium text-neutral-700 mb-1">
+                          Cole o Link direto da foto de capa:
+                        </label>
+                        <input
+                          type="url"
+                          placeholder="https://exemplo.com/minha-capa.jpg"
+                          value={formData.coverUrl || ''}
+                          onChange={(e) => {
+                            const val = e.target.value
+                            setFormData({ ...formData, coverUrl: val })
+                            setCoverPreview(val)
+                          }}
+                          className="w-full px-2.5 py-1.5 text-xs rounded-lg border border-neutral-300 focus:outline-none focus:ring-1 focus:ring-neutral-900"
+                        />
+                      </div>
+                    )}
+
+                    <div className="flex items-center justify-between pt-1">
+                      <span className="text-[10px] text-neutral-400">
+                        Foto atualizada em tempo real na página do cliente
+                      </span>
+                      <button
+                        type="button"
+                        onClick={handleResetCover}
+                        className="inline-flex items-center gap-1 text-[11px] text-neutral-500 hover:text-neutral-800"
+                      >
+                        <RefreshCw className="w-3 h-3" />
+                        <span>Restaurar padrão</span>
+                      </button>
+                    </div>
+                  </div>
                 </div>
               </div>
             </div>

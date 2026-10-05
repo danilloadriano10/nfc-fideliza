@@ -27,6 +27,11 @@ service cloud.firestore {
       allow read, write: if true;
     }
 
+    // Uploaded Images: Storage fallback when external CDN is not configured
+    match /uploaded_images/{imageId} {
+      allow read, write: if true;
+    }
+
     // Settings: System metadata and migration state
     match /settings/{settingId} {
       allow read, write: if true;
