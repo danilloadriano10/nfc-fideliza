@@ -15,6 +15,22 @@ export interface CompanyModules {
   location: boolean
   feedback: boolean
   instagram: boolean
+  services?: boolean
+}
+
+export interface CompanyService {
+  id: string
+  companyId: string
+  name: string
+  photoUrl?: string
+  description?: string
+  price?: number | null // null or undefined indicates "Consulte"
+  priceType?: 'fixed' | 'consult'
+  durationMinutes?: number | null // approximate duration in minutes (e.g., 30, 45, 60)
+  category?: string
+  isActive: boolean
+  createdAt: string
+  updatedAt?: string
 }
 
 export interface LoyaltyProgramConfig {

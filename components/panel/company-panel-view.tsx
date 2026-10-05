@@ -36,6 +36,8 @@ import {
   ImageIcon,
   Trash2,
   Sparkles,
+  Scissors,
+  Layers,
 } from 'lucide-react'
 import confetti from 'canvas-confetti'
 import {
@@ -48,6 +50,7 @@ import {
 } from '@/types/platform'
 import {
   getCompanyCustomers,
+  getCompanyServices,
   getCompanyActivityLogs,
   getCompanyFeedbacks,
   fetchFeedbacksForCompany,
@@ -67,6 +70,7 @@ import { QRCodeView } from '@/components/common/qr-code'
 import { isOwnerAuthenticated, logoutOwner, AUTH_CHANGE_EVENT } from '@/lib/auth'
 import { CompanyLoginView } from './company-login-view'
 import { CompanyOnboardingModal } from './company-onboarding-modal'
+import { ServicesTab } from './services-tab'
 
 const PRESET_BANNERS = [
   { label: '☕ Cafeteria / Café', url: '/images/cafe_central_banner_1791003956057.jpg' },
@@ -80,6 +84,7 @@ interface CompanyPanelViewProps {
 
 type TabType =
   | 'dashboard'
+  | 'services'
   | 'customers'
   | 'loyalty'
   | 'rewards'
@@ -105,6 +110,10 @@ export const CompanyPanelView: React.FC<CompanyPanelViewProps> = ({
   // Settings form state
   const [formData, setFormData] = useState<Company>(() => ({
     ...initialCompany,
+    modules: {
+      ...initialCompany.modules,
+      services: initialCompany.modules?.services ?? false,
+    },
     loyaltyProgram: initialCompany.loyaltyProgram || {
       isActive: true,
       goalPoints: 10,
@@ -350,6 +359,7 @@ export const CompanyPanelView: React.FC<CompanyPanelViewProps> = ({
 
   // Metrics
   const totalCustomers = customers.length
+  const servicesCount = getCompanyServices(company.id).length
   const totalPoints = logs.reduce((acc, l) => acc + (l.pointsChange || 0), 0)
   const rewardsAvailable = customers.reduce((acc, c) => acc + c.availableRewards, 0)
   const rewardsRedeemed = logs.filter((l) => l.type === 'reward_redeemed').length
@@ -489,6 +499,7 @@ export const CompanyPanelView: React.FC<CompanyPanelViewProps> = ({
         <div className="max-w-7xl mx-auto flex items-center gap-1 overflow-x-auto pt-3 mt-1 border-t border-neutral-100">
           {[
             { id: 'dashboard', label: 'Visão Geral', icon: LayoutDashboard },
+            { id: 'services', label: 'Serviços', count: servicesCount > 0 ? servicesCount : undefined, icon: Scissors },
             { id: 'customers', label: 'Clientes', count: totalCustomers, icon: Users },
             { id: 'loyalty', label: 'Fidelidade', icon: Gift },
             {
@@ -756,6 +767,16 @@ export const CompanyPanelView: React.FC<CompanyPanelViewProps> = ({
               </div>
             </div>
           </div>
+        )}
+
+        {/* ============================================== */}
+        {/* TAB 1.5: SERVIÇOS */}
+        {/* ============================================== */}
+        {activeTab === 'services' && (
+          <ServicesTab
+            company={company}
+            onEnableModule={() => setActiveTab('settings')}
+          />
         )}
 
         {/* ============================================== */}
@@ -1668,19 +1689,20 @@ export const CompanyPanelView: React.FC<CompanyPanelViewProps> = ({
               </div>
             </div>
 
-            {/* Modules Switches */}
-            <div className="bg-white rounded-3xl border border-neutral-200/80 shadow-sm p-6 space-y-4">
+            {/* Recursos da sua DiretoLink */}
+            <div className="bg-white rounded-3xl border border-neutral-200/80 shadow-sm p-6 space-y-5">
               <div>
                 <h3 className="font-bold text-neutral-900 text-sm">
-                  Módulos Ativos na Página Pública
+                  Recursos da sua DiretoLink
                 </h3>
                 <p className="text-xs text-neutral-500">
-                  Desative os botões que não deseja exibir para os consumidores na página NFC.
+                  Ative apenas os recursos que deseja disponibilizar aos seus clientes.
                 </p>
               </div>
 
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
                 {[
+                  { key: 'services', label: 'Serviços' },
                   { key: 'loyalty', label: 'Cartão Fidelidade' },
                   { key: 'googleReview', label: 'Avaliação Google' },
                   { key: 'menu', label: 'Cardápio' },
@@ -1697,7 +1719,7 @@ export const CompanyPanelView: React.FC<CompanyPanelViewProps> = ({
                     <span className="text-xs font-medium text-neutral-800">{mod.label}</span>
                     <input
                       type="checkbox"
-                      checked={formData.modules[mod.key as keyof typeof formData.modules]}
+                      checked={Boolean(formData.modules?.[mod.key as keyof typeof formData.modules])}
                       onChange={(e) =>
                         setFormData({
                           ...formData,
@@ -1711,6 +1733,44 @@ export const CompanyPanelView: React.FC<CompanyPanelViewProps> = ({
                     />
                   </label>
                 ))}
+              </div>
+
+              {/* Próximos Recursos Preview */}
+              <div className="pt-4 border-t border-neutral-100 space-y-2.5">
+                <div className="flex items-center gap-1.5">
+                  <Sparkles className="w-3.5 h-3.5 text-violet-600" />
+                  <h4 className="text-xs font-bold text-neutral-800">
+                    Próximos Recursos (Em desenvolvimento)
+                  </h4>
+                </div>
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5">
+                  {[
+                    { label: 'Agendamento', icon: Calendar, tag: 'Em breve' },
+                    { label: 'Catálogo de Produtos', icon: Layers, tag: 'Em breve' },
+                    { label: 'Promoções', icon: Sparkles, tag: 'Em breve' },
+                    { label: 'Portfólio / Galeria', icon: ImageIcon, tag: 'Em breve' },
+                    { label: 'Cupons de Desconto', icon: Gift, tag: 'Em breve' },
+                    { label: 'Outros Recursos', icon: Plus, tag: 'Em breve' },
+                  ].map((feat) => {
+                    const FeatIcon = feat.icon
+                    return (
+                      <div
+                        key={feat.label}
+                        className="flex items-center justify-between p-2.5 rounded-xl bg-neutral-50/70 border border-neutral-200/60 opacity-65"
+                      >
+                        <div className="flex items-center gap-2 min-w-0">
+                          <FeatIcon className="w-3.5 h-3.5 text-neutral-400 shrink-0" />
+                          <span className="text-xs text-neutral-600 font-medium truncate">
+                            {feat.label}
+                          </span>
+                        </div>
+                        <span className="text-[9px] font-bold uppercase tracking-wider text-violet-600 bg-violet-50 px-1.5 py-0.5 rounded-md shrink-0">
+                          {feat.tag}
+                        </span>
+                      </div>
+                    )
+                  })}
+                </div>
               </div>
             </div>
 

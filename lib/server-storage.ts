@@ -26,10 +26,15 @@ import {
   addFirestoreActivityLog,
   getFirestoreFeedbacks,
   saveFirestoreFeedback,
+  getFirestoreServices,
+  getFirestoreServiceById,
+  saveFirestoreService,
+  deleteFirestoreService,
+  toggleFirestoreServiceStatus,
   ensureFirestoreInitialized,
 } from './firestore-service'
 
-import { Company, Customer, PointRequest, ActivityLog, PrivateFeedback } from '@/types/platform'
+import { Company, Customer, PointRequest, ActivityLog, PrivateFeedback, CompanyService } from '@/types/platform'
 
 // Ensure system migration is initialized on startup
 ensureFirestoreInitialized().catch((err) => {
@@ -188,4 +193,39 @@ export async function saveServerFeedback(data: {
   customerPhone?: string
 }): Promise<{ success: boolean; feedback?: PrivateFeedback; error?: string }> {
   return await saveFirestoreFeedback(data)
+}
+
+// ==========================================
+// 6. SERVICES (MULTI-TENANT & ISOLATED)
+// ==========================================
+
+export async function getServerServices(companyId?: string): Promise<CompanyService[]> {
+  return await getFirestoreServices(companyId)
+}
+
+export async function getServerServiceById(
+  companyId: string,
+  serviceId: string
+): Promise<CompanyService | null> {
+  return await getFirestoreServiceById(companyId, serviceId)
+}
+
+export async function saveServerService(
+  service: CompanyService
+): Promise<{ success: boolean; service?: CompanyService; error?: string }> {
+  return await saveFirestoreService(service)
+}
+
+export async function deleteServerService(
+  serviceId: string,
+  companyId: string
+): Promise<{ success: boolean; error?: string }> {
+  return await deleteFirestoreService(serviceId, companyId)
+}
+
+export async function toggleServerServiceStatus(
+  serviceId: string,
+  companyId: string
+): Promise<{ success: boolean; error?: string }> {
+  return await toggleFirestoreServiceStatus(serviceId, companyId)
 }

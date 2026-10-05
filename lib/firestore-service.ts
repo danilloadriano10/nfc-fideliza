@@ -12,7 +12,7 @@ import {
   writeBatch,
 } from 'firebase/firestore'
 import { db } from '@/lib/firebase'
-import { Company, Customer, PointRequest, ActivityLog, PrivateFeedback } from '@/types/platform'
+import { Company, Customer, PointRequest, ActivityLog, PrivateFeedback, CompanyService } from '@/types/platform'
 import { normalizePhone } from '@/lib/utils'
 import { hashPassword } from '@/lib/auth-crypto'
 import { handleFirestoreError, OperationType } from '@/lib/firestore-errors'
@@ -32,6 +32,7 @@ const REQUESTS_COLLECTION = 'pointRequests'
 const FEEDBACKS_COLLECTION = 'feedbacks'
 const LOGS_COLLECTION = 'activityLogs'
 const SETTINGS_COLLECTION = 'settings'
+const SERVICES_COLLECTION = 'services'
 
 let migrationPromise: Promise<void> | null = null
 
@@ -978,5 +979,138 @@ export async function saveFirestoreFeedback(data: {
     return { success: true, feedback: newFeedback }
   } catch (err) {
     handleFirestoreError(err, OperationType.WRITE, `${FEEDBACKS_COLLECTION}/${feedId}`)
+  }
+}
+
+// ==========================================
+// 6. SERVICES (MULTI-TENANT & PREPARED FOR BOOKING)
+// ==========================================
+
+export async function getFirestoreServices(companyId?: string): Promise<CompanyService[]> {
+  try {
+    await ensureFirestoreInitialized()
+    const colRef = collection(db, SERVICES_COLLECTION)
+    let q
+    if (companyId) {
+      q = query(colRef, where('companyId', '==', companyId))
+    } else {
+      q = colRef
+    }
+    const snap = await getDocs(q)
+    const list: CompanyService[] = []
+    snap.forEach((d) => {
+      list.push(d.data() as CompanyService)
+    })
+    return list.sort((a, b) => (a.name || '').localeCompare(b.name || ''))
+  } catch (err) {
+    console.warn('Could not read services from Firestore (returning empty list):', err)
+    return []
+  }
+}
+
+export async function getFirestoreServiceById(
+  companyId: string,
+  serviceId: string
+): Promise<CompanyService | null> {
+  await ensureFirestoreInitialized()
+  try {
+    const docRef = doc(db, SERVICES_COLLECTION, serviceId)
+    const snap = await getDoc(docRef)
+    if (!snap.exists()) return null
+    const data = snap.data() as CompanyService
+    if (data.companyId !== companyId) return null
+    return data
+  } catch (err) {
+    handleFirestoreError(err, OperationType.GET, `${SERVICES_COLLECTION}/${serviceId}`)
+  }
+}
+
+export async function saveFirestoreService(
+  service: CompanyService
+): Promise<{ success: boolean; service?: CompanyService; error?: string }> {
+  if (!service.name || !service.name.trim()) {
+    return { success: false, error: 'Nome do serviço é obrigatório.' }
+  }
+  if (!service.companyId) {
+    return { success: false, error: 'companyId é obrigatório.' }
+  }
+
+  // Ensure no base64 in photoUrl
+  if (service.photoUrl && isBase64Image(service.photoUrl)) {
+    return { success: false, error: 'Foto não pode ser Base64. Utilize o upload oficial.' }
+  }
+
+  await ensureFirestoreInitialized()
+  const now = new Date().toISOString()
+  const serviceToSave: Record<string, unknown> = {
+    id: service.id,
+    companyId: service.companyId,
+    name: service.name.trim(),
+    description: service.description?.trim() || '',
+    category: service.category?.trim() || 'Geral',
+    price: typeof service.price === 'number' && !isNaN(service.price) ? service.price : null,
+    priceType: service.priceType || (service.price != null ? 'fixed' : 'consult'),
+    durationMinutes: typeof service.durationMinutes === 'number' && !isNaN(service.durationMinutes) ? service.durationMinutes : null,
+    isActive: service.isActive !== false,
+    updatedAt: now,
+    createdAt: service.createdAt || now,
+  }
+
+  if (service.photoUrl && typeof service.photoUrl === 'string' && service.photoUrl.trim()) {
+    serviceToSave.photoUrl = service.photoUrl.trim()
+  }
+
+  try {
+    const docRef = doc(db, SERVICES_COLLECTION, service.id)
+    await setDoc(docRef, serviceToSave, { merge: true })
+    return { success: true, service: serviceToSave as unknown as CompanyService }
+  } catch (err) {
+    handleFirestoreError(err, OperationType.WRITE, `${SERVICES_COLLECTION}/${service.id}`)
+  }
+}
+
+export async function deleteFirestoreService(
+  serviceId: string,
+  companyId: string
+): Promise<{ success: boolean; error?: string }> {
+  await ensureFirestoreInitialized()
+  try {
+    const docRef = doc(db, SERVICES_COLLECTION, serviceId)
+    const snap = await getDoc(docRef)
+    if (!snap.exists()) {
+      return { success: true }
+    }
+    const data = snap.data() as CompanyService
+    // Security check: isolate per companyId
+    if (data.companyId !== companyId) {
+      return { success: false, error: 'Operação não autorizada para este serviço.' }
+    }
+    await deleteDoc(docRef)
+    return { success: true }
+  } catch (err) {
+    handleFirestoreError(err, OperationType.DELETE, `${SERVICES_COLLECTION}/${serviceId}`)
+  }
+}
+
+export async function toggleFirestoreServiceStatus(
+  serviceId: string,
+  companyId: string
+): Promise<{ success: boolean; error?: string }> {
+  await ensureFirestoreInitialized()
+  try {
+    const docRef = doc(db, SERVICES_COLLECTION, serviceId)
+    const snap = await getDoc(docRef)
+    if (!snap.exists()) {
+      return { success: false, error: 'Serviço não encontrado.' }
+    }
+    const data = snap.data() as CompanyService
+    if (data.companyId !== companyId) {
+      return { success: false, error: 'Operação não autorizada para este serviço.' }
+    }
+    const newStatus = !data.isActive
+    await updateDoc(docRef, { isActive: newStatus, updatedAt: new Date().toISOString() })
+    return { success: true }
+  } catch (err) {
+    handleFirestoreError(err, OperationType.WRITE, `${SERVICES_COLLECTION}/${serviceId}`)
   }
 }

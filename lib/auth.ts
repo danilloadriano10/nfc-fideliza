@@ -19,7 +19,7 @@ function notifyAuthChange() {
 export function isAdminAuthenticated(): boolean {
   if (typeof window === 'undefined') return false
   try {
-    const val = localStorage.getItem(ADMIN_STORAGE_KEY)
+    const val = sessionStorage.getItem(ADMIN_STORAGE_KEY)
     return Boolean(val)
   } catch {
     return false
@@ -53,7 +53,8 @@ export async function loginAdmin(
 
     if (res.ok && data.success) {
       if (typeof window !== 'undefined') {
-        localStorage.setItem(ADMIN_STORAGE_KEY, data.token || 'authenticated')
+        sessionStorage.setItem(ADMIN_STORAGE_KEY, data.token || 'authenticated')
+        localStorage.removeItem(ADMIN_STORAGE_KEY)
         notifyAuthChange()
       }
       return { success: true }
@@ -73,6 +74,7 @@ export async function loginAdmin(
 
 export function logoutAdmin(): void {
   if (typeof window !== 'undefined') {
+    sessionStorage.removeItem(ADMIN_STORAGE_KEY)
     localStorage.removeItem(ADMIN_STORAGE_KEY)
     notifyAuthChange()
   }

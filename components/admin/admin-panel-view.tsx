@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect } from 'react'
 import Link from 'next/link'
+import { useRouter } from 'next/navigation'
 import {
   LayoutDashboard,
   Building2,
@@ -55,6 +56,7 @@ import { AdminLoginView } from './admin-login-view'
 type AdminTab = 'dashboard' | 'companies' | 'customers' | 'activity' | 'delete_company' | 'settings'
 
 export const AdminPanelView: React.FC = () => {
+  const router = useRouter()
   const [activeTab, setActiveTab] = useState<AdminTab>('dashboard')
   const [companies, setCompanies] = useState<Company[]>([])
   const [requests, setRequests] = useState<PointRequest[]>([])
@@ -86,10 +88,19 @@ export const AdminPanelView: React.FC = () => {
   }
 
   useEffect(() => {
+    if (!isAdminAuthenticated()) {
+      router.replace('/admin/login')
+      return
+    }
+
     loadData()
     syncCompaniesFromServer().then(() => loadData())
     const handleAuth = () => {
-      setIsAuthenticated(isAdminAuthenticated())
+      const auth = isAdminAuthenticated()
+      setIsAuthenticated(auth)
+      if (!auth) {
+        router.replace('/admin/login')
+      }
     }
 
     window.addEventListener(DATA_CHANGE_EVENT, loadData)
@@ -100,7 +111,7 @@ export const AdminPanelView: React.FC = () => {
       window.removeEventListener(AUTH_CHANGE_EVENT, handleAuth)
       window.removeEventListener('storage', loadData)
     }
-  }, [])
+  }, [router])
 
   const notify = (msg: string) => {
     setToastText(msg)
@@ -110,7 +121,7 @@ export const AdminPanelView: React.FC = () => {
   const handleLogout = () => {
     logoutAdmin()
     setIsAuthenticated(false)
-    notify('Sessão encerrada com sucesso.')
+    router.replace('/admin/login')
   }
 
   const handleToggleStatus = (id: string, name: string) => {

@@ -5,6 +5,7 @@ import {
   ActivityLog,
   PrivateFeedback,
   GlobalStats,
+  CompanyService,
 } from '@/types/platform'
 import {
   INITIAL_COMPANIES,
@@ -21,6 +22,7 @@ const STORAGE_KEYS = {
   REQUESTS: 'nfc_tenant_requests_v1',
   LOGS: 'nfc_tenant_logs_v1',
   FEEDBACKS: 'nfc_tenant_feedbacks_v1',
+  SERVICES: 'nfc_tenant_services_v1',
   CURRENT_CUSTOMER_PREFIX: 'nfc_client_session_',
 }
 
@@ -43,6 +45,7 @@ let memoryCustomers: Customer[] = [...INITIAL_CUSTOMERS]
 let memoryRequests: PointRequest[] = [...INITIAL_REQUESTS]
 let memoryLogs: ActivityLog[] = [...INITIAL_LOGS]
 let memoryFeedbacks: PrivateFeedback[] = [...INITIAL_FEEDBACKS]
+let memoryServices: CompanyService[] = []
 
 function isBrowser(): boolean {
   return typeof window !== 'undefined'
@@ -1193,4 +1196,125 @@ export function resetDemoData(): void {
   setItem(STORAGE_KEYS.LOGS, INITIAL_LOGS)
   setItem(STORAGE_KEYS.FEEDBACKS, INITIAL_FEEDBACKS)
   notifyDataChange()
+}
+
+// ==========================================
+// 8. SERVICES (MULTI-TENANT CRUD & SERVER SYNC)
+// ==========================================
+
+export function getCompanyServices(companyId: string): CompanyService[] {
+  if (!isBrowser()) {
+    return memoryServices.filter((s) => s.companyId === companyId)
+  }
+  const all = getItem<CompanyService[]>(STORAGE_KEYS.SERVICES, memoryServices) || []
+  return all.filter((s) => s.companyId === companyId)
+}
+
+export function saveCompanyServiceLocally(service: CompanyService): void {
+  if (!isBrowser()) return
+  const all = getItem<CompanyService[]>(STORAGE_KEYS.SERVICES, memoryServices) || []
+  const idx = all.findIndex((s) => s.id === service.id && s.companyId === service.companyId)
+  let updated: CompanyService[]
+  if (idx >= 0) {
+    updated = [...all]
+    updated[idx] = service
+  } else {
+    updated = [service, ...all]
+  }
+  memoryServices = updated
+  setItem(STORAGE_KEYS.SERVICES, updated)
+  notifyDataChange()
+}
+
+export function deleteCompanyServiceLocally(serviceId: string, companyId: string): void {
+  if (!isBrowser()) return
+  const all = getItem<CompanyService[]>(STORAGE_KEYS.SERVICES, memoryServices) || []
+  const updated = all.filter((s) => !(s.id === serviceId && s.companyId === companyId))
+  memoryServices = updated
+  setItem(STORAGE_KEYS.SERVICES, updated)
+  notifyDataChange()
+}
+
+export async function fetchCompanyServicesFromServer(companyId: string): Promise<CompanyService[]> {
+  if (!companyId) return []
+  try {
+    const res = await fetch(`/api/services?companyId=${encodeURIComponent(companyId)}`)
+    if (res.ok) {
+      const data = await res.json()
+      if (Array.isArray(data.services)) {
+        if (isBrowser()) {
+          const currentAll = getItem<CompanyService[]>(STORAGE_KEYS.SERVICES, memoryServices) || []
+          const otherServices = currentAll.filter((s) => s.companyId !== companyId)
+          const merged = [...data.services, ...otherServices]
+          memoryServices = merged
+          setItem(STORAGE_KEYS.SERVICES, merged)
+          notifyDataChange()
+        }
+        return data.services
+      }
+    }
+  } catch (err) {
+    console.error('Error fetching services from server:', err)
+  }
+  return getCompanyServices(companyId)
+}
+
+export async function saveCompanyServiceOnServerApi(
+  service: CompanyService,
+  isEdit = false
+): Promise<{ success: boolean; service?: CompanyService; error?: string }> {
+  saveCompanyServiceLocally(service)
+  try {
+    const res = await fetch('/api/services', {
+      method: isEdit ? 'PUT' : 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(service),
+    })
+    const data = await res.json()
+    if (res.ok && data.success) {
+      if (data.service) {
+        saveCompanyServiceLocally(data.service)
+      }
+      return { success: true, service: data.service || service }
+    }
+    return { success: false, error: data.error || 'Erro ao salvar serviço no servidor.' }
+  } catch {
+    return { success: true, service }
+  }
+}
+
+export async function deleteCompanyServiceOnServerApi(
+  serviceId: string,
+  companyId: string
+): Promise<boolean> {
+  deleteCompanyServiceLocally(serviceId, companyId)
+  try {
+    const res = await fetch(`/api/services?id=${encodeURIComponent(serviceId)}&companyId=${encodeURIComponent(companyId)}`, {
+      method: 'DELETE',
+    })
+    return res.ok
+  } catch {
+    return true
+  }
+}
+
+export async function toggleCompanyServiceOnServerApi(
+  serviceId: string,
+  companyId: string
+): Promise<boolean> {
+  const all = getCompanyServices(companyId)
+  const current = all.find((s) => s.id === serviceId)
+  if (current) {
+    saveCompanyServiceLocally({ ...current, isActive: !current.isActive })
+  }
+  try {
+    const res = await fetch('/api/services', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id: serviceId, companyId, toggleStatus: true }),
+    })
+    return res.ok
+  } catch {
+    return true
+  }
 }

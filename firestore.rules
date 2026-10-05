@@ -22,6 +22,11 @@ service cloud.firestore {
       allow read, write: if true;
     }
 
+    // Services: Company services for public showcase and booking preparation
+    match /services/{serviceId} {
+      allow read, write: if true;
+    }
+
     // Activity Logs: Audit logs
     match /activityLogs/{logId} {
       allow read, write: if true;

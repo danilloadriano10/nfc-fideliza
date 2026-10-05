@@ -71,6 +71,7 @@ export const CompanyOnboardingModal: React.FC<CompanyOnboardingModalProps> = ({
 
   // Step 3: Recursos
   const [modules, setModules] = useState({
+    services: company.modules?.services ?? false,
     loyalty: company.modules?.loyalty ?? true,
     googleReview: company.modules?.googleReview ?? true,
     menu: company.modules?.menu ?? false,
@@ -442,8 +443,9 @@ export const CompanyOnboardingModal: React.FC<CompanyOnboardingModalProps> = ({
                 <span className="text-xs font-bold text-neutral-800 block mb-2">
                   Quais recursos deseja ativar na sua placa NFC?
                 </span>
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5">
                   {[
+                    { key: 'services', label: 'Serviços' },
                     { key: 'loyalty', label: 'Fidelidade' },
                     { key: 'googleReview', label: 'Google Avaliações' },
                     { key: 'wifi', label: 'Wi-Fi' },

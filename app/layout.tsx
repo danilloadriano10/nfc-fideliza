@@ -2,17 +2,17 @@ import type {Metadata} from 'next';
 import './globals.css'; // Global styles
 
 export const metadata: Metadata = {
-  title: 'DiretoLink | Aproxime. Conecte. Pronto.',
-  description: 'DiretoLink - Um toque conecta o cliente à empresa. Plataforma SaaS moderna de presença digital, aproximação NFC e fidelização de clientes.',
+  title: 'DiretoLink | Tudo do seu negócio em um só lugar',
+  description: 'DiretoLink - Crie uma experiência digital completa para seus clientes. Reúna serviços, produtos, agendamentos, avaliações, fidelidade e WhatsApp em um único link. Compartilhe por link, QR Code ou NFC.',
   openGraph: {
-    title: 'DiretoLink | Aproxime. Conecte. Pronto.',
-    description: 'Um toque conecta o cliente à empresa. Plataforma inteligente de presença física NFC, fidelidade e conexão direta.',
+    title: 'DiretoLink | Tudo do seu negócio em um só lugar',
+    description: 'Um link. Várias possibilidades. Reúna serviços, produtos, agendamentos, avaliações, fidelidade e WhatsApp em um único link compartilhado por bio, QR Code ou NFC.',
     type: 'website',
   },
   twitter: {
     card: 'summary_large_image',
-    title: 'DiretoLink | Aproxime. Conecte. Pronto.',
-    description: 'Um toque conecta o cliente à empresa. Aproxime. Conecte. Pronto.',
+    title: 'DiretoLink | Tudo do seu negócio em um só lugar',
+    description: 'Um link. Várias possibilidades. Conecte clientes a tudo do seu negócio.',
   },
 };
 

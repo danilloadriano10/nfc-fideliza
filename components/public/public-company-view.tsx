@@ -11,14 +11,22 @@ import {
   MapPin,
   MessageSquareHeart,
   Store,
+  Scissors,
 } from 'lucide-react'
-import { Company } from '@/types/platform'
+import { Company, CompanyService } from '@/types/platform'
 import { ActionCard } from './action-card'
 import { LoyaltySheet } from './loyalty-sheet'
 import { WifiSheet } from './wifi-sheet'
 import { FeedbackSheet } from './feedback-sheet'
+import { ServicesSheet } from './services-sheet'
 import { InstagramSection } from './instagram-section'
-import { getLocalCustomerSession, getCustomerByPhone, DATA_CHANGE_EVENT } from '@/lib/storage'
+import {
+  getLocalCustomerSession,
+  getCustomerByPhone,
+  getCompanyServices,
+  fetchCompanyServicesFromServer,
+  DATA_CHANGE_EVENT,
+} from '@/lib/storage'
 
 interface PublicCompanyViewProps {
   company: Company
@@ -28,6 +36,8 @@ export const PublicCompanyView: React.FC<PublicCompanyViewProps> = ({ company })
   const [isLoyaltyOpen, setIsLoyaltyOpen] = useState(false)
   const [isWifiOpen, setIsWifiOpen] = useState(false)
   const [isFeedbackOpen, setIsFeedbackOpen] = useState(false)
+  const [isServicesOpen, setIsServicesOpen] = useState(false)
+  const [services, setServices] = useState<CompanyService[]>(() => getCompanyServices(company.id))
   const [coverError, setCoverError] = useState(false)
   const [logoError, setLogoError] = useState(false)
 
@@ -79,6 +89,23 @@ export const PublicCompanyView: React.FC<PublicCompanyViewProps> = ({ company })
     return () => {
       window.removeEventListener(DATA_CHANGE_EVENT, handleUpdate)
       window.removeEventListener('storage', handleUpdate)
+    }
+  }, [company.id])
+
+  // Services data sync
+  useEffect(() => {
+    setServices(getCompanyServices(company.id))
+    fetchCompanyServicesFromServer(company.id).then((srvs) => {
+      if (Array.isArray(srvs)) setServices(srvs)
+    })
+    const updateServices = () => {
+      setServices(getCompanyServices(company.id))
+    }
+    window.addEventListener(DATA_CHANGE_EVENT, updateServices)
+    window.addEventListener('storage', updateServices)
+    return () => {
+      window.removeEventListener(DATA_CHANGE_EVENT, updateServices)
+      window.removeEventListener('storage', updateServices)
     }
   }, [company.id])
 
@@ -145,15 +172,16 @@ export const PublicCompanyView: React.FC<PublicCompanyViewProps> = ({ company })
     setIsWifiOpen(true)
   }
 
-  const modules = company.modules || {
-    loyalty: true,
-    googleReview: true,
-    menu: true,
-    wifi: true,
-    whatsapp: true,
-    location: true,
-    feedback: true,
-    instagram: true,
+  const modules = {
+    services: company.modules?.services ?? false,
+    loyalty: company.modules?.loyalty ?? true,
+    googleReview: company.modules?.googleReview ?? true,
+    menu: company.modules?.menu ?? true,
+    wifi: company.modules?.wifi ?? true,
+    whatsapp: company.modules?.whatsapp ?? true,
+    location: company.modules?.location ?? true,
+    feedback: company.modules?.feedback ?? true,
+    instagram: company.modules?.instagram ?? true,
   }
   const loyaltyProgram = company.loyaltyProgram || {
     isActive: true,
@@ -240,6 +268,24 @@ export const PublicCompanyView: React.FC<PublicCompanyViewProps> = ({ company })
 
         {/* 3. BIG ACTION CARDS (Order strictly followed according to specs) */}
         <div className="px-4 sm:px-5 mt-6 space-y-3 flex-1">
+          {/* ✂️ SERVIÇOS */}
+          {modules.services && (
+            <ActionCard
+              icon={<Scissors className="w-6 h-6 text-violet-300" />}
+              title="Serviços"
+              subtitle="Conheça nossas opções e valores"
+              accentColor={company.primaryColor || '#6D28D9'}
+              badgeText={
+                services.filter((s) => s.isActive !== false).length > 0
+                  ? `${services.filter((s) => s.isActive !== false).length} ${
+                      services.filter((s) => s.isActive !== false).length === 1 ? 'opção' : 'opções'
+                    }`
+                  : undefined
+              }
+              onClick={() => setIsServicesOpen(true)}
+            />
+          )}
+
           {/* 1. 🎁 CARTÃO FIDELIDADE */}
           {modules.loyalty && loyaltyProgram.isActive && (
             <ActionCard
@@ -367,6 +413,13 @@ export const PublicCompanyView: React.FC<PublicCompanyViewProps> = ({ company })
           primaryColor={company.primaryColor}
           initialCustomerName={customerName}
           initialCustomerPhone={customerPhone || undefined}
+        />
+
+        <ServicesSheet
+          isOpen={isServicesOpen}
+          onClose={() => setIsServicesOpen(false)}
+          services={services}
+          company={company}
         />
       </main>
     </div>
