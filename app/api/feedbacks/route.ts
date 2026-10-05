@@ -57,7 +57,7 @@ export async function POST(req: NextRequest) {
   } catch (err) {
     console.error('Error in POST /api/feedbacks:', err)
     return NextResponse.json(
-      { success: false, error: 'Falha ao registrar feedback no Firestore.' },
+      { success: false, error: 'Falha ao registrar feedback no Firestore.', details: err instanceof Error ? err.message : String(err) },
       { status: 500 }
     )
   }

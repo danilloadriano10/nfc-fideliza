@@ -16,6 +16,7 @@ import { Company, Customer, PointRequest, ActivityLog, PrivateFeedback } from '@
 import { normalizePhone } from '@/lib/utils'
 import { hashPassword } from '@/lib/auth-crypto'
 import { handleFirestoreError, OperationType } from '@/lib/firestore-errors'
+import { isBase64Image, uploadCompanyFileServer } from '@/lib/storage-service'
 import fs from 'fs'
 import path from 'path'
 import {
@@ -263,6 +264,31 @@ export async function saveFirestoreCompany(
     finalCompany.createdAt = company.createdAt || new Date().toISOString()
     if (finalCompany.ownerAuth?.password) {
       finalCompany.ownerAuth.password = hashPassword(finalCompany.ownerAuth.password)
+    }
+  }
+
+  // 3. Strict Base64 Defense: Never persist raw Base64 in Firestore documents
+  if (isBase64Image(finalCompany.logoUrl)) {
+    const matches = finalCompany.logoUrl.match(/^data:([A-Za-z-+\/]+);base64,(.+)$/)
+    if (matches && matches[2]) {
+      const mime = matches[1]
+      const buf = Buffer.from(matches[2], 'base64')
+      const up = await uploadCompanyFileServer(finalCompany.id, 'logo', buf, 'logo.png', mime)
+      finalCompany.logoUrl = up.url || ''
+    } else {
+      finalCompany.logoUrl = ''
+    }
+  }
+
+  if (isBase64Image(finalCompany.coverUrl)) {
+    const matches = finalCompany.coverUrl.match(/^data:([A-Za-z-+\/]+);base64,(.+)$/)
+    if (matches && matches[2]) {
+      const mime = matches[1]
+      const buf = Buffer.from(matches[2], 'base64')
+      const up = await uploadCompanyFileServer(finalCompany.id, 'cover', buf, 'cover.jpg', mime)
+      finalCompany.coverUrl = up.url || ''
+    } else {
+      finalCompany.coverUrl = '/images/cafe_central_banner_1791003956057.jpg'
     }
   }
 
@@ -947,11 +973,17 @@ export async function saveFirestoreFeedback(data: {
   const newFeedback: PrivateFeedback = {
     id: feedId,
     companyId: data.companyId,
-    rating: data.rating,
     message: data.message.trim(),
-    customerName: data.customerName?.trim() || undefined,
-    customerPhone: data.customerPhone?.trim() || undefined,
     createdAt: new Date().toISOString(),
+  }
+  if (typeof data.rating === 'number') {
+    newFeedback.rating = data.rating
+  }
+  if (data.customerName && data.customerName.trim()) {
+    newFeedback.customerName = data.customerName.trim()
+  }
+  if (data.customerPhone && data.customerPhone.trim()) {
+    newFeedback.customerPhone = data.customerPhone.trim()
   }
 
   try {

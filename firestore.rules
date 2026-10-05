@@ -2,38 +2,34 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    function isValidId(id) {
-      return id is string && id.size() > 0 && id.size() <= 128;
-    }
-
-    // Companies collection (read & write with valid document ID)
+    // Companies: Multi-tenant establishments
     match /companies/{companyId} {
-      allow read, write: if isValidId(companyId);
+      allow read, write: if true;
     }
 
-    // Customers collection
+    // Customers: Loyalty customers scoped per companyId
     match /customers/{customerId} {
-      allow read, write: if isValidId(customerId);
+      allow read, write: if true;
     }
 
-    // Point Requests collection
+    // Point Requests: Point requests created by NFC and approved by cashiers
     match /pointRequests/{requestId} {
-      allow read, write: if isValidId(requestId);
+      allow read, write: if true;
     }
 
-    // Feedbacks collection
+    // Feedbacks: Customer feedback scoped per companyId
     match /feedbacks/{feedbackId} {
-      allow read, write: if isValidId(feedbackId);
+      allow read, write: if true;
     }
 
-    // Activity Logs collection
+    // Activity Logs: Audit logs
     match /activityLogs/{logId} {
-      allow read, write: if isValidId(logId);
+      allow read, write: if true;
     }
 
-    // Settings collection (system migration and flags)
+    // Settings: System metadata and migration state
     match /settings/{settingId} {
-      allow read, write: if isValidId(settingId);
+      allow read, write: if true;
     }
   }
 }

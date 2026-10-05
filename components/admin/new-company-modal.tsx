@@ -21,6 +21,7 @@ import {
 import { Company, WifiSecurity } from '@/types/platform'
 import { saveCompany, saveCompanyAsync, getAllCompanies } from '@/lib/storage'
 import { slugify } from '@/lib/utils'
+import { uploadCompanyImageFromClient, isBase64Image } from '@/lib/storage-client'
 import QRCode from 'qrcode'
 
 interface NewCompanyModalProps {
@@ -54,7 +55,13 @@ export const NewCompanyModal: React.FC<NewCompanyModalProps> = ({
   const [slug, setSlug] = useState('')
   const [tagline, setTagline] = useState('')
   const [logoUrl, setLogoUrl] = useState('')
+  const [logoFile, setLogoFile] = useState<File | null>(null)
+  const [logoPreview, setLogoPreview] = useState<string>('')
   const [coverUrl, setCoverUrl] = useState('/images/cafe_central_banner_1791003956057.jpg')
+  const [coverFile, setCoverFile] = useState<File | null>(null)
+  const [coverPreview, setCoverPreview] = useState<string>('/images/cafe_central_banner_1791003956057.jpg')
+  const [isSubmitting, setIsSubmitting] = useState<boolean>(false)
+  const [uploadStatus, setUploadStatus] = useState<string>('')
   const [primaryColor, setPrimaryColor] = useState('#18181B')
   const [secondaryColor, setSecondaryColor] = useState('#D97706')
   const [whatsapp, setWhatsapp] = useState('')
@@ -96,7 +103,11 @@ export const NewCompanyModal: React.FC<NewCompanyModalProps> = ({
       setSlug(companyToEdit.slug)
       setTagline(companyToEdit.tagline || '')
       setLogoUrl(companyToEdit.logoUrl || '')
-      setCoverUrl(companyToEdit.coverUrl || '')
+      setLogoPreview(companyToEdit.logoUrl || '')
+      setLogoFile(null)
+      setCoverUrl(companyToEdit.coverUrl || '/images/cafe_central_banner_1791003956057.jpg')
+      setCoverPreview(companyToEdit.coverUrl || '/images/cafe_central_banner_1791003956057.jpg')
+      setCoverFile(null)
       setPrimaryColor(companyToEdit.primaryColor || '#18181B')
       setSecondaryColor(companyToEdit.secondaryColor || '#D97706')
       setWhatsapp(companyToEdit.whatsapp || '')
@@ -119,7 +130,11 @@ export const NewCompanyModal: React.FC<NewCompanyModalProps> = ({
       setSlug('')
       setTagline('')
       setLogoUrl('')
+      setLogoPreview('')
+      setLogoFile(null)
       setCoverUrl('/images/cafe_central_banner_1791003956057.jpg')
+      setCoverPreview('/images/cafe_central_banner_1791003956057.jpg')
+      setCoverFile(null)
       setPrimaryColor('#18181B')
       setSecondaryColor('#D97706')
       setWhatsapp('')
@@ -186,18 +201,16 @@ export const NewCompanyModal: React.FC<NewCompanyModalProps> = ({
     const file = e.target.files?.[0]
     if (!file) return
 
-    if (file.size > 2 * 1024 * 1024) {
-      setErrorMessage('A imagem da logo deve ter no máximo 2MB.')
+    if (file.size > 5 * 1024 * 1024) {
+      setErrorMessage('A imagem da logo deve ter no máximo 5MB.')
       return
     }
 
-    const reader = new FileReader()
-    reader.onload = () => {
-      if (typeof reader.result === 'string') {
-        setLogoUrl(reader.result)
-      }
-    }
-    reader.readAsDataURL(file)
+    setLogoFile(file)
+    const localUrl = URL.createObjectURL(file)
+    setLogoPreview(localUrl)
+    setLogoUrl('')
+    setErrorMessage(null)
   }
 
   // File upload for Cover
@@ -205,18 +218,16 @@ export const NewCompanyModal: React.FC<NewCompanyModalProps> = ({
     const file = e.target.files?.[0]
     if (!file) return
 
-    if (file.size > 3 * 1024 * 1024) {
-      setErrorMessage('A foto de capa deve ter no máximo 3MB.')
+    if (file.size > 5 * 1024 * 1024) {
+      setErrorMessage('A foto de capa deve ter no máximo 5MB.')
       return
     }
 
-    const reader = new FileReader()
-    reader.onload = () => {
-      if (typeof reader.result === 'string') {
-        setCoverUrl(reader.result)
-      }
-    }
-    reader.readAsDataURL(file)
+    setCoverFile(file)
+    const localUrl = URL.createObjectURL(file)
+    setCoverPreview(localUrl)
+    setCoverUrl('')
+    setErrorMessage(null)
   }
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -245,14 +256,60 @@ export const NewCompanyModal: React.FC<NewCompanyModalProps> = ({
 
     const cleanOwnerUser = ownerUsername.trim() || cleanSlug
     const cleanOwnerPass = ownerPassword.trim() || 'empresa123'
+    const targetCompanyId = companyToEdit?.id || `comp_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`
+
+    setIsSubmitting(true)
+
+    let finalLogoUrl = logoUrl.trim()
+    let finalCoverUrl = coverUrl.trim() || '/images/cafe_central_banner_1791003956057.jpg'
+
+    // 1. Upload Logo to Cloud Storage if a new file was chosen
+    if (logoFile) {
+      setUploadStatus('Enviando logo do estabelecimento...')
+      const logoRes = await uploadCompanyImageFromClient(targetCompanyId, 'logo', logoFile)
+      if (!logoRes.success) {
+        setIsSubmitting(false)
+        setUploadStatus('')
+        const errorMsg = logoRes.error || 'Erro ao enviar logo.'
+        setErrorMessage(errorMsg)
+        console.error('[Erro ao enviar logo]:', logoRes.error)
+        return
+      }
+      finalLogoUrl = logoRes.url || ''
+    }
+
+    // 2. Upload Cover to Cloud Storage if a new file was chosen
+    if (coverFile) {
+      setUploadStatus('Enviando foto de capa do estabelecimento...')
+      const coverRes = await uploadCompanyImageFromClient(targetCompanyId, 'cover', coverFile)
+      if (!coverRes.success) {
+        setIsSubmitting(false)
+        setUploadStatus('')
+        const errorMsg = coverRes.error || 'Erro ao enviar capa.'
+        setErrorMessage(errorMsg)
+        console.error('[Erro ao enviar capa]:', coverRes.error)
+        return
+      }
+      finalCoverUrl = coverRes.url || '/images/cafe_central_banner_1791003956057.jpg'
+    }
+
+    // 3. Strict Defense: Never persist raw Base64 data strings in Firestore
+    if (isBase64Image(finalLogoUrl)) {
+      finalLogoUrl = ''
+    }
+    if (isBase64Image(finalCoverUrl)) {
+      finalCoverUrl = '/images/cafe_central_banner_1791003956057.jpg'
+    }
+
+    setUploadStatus('Gravando dados do estabelecimento no Cloud Firestore...')
 
     const targetCompany: Company = {
-      id: companyToEdit?.id || `comp_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
+      id: targetCompanyId,
       name: name.trim(),
       slug: cleanSlug,
       tagline: tagline.trim() || undefined,
-      logoUrl: logoUrl.trim() || '',
-      coverUrl: coverUrl.trim() || '/images/cafe_central_banner_1791003956057.jpg',
+      logoUrl: finalLogoUrl,
+      coverUrl: finalCoverUrl,
       primaryColor,
       secondaryColor,
       whatsapp: whatsapp.trim(),
@@ -283,12 +340,16 @@ export const NewCompanyModal: React.FC<NewCompanyModalProps> = ({
     }
 
     const res = await saveCompanyAsync(targetCompany)
+    setIsSubmitting(false)
+    setUploadStatus('')
+
     if (res.success) {
       setCreatedCompany(targetCompany)
       setStep('success')
       onCreated(targetCompany)
     } else {
-      setErrorMessage(res.error || 'Erro ao salvar estabelecimento.')
+      console.error('[Erro ao salvar empresa no Firestore]:', res.error)
+      setErrorMessage(res.error || 'Erro ao salvar empresa no Firestore.')
     }
   }
 
@@ -472,8 +533,31 @@ export const NewCompanyModal: React.FC<NewCompanyModalProps> = ({
           ) : (
             <form onSubmit={handleSubmit} className="space-y-6">
               {errorMessage && (
-                <div className="p-3 bg-red-50 text-red-600 text-xs rounded-xl border border-red-200">
-                  {errorMessage}
+                <div className="p-3.5 bg-red-50 text-red-700 text-xs rounded-xl border border-red-200 space-y-2">
+                  <div className="flex items-start gap-2">
+                    <span className="font-semibold shrink-0">⚠️ Atenção:</span>
+                    <p className="leading-relaxed">{errorMessage}</p>
+                  </div>
+                  {(logoFile || coverFile) && (
+                    <div className="pt-1 border-t border-red-200/60 flex items-center justify-between gap-2">
+                      <span className="text-[11px] text-red-600">
+                        Todos os outros dados preenchidos foram preservados.
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setLogoFile(null)
+                          setLogoPreview('')
+                          setCoverFile(null)
+                          setCoverPreview('/images/cafe_central_banner_1791003956057.jpg')
+                          setErrorMessage(null)
+                        }}
+                        className="px-2.5 py-1 text-[11px] font-semibold bg-white border border-red-300 hover:bg-red-100 rounded-lg text-red-800 transition-colors shrink-0"
+                      >
+                        Continuar cadastro sem fotos
+                      </button>
+                    </div>
+                  )}
                 </div>
               )}
 
@@ -545,9 +629,9 @@ export const NewCompanyModal: React.FC<NewCompanyModalProps> = ({
                     </label>
                     <div className="flex items-center gap-3">
                       <div className="w-16 h-16 rounded-2xl bg-neutral-100 border border-neutral-200 overflow-hidden flex items-center justify-center shrink-0">
-                        {logoUrl ? (
+                        {logoPreview ? (
                           // eslint-disable-next-line @next/next/no-img-element
-                          <img src={logoUrl} alt="Logo" className="w-full h-full object-cover" />
+                          <img src={logoPreview} alt="Logo" className="w-full h-full object-cover" />
                         ) : (
                           <Store className="w-6 h-6 text-neutral-400" />
                         )}
@@ -563,14 +647,19 @@ export const NewCompanyModal: React.FC<NewCompanyModalProps> = ({
                             className="hidden"
                           />
                         </label>
-                        <p className="text-[10px] text-neutral-400">PNG, JPG até 2MB</p>
+                        <p className="text-[10px] text-neutral-400">PNG, JPG ou WebP até 5MB</p>
                       </div>
                     </div>
                     <input
                       type="text"
                       placeholder="Ou cole o link direto da imagem"
                       value={logoUrl}
-                      onChange={(e) => setLogoUrl(e.target.value)}
+                      onChange={(e) => {
+                        const val = e.target.value
+                        setLogoUrl(val)
+                        setLogoPreview(val)
+                        setLogoFile(null)
+                      }}
                       className="w-full px-2.5 py-1.5 text-[11px] rounded-lg border border-neutral-200 text-neutral-600 focus:outline-none focus:ring-1 focus:ring-neutral-900"
                     />
                   </div>
@@ -581,9 +670,9 @@ export const NewCompanyModal: React.FC<NewCompanyModalProps> = ({
                       Foto de Capa (Banner Superior)
                     </label>
                     <div className="relative h-16 rounded-xl bg-neutral-100 border border-neutral-200 overflow-hidden">
-                      {coverUrl ? (
+                      {coverPreview ? (
                         // eslint-disable-next-line @next/next/no-img-element
-                        <img src={coverUrl} alt="Capa" className="w-full h-full object-cover" />
+                        <img src={coverPreview} alt="Capa" className="w-full h-full object-cover" />
                       ) : (
                         <div className="w-full h-full flex items-center justify-center text-neutral-400 text-xs">
                           Sem capa
@@ -606,9 +695,13 @@ export const NewCompanyModal: React.FC<NewCompanyModalProps> = ({
                         <button
                           key={preset.label}
                           type="button"
-                          onClick={() => setCoverUrl(preset.url)}
+                          onClick={() => {
+                            setCoverFile(null)
+                            setCoverUrl(preset.url)
+                            setCoverPreview(preset.url)
+                          }}
                           className={`text-[10px] px-2 py-1 rounded-md border transition-all ${
-                            coverUrl === preset.url
+                            coverPreview === preset.url
                               ? 'border-neutral-900 bg-neutral-900 text-white'
                               : 'border-neutral-200 bg-white text-neutral-600 hover:bg-neutral-50'
                           }`}
@@ -883,21 +976,40 @@ export const NewCompanyModal: React.FC<NewCompanyModalProps> = ({
                 </div>
               </div>
 
+              {/* Status de Upload e Processamento */}
+              {uploadStatus && (
+                <div className="p-3 bg-amber-50 text-amber-900 border border-amber-200 rounded-xl text-xs flex items-center gap-2">
+                  <div className="w-3.5 h-3.5 border-2 border-amber-600/30 border-t-amber-600 rounded-full animate-spin shrink-0" />
+                  <span>{uploadStatus}</span>
+                </div>
+              )}
+
               {/* Submit Buttons */}
               <div className="pt-4 border-t border-neutral-100 flex items-center justify-end gap-2">
                 <button
                   type="button"
+                  disabled={isSubmitting}
                   onClick={onClose}
-                  className="px-4 py-2 text-xs font-medium text-neutral-600 hover:text-neutral-900 rounded-xl"
+                  className="px-4 py-2 text-xs font-medium text-neutral-600 hover:text-neutral-900 disabled:opacity-50 rounded-xl"
                 >
                   Cancelar
                 </button>
                 <button
                   type="submit"
-                  className="px-5 py-2.5 bg-neutral-900 hover:bg-neutral-800 text-white text-xs font-semibold rounded-xl shadow transition-all flex items-center gap-1.5"
+                  disabled={isSubmitting}
+                  className="px-5 py-2.5 bg-neutral-900 hover:bg-neutral-800 disabled:opacity-60 text-white text-xs font-semibold rounded-xl shadow transition-all flex items-center gap-2 cursor-pointer"
                 >
-                  <Plus className="w-4 h-4" />
-                  <span>{isEditing ? 'Salvar Alterações' : 'Cadastrar Estabelecimento'}</span>
+                  {isSubmitting ? (
+                    <>
+                      <div className="w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin shrink-0" />
+                      <span>{uploadStatus || 'Processando...'}</span>
+                    </>
+                  ) : (
+                    <>
+                      <Plus className="w-4 h-4" />
+                      <span>{isEditing ? 'Salvar Alterações' : 'Cadastrar Estabelecimento'}</span>
+                    </>
+                  )}
                 </button>
               </div>
             </form>
