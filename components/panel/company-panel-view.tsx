@@ -27,6 +27,7 @@ import {
   AlertCircle,
   Copy,
   ArrowLeft,
+  ArrowRight,
   Store,
   RefreshCw,
   LogOut,
@@ -65,6 +66,7 @@ import { formatPhone, normalizePhone } from '@/lib/utils'
 import { QRCodeView } from '@/components/common/qr-code'
 import { isOwnerAuthenticated, logoutOwner, AUTH_CHANGE_EVENT } from '@/lib/auth'
 import { CompanyLoginView } from './company-login-view'
+import { CompanyOnboardingModal } from './company-onboarding-modal'
 
 const PRESET_BANNERS = [
   { label: '☕ Cafeteria / Café', url: '/images/cafe_central_banner_1791003956057.jpg' },
@@ -96,6 +98,9 @@ export const CompanyPanelView: React.FC<CompanyPanelViewProps> = ({
   const [customerSearch, setCustomerSearch] = useState('')
   const [toastMessage, setToastMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null)
   const [copiedLink, setCopiedLink] = useState(false)
+  const [isOnboardingOpen, setIsOnboardingOpen] = useState(
+    () => initialCompany.onboardingCompleted === false
+  )
 
   // Settings form state
   const [formData, setFormData] = useState<Company>(() => ({
@@ -540,6 +545,33 @@ export const CompanyPanelView: React.FC<CompanyPanelViewProps> = ({
         {/* ============================================== */}
         {activeTab === 'dashboard' && (
           <div className="space-y-6">
+            {/* Onboarding Welcome Banner if not yet completed */}
+            {company.onboardingCompleted !== true && (
+              <div className="p-4 sm:p-5 rounded-3xl bg-violet-50/80 border border-violet-200/90 shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-2xl bg-violet-600 text-white flex items-center justify-center shrink-0 shadow-xs">
+                    <Sparkles className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <h3 className="text-xs sm:text-sm font-bold text-violet-950">
+                      Vamos configurar sua DiretoLink
+                    </h3>
+                    <p className="text-[11px] text-violet-800">
+                      Personalize logo, capa, contatos e fidelidade para deixar sua placa NFC pronta.
+                    </p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setIsOnboardingOpen(true)}
+                  className="px-4 py-2.5 rounded-xl bg-violet-600 hover:bg-violet-700 text-white text-xs font-semibold shrink-0 shadow-xs flex items-center justify-center gap-1.5 transition-all self-start sm:self-auto cursor-pointer"
+                >
+                  <span>Iniciar Assistente</span>
+                  <ArrowRight className="w-3.5 h-3.5" />
+                </button>
+              </div>
+            )}
+
             {/* Live Pending Point Requests Alert (Multi-device Real-time) */}
             {pendingRequests.length > 0 && (
               <div className="p-4 sm:p-5 bg-gradient-to-r from-amber-50 to-orange-50 border-2 border-amber-300 rounded-3xl shadow-sm space-y-3">
@@ -1704,6 +1736,19 @@ export const CompanyPanelView: React.FC<CompanyPanelViewProps> = ({
           </form>
         )}
       </main>
+
+      {/* First Access Onboarding Modal */}
+      <CompanyOnboardingModal
+        isOpen={isOnboardingOpen}
+        company={company}
+        onFinish={(updated) => {
+          setIsOnboardingOpen(false)
+          setCompany(updated)
+          setFormData(updated)
+          loadData()
+          showToast('success', 'Configurações da DiretoLink salvas!')
+        }}
+      />
     </div>
   )
 }

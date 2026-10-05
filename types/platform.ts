@@ -27,6 +27,9 @@ export interface LoyaltyProgramConfig {
 export interface CompanyOwnerAuth {
   username: string
   password: string
+  ownerName?: string
+  ownerEmail?: string
+  ownerPhone?: string
 }
 
 export interface Company {
@@ -50,6 +53,8 @@ export interface Company {
   modules: CompanyModules
   loyaltyProgram: LoyaltyProgramConfig
   ownerAuth?: CompanyOwnerAuth
+  origin?: 'admin' | 'self_service'
+  onboardingCompleted?: boolean
   createdAt: string
   updatedAt: string
 }

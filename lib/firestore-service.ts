@@ -233,16 +233,39 @@ export async function saveFirestoreCompany(
     if (company.ownerAuth?.password) {
       if (company.ownerAuth.password !== existing.ownerAuth?.password) {
         finalCompany.ownerAuth = {
+          ...existing.ownerAuth,
+          ...company.ownerAuth,
           username: company.ownerAuth.username || company.slug,
           password: hashPassword(company.ownerAuth.password),
         }
+      } else {
+        finalCompany.ownerAuth = {
+          ...existing.ownerAuth,
+          ...company.ownerAuth,
+        }
       }
+    } else if (existing.ownerAuth) {
+      finalCompany.ownerAuth = {
+        ...existing.ownerAuth,
+        ...(company.ownerAuth || {}),
+      }
+    }
+    if (company.origin === undefined && existing.origin) {
+      finalCompany.origin = existing.origin
+    }
+    if (company.onboardingCompleted === undefined && existing.onboardingCompleted !== undefined) {
+      finalCompany.onboardingCompleted = existing.onboardingCompleted
     }
   } else {
     // New company registration
     finalCompany.createdAt = company.createdAt || new Date().toISOString()
+    finalCompany.origin = company.origin || 'admin'
+    finalCompany.onboardingCompleted = company.onboardingCompleted ?? false
     if (finalCompany.ownerAuth?.password) {
-      finalCompany.ownerAuth.password = hashPassword(finalCompany.ownerAuth.password)
+      finalCompany.ownerAuth = {
+        ...finalCompany.ownerAuth,
+        password: hashPassword(finalCompany.ownerAuth.password),
+      }
     }
   }
 

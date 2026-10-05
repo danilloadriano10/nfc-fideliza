@@ -217,8 +217,16 @@ export const CompanyLoginView: React.FC<CompanyLoginViewProps> = ({
           )}
         </div>
 
-        <div className="text-center pt-2 text-[11px] text-neutral-400 border-t border-neutral-100">
-          DiretoLink · Um toque conecta o cliente à empresa.
+        <div className="text-center pt-2 text-xs text-neutral-500 border-t border-neutral-100 space-y-1">
+          <p>
+            Ainda não tem conta?{' '}
+            <Link href="/cadastro" className="font-semibold text-violet-700 hover:underline">
+              Criar minha empresa
+            </Link>
+          </p>
+          <p className="text-[11px] text-neutral-400">
+            DiretoLink · Um toque conecta o cliente à empresa.
+          </p>
         </div>
       </div>
     </div>

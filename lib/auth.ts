@@ -92,6 +92,13 @@ export function isOwnerAuthenticated(companyId: string): boolean {
   }
 }
 
+export function setOwnerAuthenticatedSession(companyId: string): void {
+  if (typeof window !== 'undefined') {
+    localStorage.setItem(`${OWNER_STORAGE_KEY_PREFIX}${companyId}`, 'true')
+    notifyAuthChange()
+  }
+}
+
 export async function loginOwnerAsync(
   company: Company,
   usernameInput: string,

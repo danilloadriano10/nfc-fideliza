@@ -19,10 +19,13 @@ import {
   Menu,
   X,
   ChevronRight,
+  PlusCircle,
 } from 'lucide-react'
+import { RegisterCompanyModal } from '@/components/auth/register-company-modal'
 
 export default function HomePage() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
+  const [isRegisterModalOpen, setIsRegisterModalOpen] = useState(false)
 
   return (
     <div className="min-h-screen bg-white text-neutral-900 flex flex-col selection:bg-violet-100 selection:text-violet-900 font-sans w-full max-w-full overflow-x-hidden">
@@ -52,35 +55,36 @@ export default function HomePage() {
           <div className="hidden md:flex items-center gap-2 sm:gap-3 shrink-0">
             <Link
               href="/painel"
-              className="px-3.5 py-2 rounded-xl bg-white border border-neutral-200 text-neutral-700 hover:text-neutral-900 hover:border-neutral-300 font-semibold text-xs transition-all shadow-xs flex items-center gap-1.5"
+              className="px-3.5 py-2 rounded-xl bg-white border border-neutral-200 hover:border-neutral-300 text-neutral-700 hover:text-neutral-900 font-semibold text-xs transition-all shadow-xs flex items-center gap-1.5"
             >
-              <Store className="w-3.5 h-3.5 text-violet-600" />
-              <span>Painel do Estabelecimento</span>
+              <Store className="w-3.5 h-3.5 text-neutral-500" />
+              <span>Entrar</span>
             </Link>
 
-            <Link
-              href="/admin"
-              className="px-3.5 py-2 rounded-xl bg-violet-600 text-white hover:bg-violet-700 font-semibold text-xs transition-all shadow-xs flex items-center gap-1.5"
+            <button
+              type="button"
+              onClick={() => setIsRegisterModalOpen(true)}
+              className="px-4 py-2 rounded-xl bg-violet-600 text-white hover:bg-violet-700 font-semibold text-xs transition-all shadow-xs flex items-center gap-1.5 cursor-pointer"
             >
-              <ShieldCheck className="w-3.5 h-3.5 stroke-[2.5]" />
-              <span>Administração</span>
-            </Link>
+              <Sparkles className="w-3.5 h-3.5" />
+              <span>Criar minha empresa</span>
+            </button>
           </div>
 
           {/* Mobile Navigation Controls */}
           <div className="flex md:hidden items-center gap-1.5 shrink-0">
             <Link
               href="/painel"
-              className="px-2.5 py-1.5 rounded-lg bg-violet-50 text-violet-700 hover:bg-violet-100 font-semibold text-[11px] border border-violet-100 transition-colors flex items-center gap-1"
+              className="px-2.5 py-1.5 rounded-lg bg-neutral-100 text-neutral-800 hover:bg-neutral-200 font-semibold text-[11px] border border-neutral-200/80 transition-colors flex items-center gap-1"
             >
-              <Store className="w-3 h-3" />
-              <span>Painel</span>
+              <Store className="w-3 h-3 text-neutral-600" />
+              <span>Entrar</span>
             </Link>
 
             <button
               type="button"
               onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-              className="w-8 h-8 rounded-lg border border-neutral-200 bg-white hover:bg-neutral-50 flex items-center justify-center text-neutral-700 transition-colors shadow-2xs"
+              className="w-8 h-8 rounded-lg border border-neutral-200 bg-white hover:bg-neutral-50 flex items-center justify-center text-neutral-700 transition-colors shadow-2xs cursor-pointer"
               aria-label={mobileMenuOpen ? 'Fechar menu' : 'Abrir menu'}
               aria-expanded={mobileMenuOpen}
             >
@@ -97,52 +101,73 @@ export default function HomePage() {
         {mobileMenuOpen && (
           <div className="md:hidden border-t border-neutral-200 bg-white px-3.5 py-4 space-y-3 shadow-lg w-full max-w-full overflow-x-hidden animate-fade-in">
             <div className="flex items-center justify-between text-[10px] font-bold uppercase tracking-wider text-neutral-400 px-1">
-              <span>Portais de Acesso</span>
-              <span className="text-violet-600">DiretoLink</span>
+              <span>Navegação DiretoLink</span>
+              <span className="text-violet-600 font-bold">Plataforma NFC</span>
             </div>
 
             <div className="space-y-2">
-              <Link
-                href="/painel"
-                onClick={() => setMobileMenuOpen(false)}
-                className="flex items-center gap-3 p-3 rounded-2xl bg-neutral-50 hover:bg-violet-50/70 border border-neutral-200/90 active:scale-[0.99] transition-all"
+              {/* Primary action: Criar minha empresa */}
+              <button
+                type="button"
+                onClick={() => {
+                  setMobileMenuOpen(false)
+                  setIsRegisterModalOpen(true)
+                }}
+                className="w-full flex items-center gap-3 p-3 rounded-2xl bg-violet-50 hover:bg-violet-100 border border-violet-200 text-left active:scale-[0.99] transition-all cursor-pointer"
               >
                 <div className="w-9 h-9 rounded-xl bg-violet-600 text-white flex items-center justify-center shrink-0 shadow-xs">
-                  <Store className="w-4 h-4" />
+                  <Sparkles className="w-4 h-4" />
                 </div>
                 <div className="min-w-0 flex-1">
-                  <span className="text-xs font-bold text-neutral-900 block truncate">
-                    Painel do Estabelecimento
-                  </span>
-                  <span className="text-[11px] text-neutral-500 block truncate">
-                    Acesso exclusivo de lojistas e caixas
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-xs font-bold text-violet-950 block truncate">
+                      Criar minha empresa
+                    </span>
+                    <span className="text-[9px] font-bold uppercase bg-violet-600 text-white px-1.5 py-0.2 rounded-md">
+                      Grátis
+                    </span>
+                  </div>
+                  <span className="text-[11px] text-violet-700 block truncate">
+                    Cadastre e configure sua placa NFC em 1 minuto
                   </span>
                 </div>
-                <ChevronRight className="w-4 h-4 text-neutral-400 shrink-0" />
-              </Link>
+                <ChevronRight className="w-4 h-4 text-violet-400 shrink-0" />
+              </button>
 
+              {/* Secondary action: Entrar */}
               <Link
-                href="/admin"
+                href="/painel"
                 onClick={() => setMobileMenuOpen(false)}
                 className="flex items-center gap-3 p-3 rounded-2xl bg-neutral-50 hover:bg-neutral-100 border border-neutral-200/90 active:scale-[0.99] transition-all"
               >
                 <div className="w-9 h-9 rounded-xl bg-neutral-900 text-white flex items-center justify-center shrink-0 shadow-xs">
-                  <ShieldCheck className="w-4 h-4" />
+                  <Store className="w-4 h-4" />
                 </div>
                 <div className="min-w-0 flex-1">
                   <span className="text-xs font-bold text-neutral-900 block truncate">
-                    Painel Administrativo Master
+                    Entrar no Painel
                   </span>
                   <span className="text-[11px] text-neutral-500 block truncate">
-                    Gestão central de empresas e módulos NFC
+                    Acesso para estabelecimentos cadastrados
                   </span>
                 </div>
                 <ChevronRight className="w-4 h-4 text-neutral-400 shrink-0" />
               </Link>
             </div>
 
-            <div className="pt-2 text-center text-[10px] text-neutral-400 border-t border-neutral-100">
-              Aproxime. Conecte. Pronto.
+            {/* Discreto: Administrador Master */}
+            <div className="pt-2 border-t border-neutral-100 flex items-center justify-between">
+              <Link
+                href="/admin"
+                onClick={() => setMobileMenuOpen(false)}
+                className="text-[11px] text-neutral-400 hover:text-neutral-700 flex items-center gap-1.5 transition-colors"
+              >
+                <ShieldCheck className="w-3.5 h-3.5 text-neutral-400" />
+                <span>Administrador Master</span>
+              </Link>
+              <span className="text-[10px] text-neutral-400">
+                Aproxime. Conecte. Pronto.
+              </span>
             </div>
           </div>
         )}
@@ -170,21 +195,22 @@ export default function HomePage() {
 
           {/* Action CTAs */}
           <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-center gap-2.5 sm:gap-3.5 pt-3 w-full max-w-md sm:max-w-none mx-auto">
-            <Link
-              href="/painel"
-              className="w-full sm:w-auto px-6 py-3.5 rounded-xl bg-violet-600 hover:bg-violet-700 text-white font-semibold text-xs shadow-xs transition-all flex items-center justify-center gap-2"
+            <button
+              type="button"
+              onClick={() => setIsRegisterModalOpen(true)}
+              className="w-full sm:w-auto px-7 py-3.5 rounded-xl bg-violet-600 hover:bg-violet-700 text-white font-semibold text-xs shadow-xs transition-all flex items-center justify-center gap-2 cursor-pointer"
             >
-              <Store className="w-4 h-4 shrink-0" />
-              <span>Acessar Painel do Estabelecimento</span>
+              <Sparkles className="w-4 h-4 shrink-0" />
+              <span>Criar minha empresa</span>
               <ArrowRight className="w-4 h-4 shrink-0" />
-            </Link>
+            </button>
 
             <Link
-              href="/admin"
-              className="w-full sm:w-auto px-6 py-3.5 rounded-xl bg-white hover:bg-neutral-50 text-neutral-800 font-semibold text-xs border border-neutral-200 shadow-xs transition-all flex items-center justify-center gap-2"
+              href="/painel"
+              className="w-full sm:w-auto px-7 py-3.5 rounded-xl bg-white hover:bg-neutral-50 text-neutral-800 font-semibold text-xs border border-neutral-200 shadow-xs transition-all flex items-center justify-center gap-2"
             >
-              <ShieldCheck className="w-4 h-4 text-violet-600 shrink-0" />
-              <span>Painel Administrativo Master</span>
+              <Store className="w-4 h-4 text-violet-600 shrink-0" />
+              <span>Entrar no Painel</span>
             </Link>
           </div>
         </div>
@@ -236,44 +262,49 @@ export default function HomePage() {
           </div>
         </div>
 
-        {/* Portais de Acesso */}
+        {/* Portais de Acesso Principais */}
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6 pt-2 w-full max-w-full">
-          {/* Card 1: Proprietário */}
+          {/* Card 1: Autocadastro de Empresa */}
           <div className="p-5 sm:p-8 rounded-3xl bg-neutral-50 border border-neutral-200/80 space-y-4 sm:space-y-5 flex flex-col justify-between break-words">
             <div className="space-y-2.5 sm:space-y-3">
-              <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-white text-violet-600 flex items-center justify-center border border-neutral-200 shadow-xs">
+              <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-violet-600 text-white flex items-center justify-center shadow-xs">
+                <Sparkles className="w-4 h-4 sm:w-5 sm:h-5" />
+              </div>
+              <h3 className="text-base sm:text-lg font-bold text-neutral-900">
+                Criar Minha Empresa
+              </h3>
+              <p className="text-xs text-neutral-600 leading-relaxed">
+                Cadastre sua empresa em menos de 1 minuto. Crie seu link exclusivo, configure as cores e ative a fidelidade digital para colocar na sua placa NFC.
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={() => setIsRegisterModalOpen(true)}
+              className="py-3 px-5 rounded-xl bg-violet-600 hover:bg-violet-700 text-white font-semibold text-xs text-center transition-all shadow-xs flex items-center justify-center gap-2 cursor-pointer"
+            >
+              <span>Começar Agora • Criar Empresa</span>
+              <ArrowRight className="w-4 h-4 shrink-0" />
+            </button>
+          </div>
+
+          {/* Card 2: Login no Painel do Estabelecimento */}
+          <div className="p-5 sm:p-8 rounded-3xl bg-neutral-50 border border-neutral-200/80 space-y-4 sm:space-y-5 flex flex-col justify-between break-words">
+            <div className="space-y-2.5 sm:space-y-3">
+              <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-white text-neutral-800 flex items-center justify-center border border-neutral-200 shadow-xs">
                 <Store className="w-4 h-4 sm:w-5 sm:h-5" />
               </div>
-              <h3 className="text-base sm:text-lg font-bold text-neutral-900">Portal do Estabelecimento</h3>
+              <h3 className="text-base sm:text-lg font-bold text-neutral-900">
+                Já possui cadastro? Entrar
+              </h3>
               <p className="text-xs text-neutral-600 leading-relaxed">
-                Área exclusiva para lojistas e gestores de cada estabelecimento. Acesse com seu usuário e senha para gerenciar clientes, aprovar pontos de fidelidade, responder feedbacks e atualizar horários.
+                Área para lojistas e operadores acessarem seu estabelecimento. Valide pontos de fidelidade dos clientes, responda feedbacks e configure horários.
               </p>
             </div>
             <Link
               href="/painel"
-              className="py-3 px-5 rounded-xl bg-violet-600 hover:bg-violet-700 text-white font-semibold text-xs text-center transition-all shadow-xs flex items-center justify-center gap-2"
-            >
-              <span>Entrar no Painel do Estabelecimento</span>
-              <ArrowRight className="w-4 h-4 shrink-0" />
-            </Link>
-          </div>
-
-          {/* Card 2: Administrador */}
-          <div className="p-5 sm:p-8 rounded-3xl bg-neutral-50 border border-neutral-200/80 space-y-4 sm:space-y-5 flex flex-col justify-between break-words">
-            <div className="space-y-2.5 sm:space-y-3">
-              <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-white text-neutral-800 flex items-center justify-center border border-neutral-200 shadow-xs">
-                <ShieldCheck className="w-4 h-4 sm:w-5 sm:h-5" />
-              </div>
-              <h3 className="text-base sm:text-lg font-bold text-neutral-900">Painel Administrativo Master</h3>
-              <p className="text-xs text-neutral-600 leading-relaxed">
-                Área central da gerência da DiretoLink para cadastrar novos estabelecimentos, definir módulos, configurar acessos de proprietários e monitorar a métrica global da plataforma.
-              </p>
-            </div>
-            <Link
-              href="/admin"
               className="py-3 px-5 rounded-xl bg-neutral-900 hover:bg-neutral-800 text-white font-semibold text-xs text-center transition-all shadow-xs flex items-center justify-center gap-2"
             >
-              <span>Entrar no Painel Administrativo</span>
+              <span>Acessar Painel do Estabelecimento</span>
               <ArrowRight className="w-4 h-4 shrink-0" />
             </Link>
           </div>
@@ -291,15 +322,33 @@ export default function HomePage() {
             <span className="text-neutral-400">· Aproxime. Conecte. Pronto.</span>
           </div>
           <div className="flex items-center gap-4 sm:gap-5 text-[11px] sm:text-xs">
-            <Link href="/painel" className="hover:text-neutral-900 transition-colors">
-              Portal do Estabelecimento
+            <button
+              type="button"
+              onClick={() => setIsRegisterModalOpen(true)}
+              className="hover:text-neutral-900 transition-colors font-medium cursor-pointer"
+            >
+              Criar Minha Empresa
+            </button>
+            <Link href="/painel" className="hover:text-neutral-900 transition-colors font-medium">
+              Entrar
             </Link>
-            <Link href="/admin" className="hover:text-neutral-900 transition-colors">
-              Administrador Geral
+            <Link
+              href="/admin"
+              className="text-neutral-400 hover:text-neutral-600 transition-colors flex items-center gap-1"
+              title="Acesso Administrativo Master"
+            >
+              <ShieldCheck className="w-3 h-3" />
+              <span>Administração</span>
             </Link>
           </div>
         </div>
       </footer>
+
+      {/* Autocadastro Modal */}
+      <RegisterCompanyModal
+        isOpen={isRegisterModalOpen}
+        onClose={() => setIsRegisterModalOpen(false)}
+      />
     </div>
   )
 }

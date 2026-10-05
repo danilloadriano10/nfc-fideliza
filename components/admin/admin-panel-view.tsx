@@ -496,6 +496,28 @@ export const AdminPanelView: React.FC = () => {
                       </div>
 
                       <div className="text-xs text-neutral-600 space-y-1 pt-1 border-t border-neutral-200/60">
+                        <div className="flex items-center justify-between">
+                          <span className="text-neutral-400 text-[11px]">Origem:</span>
+                          <span
+                            className={`inline-flex items-center px-2 py-0.5 rounded-md font-medium text-[10px] ${
+                              comp.origin === 'self_service'
+                                ? 'bg-purple-50 text-purple-700 border border-purple-200'
+                                : 'bg-neutral-100 text-neutral-700 border border-neutral-200'
+                            }`}
+                          >
+                            {comp.origin === 'self_service'
+                              ? 'Autocadastro'
+                              : 'Cadastrada pelo Administrador'}
+                          </span>
+                        </div>
+                        {comp.ownerAuth?.ownerName && (
+                          <div className="flex justify-between">
+                            <span className="text-neutral-400 text-[11px]">Responsável:</span>
+                            <span className="font-medium truncate max-w-[140px] text-neutral-700">
+                              {comp.ownerAuth.ownerName}
+                            </span>
+                          </div>
+                        )}
                         <div className="flex justify-between">
                           <span className="text-neutral-400 text-[11px]">Campanha:</span>
                           <span className="font-medium truncate max-w-[150px]">

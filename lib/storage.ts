@@ -185,6 +185,40 @@ export async function saveCompanyAsync(company: Company): Promise<{ success: boo
   return { success: true }
 }
 
+export async function registerCompanySelfServiceAsync(data: {
+  ownerName: string
+  ownerPhone: string
+  ownerEmail: string
+  companyName: string
+  category: string
+  password: string
+}): Promise<{ success: boolean; company?: Company; error?: string }> {
+  try {
+    const res = await fetch('/api/companies/register', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data),
+    })
+    const json = await res.json()
+    if (!res.ok || !json.success) {
+      return { success: false, error: json.error || 'Erro ao realizar autocadastro.' }
+    }
+    const createdCompany: Company = json.company
+
+    // Update local cache
+    const currentCompanies = getAllCompanies()
+    const updated = [createdCompany, ...currentCompanies.filter((c) => c.id !== createdCompany.id)]
+    setItem(STORAGE_KEYS.COMPANIES, updated)
+    memoryCompanies = updated
+    notifyDataChange()
+
+    return { success: true, company: createdCompany }
+  } catch (err) {
+    console.error('Error in registerCompanySelfServiceAsync:', err)
+    return { success: false, error: 'Falha de conexão com o servidor.' }
+  }
+}
+
 export function toggleCompanyStatus(companyId: string): boolean {
   const companies = getAllCompanies()
   const index = companies.findIndex((c) => c.id === companyId)
