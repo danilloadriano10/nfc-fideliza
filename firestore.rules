@@ -27,6 +27,16 @@ service cloud.firestore {
       allow read, write: if true;
     }
 
+    // Appointments: Multi-tenant booking reservations
+    match /appointments/{appointmentId} {
+      allow read, write: if true;
+    }
+
+    // Professionals: Team members linked to services for booking
+    match /professionals/{profId} {
+      allow read, write: if true;
+    }
+
     // Activity Logs: Audit logs
     match /activityLogs/{logId} {
       allow read, write: if true;

@@ -11,6 +11,7 @@ import {
   Check,
   ChevronDown,
   ChevronUp,
+  Calendar,
 } from 'lucide-react'
 import { Company, CompanyService } from '@/types/platform'
 import { normalizePhone } from '@/lib/utils'
@@ -20,6 +21,7 @@ interface ServicesSheetProps {
   onClose: () => void
   services: CompanyService[]
   company: Company
+  onBookService?: (service: CompanyService) => void
 }
 
 export const ServicesSheet: React.FC<ServicesSheetProps> = ({
@@ -27,6 +29,7 @@ export const ServicesSheet: React.FC<ServicesSheetProps> = ({
   onClose,
   services,
   company,
+  onBookService,
 }) => {
   const [selectedCategory, setSelectedCategory] = useState<string>('Todos')
   const [expandedServiceId, setExpandedServiceId] = useState<string | null>(null)
@@ -235,16 +238,28 @@ export const ServicesSheet: React.FC<ServicesSheetProps> = ({
                       <span />
                     )}
 
-                    {company.whatsapp && (
-                      <button
-                        type="button"
-                        onClick={() => handleInquireWhatsApp(srv)}
-                        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-semibold text-[11px] shadow-2xs transition-colors cursor-pointer ml-auto"
-                      >
-                        <MessageCircle className="w-3.5 h-3.5" />
-                        <span>Consultar</span>
-                      </button>
-                    )}
+                    <div className="flex items-center gap-1.5 ml-auto">
+                      {company.modules?.appointments && onBookService && (
+                        <button
+                          type="button"
+                          onClick={() => onBookService(srv)}
+                          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-violet-600 hover:bg-violet-700 text-white font-semibold text-[11px] shadow-2xs transition-colors cursor-pointer"
+                        >
+                          <Calendar className="w-3.5 h-3.5" />
+                          <span>Agendar</span>
+                        </button>
+                      )}
+                      {company.whatsapp && (
+                        <button
+                          type="button"
+                          onClick={() => handleInquireWhatsApp(srv)}
+                          className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-semibold text-[11px] shadow-2xs transition-colors cursor-pointer"
+                        >
+                          <MessageCircle className="w-3.5 h-3.5" />
+                          <span>WhatsApp</span>
+                        </button>
+                      )}
+                    </div>
                   </div>
                 </div>
               )

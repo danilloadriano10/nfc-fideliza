@@ -645,7 +645,7 @@ export const LoyaltySheet: React.FC<LoyaltySheetProps> = ({
                       <span>Solicitação aguardando aprovação no caixa</span>
                     </div>
                     <p className="text-[11px] text-amber-700 leading-tight">
-                      Apresente seu celular para o atendente no balcão. O ponto cairá no seu cartão assim que ele confirmar no Modo Caixa.
+                      Apresente seu celular para o atendente no balcão. O ponto cairá no seu cartão assim que ele confirmar no painel.
                     </p>
                   </div>
                 ) : (

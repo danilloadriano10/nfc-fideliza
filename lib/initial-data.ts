@@ -1,4 +1,12 @@
-import { Company, Customer, PointRequest, ActivityLog, PrivateFeedback } from '@/types/platform'
+import {
+  Company,
+  Customer,
+  PointRequest,
+  ActivityLog,
+  PrivateFeedback,
+  CompanyService,
+  CompanyProfessional,
+} from '@/types/platform'
 
 export const INITIAL_COMPANIES: Company[] = [
   {
@@ -67,6 +75,8 @@ export const INITIAL_COMPANIES: Company[] = [
     addressText: 'Rua das Flores, 45 - Jardim Goiás, Goiânia - GO',
     isActive: true,
     modules: {
+      services: true,
+      appointments: true,
       loyalty: true,
       googleReview: true,
       menu: true,
@@ -283,5 +293,60 @@ export const INITIAL_FEEDBACKS: PrivateFeedback[] = [
     rating: 5,
     message: 'Profissionais de alto nível, cerveja gelada e agilidade no atendimento.',
     createdAt: '2026-03-15T18:00:00Z',
+  },
+]
+
+export const INITIAL_SERVICES: CompanyService[] = [
+  {
+    id: 'srv_corte_masculino',
+    companyId: 'comp_barbearia_junior',
+    name: 'Corte de Cabelo Masculino Clássico',
+    description: 'Corte na tesoura e máquina, degradê suave, lavagem com shampoo refrescante e finalização com pomada modeladora.',
+    price: 65,
+    durationMinutes: 45,
+    category: 'Cabelo',
+    isActive: true,
+    createdAt: '2026-02-01T10:00:00Z',
+  },
+  {
+    id: 'srv_barba_terapia',
+    companyId: 'comp_barbearia_junior',
+    name: 'Barboterapia & Toalha Quente',
+    description: 'Desenho da barba na navalha, esfoliação facial, hidratação de fios e toalha aquecida com óleos essenciais.',
+    price: 50,
+    durationMinutes: 30,
+    category: 'Barba',
+    isActive: true,
+    createdAt: '2026-02-01T10:00:00Z',
+  },
+  {
+    id: 'srv_combo_completo',
+    companyId: 'comp_barbearia_junior',
+    name: 'Combo Completo (Cabelo + Barba)',
+    description: 'Experiência completa com corte personalizado, barba tradicional na toalha quente e alinhamento.',
+    price: 100,
+    durationMinutes: 60,
+    category: 'Combos',
+    isActive: true,
+    createdAt: '2026-02-01T10:00:00Z',
+  },
+]
+
+export const INITIAL_PROFESSIONALS: CompanyProfessional[] = [
+  {
+    id: 'prof_junior',
+    companyId: 'comp_barbearia_junior',
+    name: 'Júnior Barber',
+    role: 'Mestre Barbeiro',
+    isActive: true,
+    createdAt: '2026-02-01T10:00:00Z',
+  },
+  {
+    id: 'prof_marcos',
+    companyId: 'comp_barbearia_junior',
+    name: 'Marcos Silva',
+    role: 'Especialista em Degradê & Fade',
+    isActive: true,
+    createdAt: '2026-02-01T10:00:00Z',
   },
 ]

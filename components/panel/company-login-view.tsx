@@ -11,13 +11,11 @@ import {
   KeyRound,
   ShieldCheck,
   AlertCircle,
-  HelpCircle,
   ArrowLeft,
   Radio,
 } from 'lucide-react'
 import { Company } from '@/types/platform'
 import { loginOwnerAsync, findCompanyByOwnerLoginAsync } from '@/lib/auth'
-import { getAllCompanies } from '@/lib/storage'
 
 interface CompanyLoginViewProps {
   company?: Company
@@ -62,16 +60,6 @@ export const CompanyLoginView: React.FC<CompanyLoginViewProps> = ({
       setIsLoading(false)
     }
   }
-
-  const handleQuickDemo = (targetComp: Company) => {
-    const user = targetComp.ownerAuth?.username || targetComp.slug
-    const pass = targetComp.ownerAuth?.password || 'empresa123'
-    setUsername(user)
-    setPassword(pass)
-    setErrorMessage(null)
-  }
-
-  const all = !company ? getAllCompanies() : []
 
   return (
     <div className="min-h-screen bg-neutral-50 flex flex-col justify-center items-center p-4 selection:bg-violet-100 selection:text-violet-900 font-sans text-neutral-900">
@@ -169,53 +157,6 @@ export const CompanyLoginView: React.FC<CompanyLoginViewProps> = ({
             <ArrowRight className="w-4 h-4" />
           </button>
         </form>
-
-        {/* Demo Credentials Helper */}
-        <div className="p-3.5 bg-neutral-50 rounded-2xl border border-neutral-200 space-y-2">
-          <div className="flex items-center gap-1.5 text-xs font-bold text-neutral-600">
-            <HelpCircle className="w-3.5 h-3.5 text-violet-600" />
-            <span>Credenciais para teste rápido:</span>
-          </div>
-
-          {company ? (
-            <div className="flex items-center justify-between bg-white p-2.5 rounded-xl border border-neutral-200 text-[11px] font-mono">
-              <div className="space-x-2 text-neutral-700">
-                <span>Usuário: <strong className="text-neutral-900">{company.ownerAuth?.username || company.slug}</strong></span>
-                <span>Senha: <strong className="text-neutral-900">{company.ownerAuth?.password || 'cafe123'}</strong></span>
-              </div>
-              <button
-                type="button"
-                onClick={() => handleQuickDemo(company)}
-                className="text-[10px] text-violet-700 hover:underline font-semibold shrink-0"
-              >
-                Preencher
-              </button>
-            </div>
-          ) : (
-            <div className="space-y-1.5 pt-1">
-              {all.slice(0, 3).map((c) => (
-                <div
-                  key={c.id}
-                  className="flex items-center justify-between bg-white p-2.5 rounded-xl border border-neutral-200 text-[11px]"
-                >
-                  <div className="min-w-0 font-mono text-neutral-700">
-                    <span className="font-sans font-bold text-neutral-900 block truncate">{c.name}</span>
-                    <span className="text-[10px] text-neutral-500">
-                      {c.ownerAuth?.username || c.slug} / {c.ownerAuth?.password || '123456'}
-                    </span>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => handleQuickDemo(c)}
-                    className="text-[10px] text-violet-700 hover:underline font-semibold shrink-0 px-2 py-1 bg-violet-50 rounded-md"
-                  >
-                    Usar
-                  </button>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
 
         <div className="text-center pt-2 text-xs text-neutral-500 border-t border-neutral-100 space-y-1">
           <p>

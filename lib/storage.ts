@@ -6,6 +6,9 @@ import {
   PrivateFeedback,
   GlobalStats,
   CompanyService,
+  Appointment,
+  AppointmentStatus,
+  CompanyProfessional,
 } from '@/types/platform'
 import {
   INITIAL_COMPANIES,
@@ -13,6 +16,8 @@ import {
   INITIAL_REQUESTS,
   INITIAL_LOGS,
   INITIAL_FEEDBACKS,
+  INITIAL_SERVICES,
+  INITIAL_PROFESSIONALS,
 } from './initial-data'
 import { normalizePhone } from './utils'
 
@@ -23,6 +28,8 @@ const STORAGE_KEYS = {
   LOGS: 'nfc_tenant_logs_v1',
   FEEDBACKS: 'nfc_tenant_feedbacks_v1',
   SERVICES: 'nfc_tenant_services_v1',
+  APPOINTMENTS: 'nfc_tenant_appointments_v1',
+  PROFESSIONALS: 'nfc_tenant_professionals_v1',
   CURRENT_CUSTOMER_PREFIX: 'nfc_client_session_',
 }
 
@@ -45,7 +52,9 @@ let memoryCustomers: Customer[] = [...INITIAL_CUSTOMERS]
 let memoryRequests: PointRequest[] = [...INITIAL_REQUESTS]
 let memoryLogs: ActivityLog[] = [...INITIAL_LOGS]
 let memoryFeedbacks: PrivateFeedback[] = [...INITIAL_FEEDBACKS]
-let memoryServices: CompanyService[] = []
+let memoryServices: CompanyService[] = [...INITIAL_SERVICES]
+let memoryAppointments: Appointment[] = []
+let memoryProfessionals: CompanyProfessional[] = [...INITIAL_PROFESSIONALS]
 
 function isBrowser(): boolean {
   return typeof window !== 'undefined'
@@ -1195,6 +1204,12 @@ export function resetDemoData(): void {
   setItem(STORAGE_KEYS.REQUESTS, INITIAL_REQUESTS)
   setItem(STORAGE_KEYS.LOGS, INITIAL_LOGS)
   setItem(STORAGE_KEYS.FEEDBACKS, INITIAL_FEEDBACKS)
+  setItem(STORAGE_KEYS.SERVICES, [])
+  setItem(STORAGE_KEYS.APPOINTMENTS, [])
+  setItem(STORAGE_KEYS.PROFESSIONALS, [])
+  memoryServices = []
+  memoryAppointments = []
+  memoryProfessionals = []
   notifyDataChange()
 }
 
@@ -1312,6 +1327,209 @@ export async function toggleCompanyServiceOnServerApi(
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ id: serviceId, companyId, toggleStatus: true }),
+    })
+    return res.ok
+  } catch {
+    return true
+  }
+}
+
+// ==========================================
+// 9. APPOINTMENTS (MULTI-TENANT & SERVER SYNC)
+// ==========================================
+
+export function getCompanyAppointments(companyId: string): Appointment[] {
+  if (!isBrowser()) {
+    return memoryAppointments.filter((a) => a.companyId === companyId)
+  }
+  const all = getItem<Appointment[]>(STORAGE_KEYS.APPOINTMENTS, memoryAppointments) || []
+  return all.filter((a) => a.companyId === companyId)
+}
+
+export function saveCompanyAppointmentLocally(appt: Appointment): void {
+  if (!isBrowser()) return
+  const all = getItem<Appointment[]>(STORAGE_KEYS.APPOINTMENTS, memoryAppointments) || []
+  const idx = all.findIndex((a) => a.id === appt.id)
+  let updated: Appointment[]
+  if (idx >= 0) {
+    updated = [...all]
+    updated[idx] = appt
+  } else {
+    updated = [appt, ...all]
+  }
+  memoryAppointments = updated
+  setItem(STORAGE_KEYS.APPOINTMENTS, updated)
+  notifyDataChange()
+}
+
+export async function fetchCompanyAppointmentsFromServer(
+  companyId: string,
+  date?: string
+): Promise<Appointment[]> {
+  if (!companyId) return []
+  try {
+    const url = date
+      ? `/api/appointments?companyId=${encodeURIComponent(companyId)}&date=${encodeURIComponent(date)}`
+      : `/api/appointments?companyId=${encodeURIComponent(companyId)}`
+    const res = await fetch(url)
+    if (res.ok) {
+      const data = await res.json()
+      if (Array.isArray(data.appointments)) {
+        if (isBrowser()) {
+          const currentAll = getItem<Appointment[]>(STORAGE_KEYS.APPOINTMENTS, memoryAppointments) || []
+          const otherAppts = currentAll.filter((a) => a.companyId !== companyId)
+          const merged = [...data.appointments, ...otherAppts]
+          memoryAppointments = merged
+          setItem(STORAGE_KEYS.APPOINTMENTS, merged)
+          notifyDataChange()
+        }
+        return data.appointments
+      }
+    }
+  } catch (err) {
+    console.error('Error fetching appointments:', err)
+  }
+  return getCompanyAppointments(companyId)
+}
+
+export async function createAppointmentOnServerApi(
+  appt: Appointment
+): Promise<{ success: boolean; appointment?: Appointment; error?: string }> {
+  try {
+    const res = await fetch('/api/appointments', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(appt),
+    })
+    const data = await res.json()
+    if (res.ok && data.success) {
+      if (data.appointment) {
+        saveCompanyAppointmentLocally(data.appointment)
+      }
+      return { success: true, appointment: data.appointment || appt }
+    }
+    return { success: false, error: data.error || 'Erro ao agendar horário.' }
+  } catch {
+    return { success: false, error: 'Erro de conexão ao realizar agendamento.' }
+  }
+}
+
+export async function updateAppointmentStatusOnServerApi(
+  id: string,
+  companyId: string,
+  status: AppointmentStatus
+): Promise<boolean> {
+  const all = getCompanyAppointments(companyId)
+  const appt = all.find((a) => a.id === id)
+  if (appt) {
+    saveCompanyAppointmentLocally({ ...appt, status })
+  }
+  try {
+    const res = await fetch('/api/appointments', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id, companyId, status }),
+    })
+    return res.ok
+  } catch {
+    return true
+  }
+}
+
+// ==========================================
+// 10. PROFESSIONALS (MULTI-TENANT & SERVER SYNC)
+// ==========================================
+
+export function getCompanyProfessionals(companyId: string): CompanyProfessional[] {
+  if (!isBrowser()) {
+    return memoryProfessionals.filter((p) => p.companyId === companyId)
+  }
+  const all = getItem<CompanyProfessional[]>(STORAGE_KEYS.PROFESSIONALS, memoryProfessionals) || []
+  return all.filter((p) => p.companyId === companyId)
+}
+
+export function saveCompanyProfessionalLocally(prof: CompanyProfessional): void {
+  if (!isBrowser()) return
+  const all = getItem<CompanyProfessional[]>(STORAGE_KEYS.PROFESSIONALS, memoryProfessionals) || []
+  const idx = all.findIndex((p) => p.id === prof.id)
+  let updated: CompanyProfessional[]
+  if (idx >= 0) {
+    updated = [...all]
+    updated[idx] = prof
+  } else {
+    updated = [prof, ...all]
+  }
+  memoryProfessionals = updated
+  setItem(STORAGE_KEYS.PROFESSIONALS, updated)
+  notifyDataChange()
+}
+
+export function deleteCompanyProfessionalLocally(profId: string, companyId: string): void {
+  if (!isBrowser()) return
+  const all = getItem<CompanyProfessional[]>(STORAGE_KEYS.PROFESSIONALS, memoryProfessionals) || []
+  const updated = all.filter((p) => !(p.id === profId && p.companyId === companyId))
+  memoryProfessionals = updated
+  setItem(STORAGE_KEYS.PROFESSIONALS, updated)
+  notifyDataChange()
+}
+
+export async function fetchCompanyProfessionalsFromServer(
+  companyId: string
+): Promise<CompanyProfessional[]> {
+  if (!companyId) return []
+  try {
+    const res = await fetch(`/api/professionals?companyId=${encodeURIComponent(companyId)}`)
+    if (res.ok) {
+      const data = await res.json()
+      if (Array.isArray(data.professionals)) {
+        if (isBrowser()) {
+          const currentAll = getItem<CompanyProfessional[]>(STORAGE_KEYS.PROFESSIONALS, memoryProfessionals) || []
+          const others = currentAll.filter((p) => p.companyId !== companyId)
+          const merged = [...data.professionals, ...others]
+          memoryProfessionals = merged
+          setItem(STORAGE_KEYS.PROFESSIONALS, merged)
+          notifyDataChange()
+        }
+        return data.professionals
+      }
+    }
+  } catch (err) {
+    console.error('Error fetching professionals:', err)
+  }
+  return getCompanyProfessionals(companyId)
+}
+
+export async function saveCompanyProfessionalOnServerApi(
+  prof: CompanyProfessional
+): Promise<{ success: boolean; professional?: CompanyProfessional; error?: string }> {
+  saveCompanyProfessionalLocally(prof)
+  try {
+    const res = await fetch('/api/professionals', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(prof),
+    })
+    const data = await res.json()
+    if (res.ok && data.success) {
+      if (data.professional) {
+        saveCompanyProfessionalLocally(data.professional)
+      }
+      return { success: true, professional: data.professional || prof }
+    }
+    return { success: false, error: data.error || 'Erro ao salvar profissional.' }
+  } catch {
+    return { success: true, professional: prof }
+  }
+}
+
+export async function deleteCompanyProfessionalOnServerApi(
+  profId: string,
+  companyId: string
+): Promise<boolean> {
+  deleteCompanyProfessionalLocally(profId, companyId)
+  try {
+    const res = await fetch(`/api/professionals?id=${encodeURIComponent(profId)}&companyId=${encodeURIComponent(companyId)}`, {
+      method: 'DELETE',
     })
     return res.ok
   } catch {

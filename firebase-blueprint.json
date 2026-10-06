@@ -97,6 +97,56 @@
         "timestamp": { "type": "string", "format": "date-time" }
       },
       "required": ["id", "companyId", "type", "description", "timestamp"]
+    },
+    "Service": {
+      "title": "Service",
+      "description": "Establishment services catalog used for booking and public showcase.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128 },
+        "companyId": { "type": "string", "maxLength": 128 },
+        "name": { "type": "string", "maxLength": 150 },
+        "photoUrl": { "type": "string", "maxLength": 2048 },
+        "description": { "type": "string", "maxLength": 1000 },
+        "price": { "type": "number" },
+        "durationMinutes": { "type": "number" },
+        "category": { "type": "string", "maxLength": 100 },
+        "isActive": { "type": "boolean" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "companyId", "name", "isActive"]
+    },
+    "Appointment": {
+      "title": "Appointment",
+      "description": "Customer scheduling reservation scoped per companyId.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128 },
+        "companyId": { "type": "string", "maxLength": 128 },
+        "serviceId": { "type": "string", "maxLength": 128 },
+        "serviceName": { "type": "string", "maxLength": 150 },
+        "professionalId": { "type": "string", "maxLength": 128 },
+        "date": { "type": "string", "maxLength": 20 },
+        "time": { "type": "string", "maxLength": 10 },
+        "customerName": { "type": "string", "maxLength": 150 },
+        "customerPhone": { "type": "string", "maxLength": 30 },
+        "status": { "type": "string", "enum": ["pending", "confirmed", "completed", "cancelled"] },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "companyId", "serviceId", "date", "time", "customerName", "customerPhone", "status"]
+    },
+    "CompanyProfessional": {
+      "title": "CompanyProfessional",
+      "description": "Professional team member linked to services for booking.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128 },
+        "companyId": { "type": "string", "maxLength": 128 },
+        "name": { "type": "string", "maxLength": 150 },
+        "role": { "type": "string", "maxLength": 100 },
+        "isActive": { "type": "boolean" }
+      },
+      "required": ["id", "companyId", "name", "isActive"]
     }
   },
   "firestore": {
@@ -119,6 +169,18 @@
     "/activityLogs/{logId}": {
       "schema": "ActivityLog",
       "description": "Audit and operational activity logs."
+    },
+    "/services/{serviceId}": {
+      "schema": "Service",
+      "description": "Catalog of company services."
+    },
+    "/appointments/{appointmentId}": {
+      "schema": "Appointment",
+      "description": "Client appointment reservations."
+    },
+    "/professionals/{profId}": {
+      "schema": "CompanyProfessional",
+      "description": "Company professionals for booking assignment."
     }
   }
 }

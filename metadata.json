@@ -1,6 +1,6 @@
 {
   "name": "NFC Fideliza - Plataforma Multiempresa NFC & Fidelidade",
-  "description": "Plataforma multiempresa de cartões NFC para estabelecimentos locais com página pública dinâmica, fidelidade inteligente, modo caixa e gestão completa.",
+  "description": "Plataforma multiempresa de presença digital e relacionamento para estabelecimentos locais com página pública dinâmica, agendamentos, serviços, fidelidade inteligente e gestão completa.",
   "requestFramePermissions": [],
   "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
 }

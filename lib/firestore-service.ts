@@ -12,7 +12,18 @@ import {
   writeBatch,
 } from 'firebase/firestore'
 import { db } from '@/lib/firebase'
-import { Company, Customer, PointRequest, ActivityLog, PrivateFeedback, CompanyService } from '@/types/platform'
+import {
+  Company,
+  Customer,
+  PointRequest,
+  ActivityLog,
+  PrivateFeedback,
+  CompanyService,
+  Appointment,
+  AppointmentStatus,
+  CompanyProfessional,
+  BookingSettings,
+} from '@/types/platform'
 import { normalizePhone } from '@/lib/utils'
 import { hashPassword } from '@/lib/auth-crypto'
 import { handleFirestoreError, OperationType } from '@/lib/firestore-errors'
@@ -23,6 +34,8 @@ import {
   INITIAL_REQUESTS,
   INITIAL_LOGS,
   INITIAL_FEEDBACKS,
+  INITIAL_SERVICES,
+  INITIAL_PROFESSIONALS,
 } from '@/lib/initial-data'
 
 // Collection references
@@ -33,6 +46,8 @@ const FEEDBACKS_COLLECTION = 'feedbacks'
 const LOGS_COLLECTION = 'activityLogs'
 const SETTINGS_COLLECTION = 'settings'
 const SERVICES_COLLECTION = 'services'
+const APPOINTMENTS_COLLECTION = 'appointments'
+const PROFESSIONALS_COLLECTION = 'professionals'
 
 let migrationPromise: Promise<void> | null = null
 
@@ -129,11 +144,29 @@ export async function ensureFirestoreInitialized(): Promise<void> {
         }
       }
 
-      // 8. Mark migration as completed in Firestore
+      // 8. Migrate Services
+      for (const srv of INITIAL_SERVICES) {
+        const srvRef = doc(db, SERVICES_COLLECTION, srv.id)
+        const srvDoc = await getDoc(srvRef)
+        if (!srvDoc.exists()) {
+          await setDoc(srvRef, srv)
+        }
+      }
+
+      // 9. Migrate Professionals
+      for (const prof of INITIAL_PROFESSIONALS) {
+        const profRef = doc(db, PROFESSIONALS_COLLECTION, prof.id)
+        const profDoc = await getDoc(profRef)
+        if (!profDoc.exists()) {
+          await setDoc(profRef, prof)
+        }
+      }
+
+      // 10. Mark migration as completed in Firestore
       await setDoc(settingsRef, {
         migrationCompleted: true,
         migratedAt: new Date().toISOString(),
-        version: '2.0.0-firestore-production',
+        version: '2.1.0-firestore-production',
       })
 
       console.log('✅ Migração para o Firebase Cloud Firestore concluída com sucesso!')
@@ -1112,5 +1145,204 @@ export async function toggleFirestoreServiceStatus(
     return { success: true }
   } catch (err) {
     handleFirestoreError(err, OperationType.WRITE, `${SERVICES_COLLECTION}/${serviceId}`)
+  }
+}
+
+// ==========================================
+// 7. APPOINTMENTS & SCHEDULING (MULTI-TENANT)
+// ==========================================
+
+export async function getFirestoreAppointments(
+  companyId: string,
+  date?: string
+): Promise<Appointment[]> {
+  try {
+    await ensureFirestoreInitialized()
+    const colRef = collection(db, APPOINTMENTS_COLLECTION)
+    let q = query(colRef, where('companyId', '==', companyId))
+    if (date) {
+      q = query(colRef, where('companyId', '==', companyId), where('date', '==', date))
+    }
+    const snap = await getDocs(q)
+    const list: Appointment[] = []
+    snap.forEach((d) => {
+      list.push(d.data() as Appointment)
+    })
+    return list.sort((a, b) => {
+      if (a.date !== b.date) return a.date.localeCompare(b.date)
+      return a.time.localeCompare(b.time)
+    })
+  } catch (err) {
+    console.warn('Could not read appointments from Firestore:', err)
+    return []
+  }
+}
+
+export async function createFirestoreAppointment(
+  data: Appointment
+): Promise<{ success: boolean; appointment?: Appointment; error?: string }> {
+  if (!data.companyId || !data.serviceId || !data.date || !data.time || !data.customerName || !data.customerPhone) {
+    return { success: false, error: 'Dados incompletos para realizar o agendamento.' }
+  }
+
+  try {
+    await ensureFirestoreInitialized()
+    const colRef = collection(db, APPOINTMENTS_COLLECTION)
+
+    // BACKEND CONFLICT CHECK (Never allow double-booking on same professional/date/time or company/date/time)
+    const existingSnap = await getDocs(
+      query(colRef, where('companyId', '==', data.companyId), where('date', '==', data.date))
+    )
+
+    const existingAppointments: Appointment[] = []
+    existingSnap.forEach((d) => existingAppointments.push(d.data() as Appointment))
+
+    const activeConflicting = existingAppointments.filter((app) => {
+      if (app.status === 'cancelled') return false
+      if (app.time !== data.time) return false
+
+      if (data.professionalId) {
+        return app.professionalId === data.professionalId
+      } else {
+        return !app.professionalId
+      }
+    })
+
+    if (activeConflicting.length > 0) {
+      return {
+        success: false,
+        error: data.professionalId
+          ? 'Este profissional já possui um agendamento neste horário. Por favor, escolha outro horário.'
+          : 'Este horário já está reservado. Por favor, escolha outro horário disponível.',
+      }
+    }
+
+    const apptId = data.id || `apt_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`
+    const now = new Date().toISOString()
+
+    const sanitizedAppt: Record<string, unknown> = {
+      id: apptId,
+      companyId: data.companyId,
+      serviceId: data.serviceId,
+      serviceName: data.serviceName,
+      date: data.date,
+      time: data.time,
+      customerName: data.customerName.trim(),
+      customerPhone: normalizePhone(data.customerPhone),
+      status: data.status || 'pending',
+      createdAt: data.createdAt || now,
+      updatedAt: now,
+    }
+
+    if (typeof data.servicePrice === 'number' && !isNaN(data.servicePrice)) {
+      sanitizedAppt.servicePrice = data.servicePrice
+    }
+    if (typeof data.serviceDurationMinutes === 'number' && !isNaN(data.serviceDurationMinutes)) {
+      sanitizedAppt.serviceDurationMinutes = data.serviceDurationMinutes
+    }
+    if (data.professionalId) sanitizedAppt.professionalId = data.professionalId
+    if (data.professionalName) sanitizedAppt.professionalName = data.professionalName
+    if (data.notes && data.notes.trim()) sanitizedAppt.notes = data.notes.trim()
+
+    const docRef = doc(db, APPOINTMENTS_COLLECTION, apptId)
+    await setDoc(docRef, sanitizedAppt)
+    return { success: true, appointment: sanitizedAppt as unknown as Appointment }
+  } catch (err) {
+    handleFirestoreError(err, OperationType.WRITE, APPOINTMENTS_COLLECTION)
+  }
+}
+
+export async function updateFirestoreAppointmentStatus(
+  id: string,
+  companyId: string,
+  status: AppointmentStatus
+): Promise<{ success: boolean; error?: string }> {
+  try {
+    await ensureFirestoreInitialized()
+    const docRef = doc(db, APPOINTMENTS_COLLECTION, id)
+    const snap = await getDoc(docRef)
+    if (!snap.exists()) {
+      return { success: false, error: 'Agendamento não encontrado.' }
+    }
+    const data = snap.data() as Appointment
+    if (data.companyId !== companyId) {
+      return { success: false, error: 'Operação não autorizada.' }
+    }
+
+    await updateDoc(docRef, { status, updatedAt: new Date().toISOString() })
+    return { success: true }
+  } catch (err) {
+    handleFirestoreError(err, OperationType.WRITE, `${APPOINTMENTS_COLLECTION}/${id}`)
+  }
+}
+
+// ==========================================
+// 8. PROFESSIONALS (MULTI-TENANT)
+// ==========================================
+
+export async function getFirestoreProfessionals(companyId: string): Promise<CompanyProfessional[]> {
+  try {
+    await ensureFirestoreInitialized()
+    const colRef = collection(db, PROFESSIONALS_COLLECTION)
+    const q = query(colRef, where('companyId', '==', companyId))
+    const snap = await getDocs(q)
+    const list: CompanyProfessional[] = []
+    snap.forEach((d) => list.push(d.data() as CompanyProfessional))
+    return list.sort((a, b) => (a.name || '').localeCompare(b.name || ''))
+  } catch (err) {
+    console.warn('Could not read professionals from Firestore:', err)
+    return []
+  }
+}
+
+export async function saveFirestoreProfessional(
+  prof: CompanyProfessional
+): Promise<{ success: boolean; professional?: CompanyProfessional; error?: string }> {
+  if (!prof.companyId || !prof.name || !prof.name.trim()) {
+    return { success: false, error: 'Nome do profissional é obrigatório.' }
+  }
+  if (prof.photoUrl && isBase64Image(prof.photoUrl)) {
+    return { success: false, error: 'Foto não pode ser Base64.' }
+  }
+
+  try {
+    await ensureFirestoreInitialized()
+    const profId = prof.id || `prf_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`
+    const sanitized: Record<string, unknown> = {
+      id: profId,
+      companyId: prof.companyId,
+      name: prof.name.trim(),
+      isActive: prof.isActive !== false,
+      serviceIds: Array.isArray(prof.serviceIds) ? prof.serviceIds : [],
+      createdAt: prof.createdAt || new Date().toISOString(),
+    }
+    if (prof.role && prof.role.trim()) sanitized.role = prof.role.trim()
+    if (prof.photoUrl && prof.photoUrl.trim()) sanitized.photoUrl = prof.photoUrl.trim()
+
+    const docRef = doc(db, PROFESSIONALS_COLLECTION, profId)
+    await setDoc(docRef, sanitized, { merge: true })
+    return { success: true, professional: sanitized as unknown as CompanyProfessional }
+  } catch (err) {
+    handleFirestoreError(err, OperationType.WRITE, `${PROFESSIONALS_COLLECTION}/${prof.id}`)
+  }
+}
+
+export async function deleteFirestoreProfessional(
+  profId: string,
+  companyId: string
+): Promise<{ success: boolean; error?: string }> {
+  try {
+    await ensureFirestoreInitialized()
+    const docRef = doc(db, PROFESSIONALS_COLLECTION, profId)
+    const snap = await getDoc(docRef)
+    if (!snap.exists()) return { success: true }
+    const data = snap.data() as CompanyProfessional
+    if (data.companyId !== companyId) {
+      return { success: false, error: 'Operação não autorizada.' }
+    }
+    await deleteDoc(docRef)
+    return { success: true }
+  } catch (err) {
+    handleFirestoreError(err, OperationType.DELETE, `${PROFESSIONALS_COLLECTION}/${profId}`)
   }
 }

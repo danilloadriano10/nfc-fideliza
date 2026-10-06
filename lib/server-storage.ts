@@ -31,10 +31,26 @@ import {
   saveFirestoreService,
   deleteFirestoreService,
   toggleFirestoreServiceStatus,
+  getFirestoreAppointments,
+  createFirestoreAppointment,
+  updateFirestoreAppointmentStatus,
+  getFirestoreProfessionals,
+  saveFirestoreProfessional,
+  deleteFirestoreProfessional,
   ensureFirestoreInitialized,
 } from './firestore-service'
 
-import { Company, Customer, PointRequest, ActivityLog, PrivateFeedback, CompanyService } from '@/types/platform'
+import {
+  Company,
+  Customer,
+  PointRequest,
+  ActivityLog,
+  PrivateFeedback,
+  CompanyService,
+  Appointment,
+  AppointmentStatus,
+  CompanyProfessional,
+} from '@/types/platform'
 
 // Ensure system migration is initialized on startup
 ensureFirestoreInitialized().catch((err) => {
@@ -228,4 +244,46 @@ export async function toggleServerServiceStatus(
   companyId: string
 ): Promise<{ success: boolean; error?: string }> {
   return await toggleFirestoreServiceStatus(serviceId, companyId)
+}
+
+// ==========================================
+// 7. APPOINTMENTS & SCHEDULING (MULTI-TENANT)
+// ==========================================
+
+export async function getServerAppointments(
+  companyId: string,
+  date?: string
+): Promise<Appointment[]> {
+  return await getFirestoreAppointments(companyId, date)
+}
+
+export async function createServerAppointment(
+  data: Appointment
+): Promise<{ success: boolean; appointment?: Appointment; error?: string }> {
+  return await createFirestoreAppointment(data)
+}
+
+export async function updateServerAppointmentStatus(
+  id: string,
+  companyId: string,
+  status: AppointmentStatus
+): Promise<{ success: boolean; error?: string }> {
+  return await updateFirestoreAppointmentStatus(id, companyId, status)
+}
+
+export async function getServerProfessionals(companyId: string): Promise<CompanyProfessional[]> {
+  return await getFirestoreProfessionals(companyId)
+}
+
+export async function saveServerProfessional(
+  prof: CompanyProfessional
+): Promise<{ success: boolean; professional?: CompanyProfessional; error?: string }> {
+  return await saveFirestoreProfessional(prof)
+}
+
+export async function deleteServerProfessional(
+  profId: string,
+  companyId: string
+): Promise<{ success: boolean; error?: string }> {
+  return await deleteFirestoreProfessional(profId, companyId)
 }

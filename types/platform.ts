@@ -16,6 +16,54 @@ export interface CompanyModules {
   feedback: boolean
   instagram: boolean
   services?: boolean
+  appointments?: boolean
+}
+
+export interface DaySchedule {
+  dayOfWeek: number // 0 (Domingo) to 6 (Sábado)
+  isOpen: boolean
+  openTime: string // e.g. "08:00"
+  closeTime: string // e.g. "18:00"
+  breakStart?: string // e.g. "12:00"
+  breakEnd?: string // e.g. "13:00"
+}
+
+export interface BookingSettings {
+  slotDurationMinutes: number
+  days: DaySchedule[]
+  blockedDates?: string[] // "YYYY-MM-DD"
+}
+
+export interface CompanyProfessional {
+  id: string
+  companyId: string
+  name: string
+  role?: string
+  photoUrl?: string
+  serviceIds?: string[] // IDs dos serviços atendidos; vazio = todos
+  isActive: boolean
+  createdAt?: string
+}
+
+export type AppointmentStatus = 'pending' | 'confirmed' | 'completed' | 'cancelled'
+
+export interface Appointment {
+  id: string
+  companyId: string
+  serviceId: string
+  serviceName: string
+  servicePrice?: number | null
+  serviceDurationMinutes?: number | null
+  professionalId?: string
+  professionalName?: string
+  date: string // "YYYY-MM-DD"
+  time: string // "HH:MM"
+  customerName: string
+  customerPhone: string
+  status: AppointmentStatus
+  notes?: string
+  createdAt: string
+  updatedAt?: string
 }
 
 export interface CompanyService {
@@ -68,6 +116,10 @@ export interface Company {
   isActive: boolean
   modules: CompanyModules
   loyaltyProgram: LoyaltyProgramConfig
+  highlightModule?: string // 'auto' | 'appointments' | 'services' | 'whatsapp' | 'loyalty' | 'googleReview' | 'menu' | etc.
+  rating?: number
+  reviewCount?: number
+  bookingSettings?: BookingSettings
   ownerAuth?: CompanyOwnerAuth
   origin?: 'admin' | 'self_service'
   onboardingCompleted?: boolean

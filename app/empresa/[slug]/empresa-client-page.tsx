@@ -16,8 +16,8 @@ export const EmpresaClientPage: React.FC<EmpresaClientPageProps> = ({
   slug,
   initialCompany,
 }) => {
-  const [company, setCompany] = useState<Company | null>(() => initialCompany || getCompanyBySlug(slug))
-  const [isLoading, setIsLoading] = useState(!initialCompany && !getCompanyBySlug(slug))
+  const [company, setCompany] = useState<Company | null>(initialCompany || null)
+  const [isLoading, setIsLoading] = useState(!initialCompany)
 
   useEffect(() => {
     let isMounted = true

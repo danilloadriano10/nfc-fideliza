@@ -51,6 +51,7 @@ import {
 import {
   getCompanyCustomers,
   getCompanyServices,
+  getCompanyAppointments,
   getCompanyActivityLogs,
   getCompanyFeedbacks,
   fetchFeedbacksForCompany,
@@ -71,6 +72,7 @@ import { isOwnerAuthenticated, logoutOwner, AUTH_CHANGE_EVENT } from '@/lib/auth
 import { CompanyLoginView } from './company-login-view'
 import { CompanyOnboardingModal } from './company-onboarding-modal'
 import { ServicesTab } from './services-tab'
+import { AppointmentsTab } from './appointments-tab'
 
 const PRESET_BANNERS = [
   { label: '☕ Cafeteria / Café', url: '/images/cafe_central_banner_1791003956057.jpg' },
@@ -85,6 +87,7 @@ interface CompanyPanelViewProps {
 type TabType =
   | 'dashboard'
   | 'services'
+  | 'appointments'
   | 'customers'
   | 'loyalty'
   | 'rewards'
@@ -110,9 +113,11 @@ export const CompanyPanelView: React.FC<CompanyPanelViewProps> = ({
   // Settings form state
   const [formData, setFormData] = useState<Company>(() => ({
     ...initialCompany,
+    highlightModule: initialCompany.highlightModule || 'auto',
     modules: {
       ...initialCompany.modules,
       services: initialCompany.modules?.services ?? false,
+      appointments: initialCompany.modules?.appointments ?? false,
     },
     loyaltyProgram: initialCompany.loyaltyProgram || {
       isActive: true,
@@ -360,6 +365,8 @@ export const CompanyPanelView: React.FC<CompanyPanelViewProps> = ({
   // Metrics
   const totalCustomers = customers.length
   const servicesCount = getCompanyServices(company.id).length
+  const allAppointments = getCompanyAppointments(company.id)
+  const pendingAppointmentsCount = allAppointments.filter((a) => a.status === 'pending').length
   const totalPoints = logs.reduce((acc, l) => acc + (l.pointsChange || 0), 0)
   const rewardsAvailable = customers.reduce((acc, c) => acc + c.availableRewards, 0)
   const rewardsRedeemed = logs.filter((l) => l.type === 'reward_redeemed').length
@@ -468,20 +475,12 @@ export const CompanyPanelView: React.FC<CompanyPanelViewProps> = ({
           {/* Quick Actions */}
           <div className="flex items-center gap-2">
             <Link
-              href={`/empresa/${company.slug}/caixa`}
-              className="px-3.5 py-2 rounded-xl bg-violet-600 hover:bg-violet-700 text-white font-semibold text-xs shadow-xs transition-all flex items-center gap-1.5"
-            >
-              <SlidersHorizontal className="w-3.5 h-3.5 stroke-[2.5]" />
-              <span>Modo Caixa</span>
-            </Link>
-
-            <Link
               href={`/empresa/${company.slug}`}
               target="_blank"
-              className="px-3.5 py-2 rounded-xl bg-white border border-neutral-200 hover:bg-neutral-50 text-neutral-800 font-semibold text-xs shadow-xs transition-all flex items-center gap-1.5"
+              className="px-3.5 py-2 rounded-xl bg-violet-600 hover:bg-violet-700 text-white font-semibold text-xs shadow-xs transition-all flex items-center gap-1.5"
             >
               <ExternalLink className="w-3.5 h-3.5" />
-              <span>Ver Página NFC</span>
+              <span>Ver Página Pública</span>
             </Link>
 
             <button
@@ -500,6 +499,12 @@ export const CompanyPanelView: React.FC<CompanyPanelViewProps> = ({
           {[
             { id: 'dashboard', label: 'Visão Geral', icon: LayoutDashboard },
             { id: 'services', label: 'Serviços', count: servicesCount > 0 ? servicesCount : undefined, icon: Scissors },
+            {
+              id: 'appointments',
+              label: 'Agendamentos',
+              count: pendingAppointmentsCount > 0 ? pendingAppointmentsCount : (allAppointments.length > 0 ? allAppointments.length : undefined),
+              icon: Calendar,
+            },
             { id: 'customers', label: 'Clientes', count: totalCustomers, icon: Users },
             { id: 'loyalty', label: 'Fidelidade', icon: Gift },
             {
@@ -593,13 +598,13 @@ export const CompanyPanelView: React.FC<CompanyPanelViewProps> = ({
                       Solicitações de Pontos em Tempo Real ({pendingRequests.length})
                     </h3>
                   </div>
-                  <Link
-                    href={`/empresa/${company.slug}/caixa`}
-                    className="text-xs font-semibold text-amber-800 hover:text-amber-950 underline underline-offset-2 flex items-center gap-1 self-start sm:self-auto"
+                  <button
+                    onClick={() => setActiveTab('rewards')}
+                    className="text-xs font-semibold text-amber-800 hover:text-amber-950 underline underline-offset-2 flex items-center gap-1 self-start sm:self-auto cursor-pointer"
                   >
-                    <span>Abrir Modo Caixa Completo</span>
-                    <ExternalLink className="w-3 h-3" />
-                  </Link>
+                    <span>Ver todas as solicitações</span>
+                    <ArrowRight className="w-3 h-3" />
+                  </button>
                 </div>
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
                   {pendingRequests.map((req) => (
@@ -776,6 +781,16 @@ export const CompanyPanelView: React.FC<CompanyPanelViewProps> = ({
           <ServicesTab
             company={company}
             onEnableModule={() => setActiveTab('settings')}
+          />
+        )}
+
+        {/* ============================================== */}
+        {/* TAB 1.6: AGENDAMENTOS */}
+        {/* ============================================== */}
+        {activeTab === 'appointments' && (
+          <AppointmentsTab
+            company={company}
+            onUpdateCompany={(updated) => setCompany(updated)}
           />
         )}
 
@@ -1703,6 +1718,7 @@ export const CompanyPanelView: React.FC<CompanyPanelViewProps> = ({
               <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
                 {[
                   { key: 'services', label: 'Serviços' },
+                  { key: 'appointments', label: 'Agendamento' },
                   { key: 'loyalty', label: 'Cartão Fidelidade' },
                   { key: 'googleReview', label: 'Avaliação Google' },
                   { key: 'menu', label: 'Cardápio' },
@@ -1735,6 +1751,73 @@ export const CompanyPanelView: React.FC<CompanyPanelViewProps> = ({
                 ))}
               </div>
 
+              {/* Destaque Principal da Página Pública */}
+              <div className="pt-5 border-t border-neutral-100 space-y-3">
+                <div className="flex items-center gap-2">
+                  <div className="w-7 h-7 rounded-lg bg-violet-100 text-violet-700 flex items-center justify-center">
+                    <Sparkles className="w-4 h-4" />
+                  </div>
+                  <div>
+                    <h4 className="text-xs font-bold text-neutral-900">
+                      Destaque Principal na Página Pública
+                    </h4>
+                    <p className="text-[11px] text-neutral-500">
+                      Escolha qual módulo ativo ocupará o grande card roxo de destaque no topo da página.
+                    </p>
+                  </div>
+                </div>
+
+                <div className="max-w-md">
+                  <select
+                    value={formData.highlightModule || 'auto'}
+                    onChange={(e) =>
+                      setFormData({
+                        ...formData,
+                        highlightModule: e.target.value,
+                      })
+                    }
+                    className="w-full px-3.5 py-2.5 rounded-xl border border-neutral-300 text-xs bg-white text-neutral-900 font-semibold focus:ring-2 focus:ring-violet-500 focus:outline-none"
+                  >
+                    <option value="auto">
+                      ⚡ Automático (prioriza o principal serviço ativo)
+                    </option>
+                    {Boolean(formData.modules?.appointments) && (
+                      <option value="appointments">📅 Agendamento Online</option>
+                    )}
+                    {Boolean(formData.modules?.services) && (
+                      <option value="services">✂️ Catálogo de Serviços</option>
+                    )}
+                    {Boolean(formData.modules?.loyalty) && (
+                      <option value="loyalty">🎁 Cartão Fidelidade</option>
+                    )}
+                    {Boolean(formData.modules?.whatsapp) && (
+                      <option value="whatsapp">💬 WhatsApp Direto</option>
+                    )}
+                    {Boolean(formData.modules?.googleReview) && (
+                      <option value="googleReview">⭐ Avaliação Google</option>
+                    )}
+                    {Boolean(formData.modules?.menu) && (
+                      <option value="menu">📖 Cardápio Digital</option>
+                    )}
+                    {Boolean(formData.modules?.wifi) && (
+                      <option value="wifi">📶 Conexão Wi-Fi</option>
+                    )}
+                    {Boolean(formData.modules?.location) && (
+                      <option value="location">📍 Localização e Rota</option>
+                    )}
+                    {Boolean(formData.modules?.feedback) && (
+                      <option value="feedback">💭 Feedback Privado</option>
+                    )}
+                    {Boolean(formData.modules?.instagram) && (
+                      <option value="instagram">📸 Instagram</option>
+                    )}
+                  </select>
+                  <p className="text-[10px] text-neutral-400 mt-1.5 leading-relaxed">
+                    O card se adapta automaticamente. Caso o módulo configurado seja desativado, o sistema selecionará outro recurso ativo automaticamente.
+                  </p>
+                </div>
+              </div>
+
               {/* Próximos Recursos Preview */}
               <div className="pt-4 border-t border-neutral-100 space-y-2.5">
                 <div className="flex items-center gap-1.5">
@@ -1745,7 +1828,6 @@ export const CompanyPanelView: React.FC<CompanyPanelViewProps> = ({
                 </div>
                 <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5">
                   {[
-                    { label: 'Agendamento', icon: Calendar, tag: 'Em breve' },
                     { label: 'Catálogo de Produtos', icon: Layers, tag: 'Em breve' },
                     { label: 'Promoções', icon: Sparkles, tag: 'Em breve' },
                     { label: 'Portfólio / Galeria', icon: ImageIcon, tag: 'Em breve' },

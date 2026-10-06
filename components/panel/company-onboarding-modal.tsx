@@ -72,6 +72,7 @@ export const CompanyOnboardingModal: React.FC<CompanyOnboardingModalProps> = ({
   // Step 3: Recursos
   const [modules, setModules] = useState({
     services: company.modules?.services ?? false,
+    appointments: company.modules?.appointments ?? false,
     loyalty: company.modules?.loyalty ?? true,
     googleReview: company.modules?.googleReview ?? true,
     menu: company.modules?.menu ?? false,
@@ -446,6 +447,7 @@ export const CompanyOnboardingModal: React.FC<CompanyOnboardingModalProps> = ({
                 <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5">
                   {[
                     { key: 'services', label: 'Serviços' },
+                    { key: 'appointments', label: 'Agendamento' },
                     { key: 'loyalty', label: 'Fidelidade' },
                     { key: 'googleReview', label: 'Google Avaliações' },
                     { key: 'wifi', label: 'Wi-Fi' },
