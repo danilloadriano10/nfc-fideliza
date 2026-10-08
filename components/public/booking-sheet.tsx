@@ -357,36 +357,56 @@ export const BookingSheet: React.FC<BookingSheetProps> = ({
               </div>
             ) : (
               <div className="space-y-2">
-                {services.map((srv) => (
-                  <button
-                    key={srv.id}
-                    type="button"
-                    onClick={() => handleSelectService(srv)}
-                    className="w-full text-left p-3.5 rounded-2xl bg-neutral-50 hover:bg-violet-50/50 border border-neutral-200/80 hover:border-violet-300 transition-all flex items-center justify-between gap-3 group cursor-pointer"
-                  >
-                    <div className="min-w-0">
-                      <h4 className="font-bold text-neutral-900 text-xs sm:text-sm group-hover:text-violet-900 truncate">
-                        {srv.name}
-                      </h4>
-                      <div className="flex items-center gap-2 mt-1 text-[11px] text-neutral-500">
-                        {srv.price != null ? (
-                          <span className="font-bold text-neutral-900 font-mono">
-                            R$ {srv.price.toFixed(2).replace('.', ',')}
-                          </span>
+                {services.map((srv) => {
+                  const srvPhoto = srv.photoUrl || (srv as unknown as { imageUrl?: string }).imageUrl || ''
+                  return (
+                    <button
+                      key={srv.id}
+                      type="button"
+                      onClick={() => handleSelectService(srv)}
+                      className="w-full text-left p-3.5 rounded-2xl bg-neutral-50 hover:bg-violet-50/50 border border-neutral-200/80 hover:border-violet-300 transition-all flex items-center justify-between gap-3 group cursor-pointer"
+                    >
+                      <div className="flex items-center gap-3 min-w-0 flex-1">
+                        {srvPhoto ? (
+                          <div className="w-12 h-12 rounded-xl overflow-hidden shrink-0 bg-neutral-200 border border-neutral-200/80 shadow-2xs">
+                            {/* eslint-disable-next-line @next/next/no-img-element */}
+                            <img
+                              src={srvPhoto}
+                              alt={srv.name}
+                              className="w-full h-full object-cover"
+                              loading="lazy"
+                            />
+                          </div>
                         ) : (
-                          <span className="text-violet-700 font-medium">Consulte</span>
+                          <div className="w-12 h-12 rounded-xl bg-violet-100 text-violet-700 flex items-center justify-center shrink-0 border border-violet-200/50">
+                            <Scissors className="w-5 h-5 opacity-70" />
+                          </div>
                         )}
-                        {srv.durationMinutes && (
-                          <span className="flex items-center gap-0.5">
-                            <Clock className="w-3 h-3 text-neutral-400" />
-                            {srv.durationMinutes} min
-                          </span>
-                        )}
+                        <div className="min-w-0 flex-1">
+                          <h4 className="font-bold text-neutral-900 text-xs sm:text-sm group-hover:text-violet-900 truncate">
+                            {srv.name}
+                          </h4>
+                          <div className="flex items-center gap-2 mt-1 text-[11px] text-neutral-500">
+                            {srv.price != null ? (
+                              <span className="font-bold text-neutral-900 font-mono">
+                                R$ {srv.price.toFixed(2).replace('.', ',')}
+                              </span>
+                            ) : (
+                              <span className="text-violet-700 font-medium">Consulte</span>
+                            )}
+                            {srv.durationMinutes && (
+                              <span className="flex items-center gap-0.5">
+                                <Clock className="w-3 h-3 text-neutral-400" />
+                                {srv.durationMinutes} min
+                              </span>
+                            )}
+                          </div>
+                        </div>
                       </div>
-                    </div>
-                    <ArrowRight className="w-4 h-4 text-neutral-400 group-hover:text-violet-600 shrink-0" />
-                  </button>
-                ))}
+                      <ArrowRight className="w-4 h-4 text-neutral-400 group-hover:text-violet-600 shrink-0" />
+                    </button>
+                  )
+                })}
               </div>
             )}
           </div>
@@ -589,7 +609,7 @@ export const BookingSheet: React.FC<BookingSheetProps> = ({
                 type="text"
                 required
                 placeholder="Ex: Maria Oliveira"
-                value={customerName}
+                value={customerName || ''}
                 onChange={(e) => setCustomerName(e.target.value)}
                 className="w-full px-3.5 py-2.5 rounded-xl border border-neutral-300 text-xs text-neutral-900 focus:outline-none focus:border-violet-600"
               />
@@ -604,7 +624,7 @@ export const BookingSheet: React.FC<BookingSheetProps> = ({
                 type="tel"
                 required
                 placeholder="Ex: 11999998888"
-                value={customerPhone}
+                value={customerPhone || ''}
                 onChange={(e) => setCustomerPhone(e.target.value)}
                 className="w-full px-3.5 py-2.5 rounded-xl border border-neutral-300 text-xs text-neutral-900 font-mono focus:outline-none focus:border-violet-600"
               />

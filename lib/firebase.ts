@@ -1,7 +1,13 @@
 import { initializeApp, getApps, getApp } from 'firebase/app'
-import { getFirestore, Firestore } from 'firebase/firestore'
+import { getFirestore, Firestore, setLogLevel } from 'firebase/firestore'
 import { getAuth, Auth } from 'firebase/auth'
 import firebaseConfigJson from '@/firebase-applet-config.json'
+import '@/lib/suppress-firestore-logs'
+
+// Suppress internal Firestore idle stream timeout logs
+try {
+  setLogLevel('silent')
+} catch {}
 
 // Environment variables or fallback to provisioned configuration
 const firebaseConfig = {

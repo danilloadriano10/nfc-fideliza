@@ -665,7 +665,7 @@ export const AdminPanelView: React.FC = () => {
                   <Search className="w-4 h-4 text-neutral-400 absolute left-3 top-2.5" />
                   <input
                     type="text"
-                    value={searchFilter}
+                    value={searchFilter || ''}
                     onChange={(e) => setSearchFilter(e.target.value)}
                     placeholder="Filtrar por nome ou slug..."
                     className="w-full pl-9 pr-3 py-2 rounded-xl border border-neutral-300 text-xs focus:outline-none focus:ring-1 focus:ring-violet-600 bg-white"

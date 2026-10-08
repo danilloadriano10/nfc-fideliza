@@ -159,7 +159,7 @@ export const FeedbackSheet: React.FC<FeedbackSheetProps> = ({
               <textarea
                 required
                 rows={3}
-                value={message}
+                value={message || ''}
                 onChange={(e) => setMessage(e.target.value)}
                 placeholder="Conte com detalhes o que podemos melhorar ou o que você mais gostou..."
                 className="w-full p-3 rounded-xl border border-neutral-300 focus:outline-none focus:ring-2 focus:ring-neutral-900 text-sm resize-none"
@@ -174,7 +174,7 @@ export const FeedbackSheet: React.FC<FeedbackSheetProps> = ({
                 </label>
                 <input
                   type="text"
-                  value={name}
+                  value={name || ''}
                   onChange={(e) => setName(e.target.value)}
                   placeholder="Nome"
                   className="w-full px-3 py-2 rounded-xl border border-neutral-300 text-xs focus:outline-none"
@@ -186,7 +186,7 @@ export const FeedbackSheet: React.FC<FeedbackSheetProps> = ({
                 </label>
                 <input
                   type="tel"
-                  value={phone}
+                  value={phone || ''}
                   onChange={(e) => setPhone(formatPhone(e.target.value))}
                   placeholder="(62) 99999-9999"
                   className="w-full px-3 py-2 rounded-xl border border-neutral-300 text-xs focus:outline-none"

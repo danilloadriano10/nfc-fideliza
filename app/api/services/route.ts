@@ -9,6 +9,7 @@ import {
   getServerCompanyBySlug,
 } from '@/lib/server-storage'
 import { CompanyService } from '@/types/platform'
+import { uploadCompanyFileServer, isBase64Image } from '@/lib/storage-service'
 
 export const dynamic = 'force-dynamic'
 export const revalidate = 0
@@ -118,11 +119,26 @@ export async function POST(req: NextRequest) {
       if (!isNaN(num)) parsedDuration = num
     }
 
+    let finalPhotoUrl = photoUrl && typeof photoUrl === 'string' ? photoUrl.trim() : undefined
+    if (finalPhotoUrl && isBase64Image(finalPhotoUrl)) {
+      try {
+        const matches = finalPhotoUrl.match(/^data:([A-Za-z-+\/]+);base64,(.+)$/)
+        if (matches && matches[2]) {
+          const mime = matches[1]
+          const buf = Buffer.from(matches[2], 'base64')
+          const up = await uploadCompanyFileServer(companyId, 'service', buf, 'service.jpg', mime)
+          finalPhotoUrl = up.url || undefined
+        }
+      } catch (uploadErr) {
+        console.warn('Error converting service base64 image on server:', uploadErr)
+      }
+    }
+
     const newService: CompanyService = {
       id: body.id && typeof body.id === 'string' && body.id.trim() ? body.id.trim() : `srv_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
       companyId: companyId.trim(),
       name: name.trim(),
-      photoUrl: photoUrl && typeof photoUrl === 'string' ? photoUrl.trim() : undefined,
+      photoUrl: finalPhotoUrl || undefined,
       description: description && typeof description === 'string' ? description.trim() : '',
       price: parsedPrice,
       priceType: priceType === 'consult' || parsedPrice === null ? 'consult' : 'fixed',
@@ -220,10 +236,25 @@ export async function PUT(req: NextRequest) {
       if (!isNaN(num)) parsedDuration = num
     }
 
+    let finalPhotoUrl = photoUrl !== undefined ? (typeof photoUrl === 'string' ? photoUrl.trim() : '') : existing.photoUrl
+    if (finalPhotoUrl && isBase64Image(finalPhotoUrl)) {
+      try {
+        const matches = finalPhotoUrl.match(/^data:([A-Za-z-+\/]+);base64,(.+)$/)
+        if (matches && matches[2]) {
+          const mime = matches[1]
+          const buf = Buffer.from(matches[2], 'base64')
+          const up = await uploadCompanyFileServer(companyId, 'service', buf, 'service.jpg', mime)
+          finalPhotoUrl = up.url || ''
+        }
+      } catch (uploadErr) {
+        console.warn('Error converting service base64 image on server in PUT:', uploadErr)
+      }
+    }
+
     const updatedService: CompanyService = {
       ...existing,
       name: name.trim(),
-      photoUrl: photoUrl !== undefined ? (typeof photoUrl === 'string' ? photoUrl.trim() : '') : existing.photoUrl,
+      photoUrl: finalPhotoUrl || undefined,
       description: description !== undefined ? (typeof description === 'string' ? description.trim() : '') : existing.description,
       price: parsedPrice,
       priceType: priceType === 'consult' || parsedPrice === null ? 'consult' : 'fixed',

@@ -382,7 +382,7 @@ export const LoyaltySheet: React.FC<LoyaltySheetProps> = ({
                       <input
                         type="tel"
                         required
-                        value={phoneInput}
+                        value={phoneInput || ''}
                         onChange={(e) => setPhoneInput(formatPhone(e.target.value))}
                         placeholder="(62) 99999-9999"
                         className="w-full pl-9 pr-3 py-3 rounded-xl border border-neutral-300 focus:outline-none focus:ring-2 focus:ring-neutral-900 text-sm font-medium"
@@ -420,7 +420,7 @@ export const LoyaltySheet: React.FC<LoyaltySheetProps> = ({
                       <input
                         type="text"
                         required
-                        value={nameInput}
+                        value={nameInput || ''}
                         onChange={(e) => setNameInput(e.target.value)}
                         placeholder="Ex: Maria Silva"
                         className="w-full pl-9 pr-3 py-3 rounded-xl border border-neutral-300 focus:outline-none focus:ring-2 focus:ring-neutral-900 text-sm"
@@ -437,7 +437,7 @@ export const LoyaltySheet: React.FC<LoyaltySheetProps> = ({
                       <input
                         type="tel"
                         required
-                        value={phoneInput}
+                        value={phoneInput || ''}
                         onChange={(e) => setPhoneInput(formatPhone(e.target.value))}
                         placeholder="(62) 99999-9999"
                         className="w-full pl-9 pr-3 py-3 rounded-xl border border-neutral-300 focus:outline-none focus:ring-2 focus:ring-neutral-900 text-sm"
@@ -553,7 +553,7 @@ export const LoyaltySheet: React.FC<LoyaltySheetProps> = ({
               <div
                 className="p-5 rounded-2xl text-white shadow-md relative overflow-hidden space-y-4"
                 style={{
-                  background: `linear-gradient(135deg, ${company.primaryColor} 0%, #1e1e24 100%)`,
+                  background: `linear-gradient(135deg, ${company.primaryColor || '#6D28D9'} 0%, ${company.secondaryColor || '#1e1e24'} 100%)`,
                 }}
               >
                 <div className="flex items-center justify-between">

@@ -51,5 +51,10 @@ service cloud.firestore {
     match /settings/{settingId} {
       allow read, write: if true;
     }
+
+    // Deleted Companies: Tombstones to prevent resurrection of deleted companies
+    match /deleted_companies/{companyId} {
+      allow read, write: if true;
+    }
   }
 }

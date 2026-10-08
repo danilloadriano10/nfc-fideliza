@@ -38,8 +38,13 @@ import {
   Sparkles,
   Scissors,
   Layers,
+  KeyRound,
+  Eye,
+  EyeOff,
+  Palette,
 } from 'lucide-react'
 import confetti from 'canvas-confetti'
+import { BRAND_COLOR_PRESETS, sanitizeHex, getGradientContrastTextColor } from '@/lib/colors'
 import {
   Company,
   Customer,
@@ -57,6 +62,7 @@ import {
   fetchFeedbacksForCompany,
   fetchCompanyCustomersFromServer,
   saveCompany,
+  saveCompanyAsync,
   directAddPoint,
   redeemReward,
   toggleCompanyStatus,
@@ -113,6 +119,8 @@ export const CompanyPanelView: React.FC<CompanyPanelViewProps> = ({
   // Settings form state
   const [formData, setFormData] = useState<Company>(() => ({
     ...initialCompany,
+    primaryColor: initialCompany.primaryColor || '#6D28D9',
+    secondaryColor: initialCompany.secondaryColor || '#8B5CF6',
     highlightModule: initialCompany.highlightModule || 'auto',
     modules: {
       ...initialCompany.modules,
@@ -127,6 +135,14 @@ export const CompanyPanelView: React.FC<CompanyPanelViewProps> = ({
     },
   }))
   const [isSaving, setIsSaving] = useState(false)
+
+  // Company Access Credentials & Password state
+  const [ownerUsername, setOwnerUsername] = useState(
+    initialCompany.ownerAuth?.username || initialCompany.slug || ''
+  )
+  const [newPassword, setNewPassword] = useState('')
+  const [confirmPassword, setConfirmPassword] = useState('')
+  const [showPassword, setShowPassword] = useState(false)
 
   // Visual identity (Logo & Cover) states
   const [logoPreview, setLogoPreview] = useState<string>(initialCompany.logoUrl || '')
@@ -310,19 +326,55 @@ export const CompanyPanelView: React.FC<CompanyPanelViewProps> = ({
     showToast('success', 'URL da placa NFC copiada!')
   }
 
-  const handleSaveSettings = (e: React.FormEvent) => {
+  const handleSaveSettings = async (e: React.FormEvent) => {
     e.preventDefault()
+
+    // Validate password if user entered a new one
+    if (newPassword.trim()) {
+      if (newPassword.trim().length < 4) {
+        showToast('error', 'A nova senha deve ter no mínimo 4 caracteres.')
+        return
+      }
+      if (newPassword.trim() !== confirmPassword.trim()) {
+        showToast('error', 'A confirmação de senha não confere com a nova senha digitada.')
+        return
+      }
+    }
+
     setIsSaving(true)
 
-    const res = saveCompany(formData)
+    const currentPass = formData.ownerAuth?.password || 'empresa123'
+    const finalPass = newPassword.trim() ? newPassword.trim() : currentPass
+
+    const updatedToSave: Company = {
+      ...formData,
+      ownerAuth: {
+        ...(formData.ownerAuth || {}),
+        username: ownerUsername.trim() || formData.slug,
+        password: finalPass,
+      },
+    }
+
+    const res = await saveCompanyAsync(updatedToSave)
     setIsSaving(false)
 
     if (res.success) {
-      setCompany(formData)
-      showToast(
-        'success',
-        'Configurações salvas com sucesso! A URL da sua placa NFC permanece exatamente a mesma.'
-      )
+      const saved = res.company || updatedToSave
+      setCompany(saved)
+      setFormData(saved)
+      if (newPassword.trim()) {
+        setNewPassword('')
+        setConfirmPassword('')
+        showToast(
+          'success',
+          'Configurações e nova senha de acesso salvas com sucesso!'
+        )
+      } else {
+        showToast(
+          'success',
+          'Configurações salvas com sucesso! A URL da sua placa NFC permanece exatamente a mesma.'
+        )
+      }
     } else {
       showToast('error', res.error || 'Erro ao salvar configurações.')
     }
@@ -941,7 +993,7 @@ export const CompanyPanelView: React.FC<CompanyPanelViewProps> = ({
                       </div>
                       <input
                         type="checkbox"
-                        checked={currentLoyalty.isActive}
+                        checked={Boolean(currentLoyalty.isActive ?? false)}
                         onChange={(e) =>
                           setFormData({
                             ...formData,
@@ -962,7 +1014,7 @@ export const CompanyPanelView: React.FC<CompanyPanelViewProps> = ({
                       <input
                         type="text"
                         required
-                        value={currentLoyalty.campaignName}
+                        value={currentLoyalty.campaignName || ''}
                         onChange={(e) =>
                           setFormData({
                             ...formData,
@@ -986,7 +1038,7 @@ export const CompanyPanelView: React.FC<CompanyPanelViewProps> = ({
                         min="2"
                         max="50"
                         required
-                        value={currentLoyalty.goalPoints}
+                        value={currentLoyalty.goalPoints ?? 10}
                         onChange={(e) =>
                           setFormData({
                             ...formData,
@@ -1010,7 +1062,7 @@ export const CompanyPanelView: React.FC<CompanyPanelViewProps> = ({
                       <input
                         type="text"
                         required
-                        value={currentLoyalty.rewardDescription}
+                        value={currentLoyalty.rewardDescription || ''}
                         onChange={(e) =>
                           setFormData({
                             ...formData,
@@ -1206,7 +1258,7 @@ export const CompanyPanelView: React.FC<CompanyPanelViewProps> = ({
                   <input
                     type="text"
                     required
-                    value={formData.name}
+                    value={formData.name || ''}
                     onChange={(e) => setFormData({ ...formData, name: e.target.value })}
                     className="w-full px-3 py-2 rounded-xl border border-neutral-300 text-xs focus:outline-none focus:ring-2 focus:ring-neutral-900"
                   />
@@ -1219,7 +1271,7 @@ export const CompanyPanelView: React.FC<CompanyPanelViewProps> = ({
                   <input
                     type="text"
                     required
-                    value={formData.slug}
+                    value={formData.slug || ''}
                     onChange={(e) => setFormData({ ...formData, slug: e.target.value })}
                     className="w-full px-3 py-2 rounded-xl border border-neutral-300 text-xs font-mono focus:outline-none focus:ring-2 focus:ring-neutral-900 bg-neutral-50"
                   />
@@ -1249,26 +1301,6 @@ export const CompanyPanelView: React.FC<CompanyPanelViewProps> = ({
                     placeholder="Ex: Av. Central, 123 - Setor Bueno"
                     className="w-full px-3 py-2 rounded-xl border border-neutral-300 text-xs focus:outline-none"
                   />
-                </div>
-
-                <div>
-                  <label className="block text-xs font-semibold text-neutral-700 mb-1">
-                    Cor Principal (Hexadecimal)
-                  </label>
-                  <div className="flex items-center gap-2">
-                    <input
-                      type="color"
-                      value={formData.primaryColor}
-                      onChange={(e) => setFormData({ ...formData, primaryColor: e.target.value })}
-                      className="w-9 h-9 rounded-lg border border-neutral-300 cursor-pointer"
-                    />
-                    <input
-                      type="text"
-                      value={formData.primaryColor}
-                      onChange={(e) => setFormData({ ...formData, primaryColor: e.target.value })}
-                      className="w-full px-3 py-2 rounded-xl border border-neutral-300 text-xs font-mono uppercase"
-                    />
-                  </div>
                 </div>
               </div>
             </div>
@@ -1562,6 +1594,319 @@ export const CompanyPanelView: React.FC<CompanyPanelViewProps> = ({
               </div>
             </div>
 
+            {/* =================================================== */}
+            {/* SEÇÃO: APARÊNCIA DA PÁGINA (PERSONALIZAÇÃO DE CORES) */}
+            {/* =================================================== */}
+            <div className="bg-white rounded-3xl border border-neutral-200/80 shadow-sm p-6 space-y-6">
+              <div className="flex items-center justify-between pb-3 border-b border-neutral-100">
+                <div className="flex items-center gap-2.5">
+                  <div className="p-2 rounded-xl bg-neutral-900 text-white shadow-sm">
+                    <Palette className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <h3 className="font-bold text-neutral-900 text-sm">
+                      Aparência da Página
+                    </h3>
+                    <p className="text-xs text-neutral-500">
+                      Personalize a identidade de cores e o gradiente elegante da página pública da sua empresa (inspirado em cartões VIP de alta classe).
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              {/* 1. COMBINAÇÕES PRONTAS DE CORES */}
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <label className="text-xs font-bold text-neutral-900 uppercase tracking-wider flex items-center gap-1.5">
+                    <Sparkles className="w-4 h-4 text-amber-500" />
+                    Combinações Prontas de Cores
+                  </label>
+                  <span className="text-[11px] text-neutral-400">
+                    Toque para aplicar instantaneamente
+                  </span>
+                </div>
+
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
+                  {BRAND_COLOR_PRESETS.map((preset) => {
+                    const isSelected =
+                      (formData.primaryColor || '').toLowerCase() === preset.primary.toLowerCase() &&
+                      (formData.secondaryColor || '').toLowerCase() === preset.secondary.toLowerCase()
+
+                    return (
+                      <button
+                        key={preset.id}
+                        type="button"
+                        onClick={() => {
+                          setFormData((prev) => ({
+                            ...prev,
+                            primaryColor: preset.primary,
+                            secondaryColor: preset.secondary,
+                          }))
+                        }}
+                        className={`p-2.5 rounded-2xl border text-left transition-all relative flex flex-col justify-between gap-2 cursor-pointer group ${
+                          isSelected
+                            ? 'border-neutral-900 bg-neutral-50/90 ring-2 ring-neutral-900/10 shadow-xs'
+                            : 'border-neutral-200 hover:border-neutral-300 bg-white hover:bg-neutral-50/50'
+                        }`}
+                      >
+                        {/* Barra visual com o gradiente */}
+                        <div
+                          className="w-full h-8 rounded-xl shadow-2xs border border-black/10 relative overflow-hidden flex items-center justify-between px-2"
+                          style={{
+                            background: `linear-gradient(135deg, ${preset.primary} 0%, ${preset.secondary} 100%)`,
+                          }}
+                        >
+                          <span className="text-[10px] font-mono font-bold text-white drop-shadow-xs">
+                            {preset.primary}
+                          </span>
+                          <span className="text-[10px] font-mono font-bold text-white drop-shadow-xs">
+                            {preset.secondary}
+                          </span>
+                        </div>
+
+                        <div>
+                          <div className="flex items-center justify-between gap-1">
+                            <span className="text-xs font-bold text-neutral-900 truncate">
+                              {preset.name}
+                            </span>
+                            {isSelected && (
+                              <Check className="w-3.5 h-3.5 text-neutral-900 shrink-0 stroke-[2.5]" />
+                            )}
+                          </div>
+                          <p className="text-[10px] text-neutral-500 truncate mt-0.5">
+                            {preset.description}
+                          </p>
+                        </div>
+                      </button>
+                    )
+                  })}
+                </div>
+              </div>
+
+              {/* 2. OPÇÃO DE CORES PERSONALIZADAS */}
+              <div className="rounded-2xl border border-neutral-200 bg-neutral-50/50 p-4 space-y-4">
+                <div className="flex items-center justify-between">
+                  <h4 className="text-xs font-bold text-neutral-900 uppercase tracking-wider flex items-center gap-1.5">
+                    <SlidersHorizontal className="w-4 h-4 text-neutral-700" />
+                    Opção de Cores Personalizadas
+                  </h4>
+                  <span className="text-[11px] text-neutral-400">
+                    Defina qualquer código hexadecimal
+                  </span>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  {/* Cor Principal */}
+                  <div className="space-y-1.5 bg-white p-3 rounded-xl border border-neutral-200 shadow-2xs">
+                    <div className="flex items-center justify-between">
+                      <label className="text-xs font-semibold text-neutral-700">
+                        Cor Principal
+                      </label>
+                      <span className="text-[10px] text-neutral-400 font-mono">
+                        Base e elemento principal
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="color"
+                        value={sanitizeHex(formData.primaryColor, '#6D28D9')}
+                        onChange={(e) =>
+                          setFormData({
+                            ...formData,
+                            primaryColor: e.target.value.toUpperCase(),
+                          })
+                        }
+                        className="w-10 h-10 rounded-xl border border-neutral-300 cursor-pointer p-0.5 bg-white shrink-0"
+                      />
+                      <input
+                        type="text"
+                        value={formData.primaryColor || '#6D28D9'}
+                        onChange={(e) =>
+                          setFormData({
+                            ...formData,
+                            primaryColor: e.target.value.toUpperCase(),
+                          })
+                        }
+                        placeholder="#6D28D9"
+                        className="w-full px-3 py-2 rounded-xl border border-neutral-300 text-xs font-mono uppercase focus:outline-none focus:ring-2 focus:ring-neutral-900"
+                      />
+                    </div>
+                  </div>
+
+                  {/* Cor Secundária */}
+                  <div className="space-y-1.5 bg-white p-3 rounded-xl border border-neutral-200 shadow-2xs">
+                    <div className="flex items-center justify-between">
+                      <label className="text-xs font-semibold text-neutral-700">
+                        Cor Secundária
+                      </label>
+                      <span className="text-[10px] text-neutral-400 font-mono">
+                        Transição e destaques
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="color"
+                        value={sanitizeHex(formData.secondaryColor, '#8B5CF6')}
+                        onChange={(e) =>
+                          setFormData({
+                            ...formData,
+                            secondaryColor: e.target.value.toUpperCase(),
+                          })
+                        }
+                        className="w-10 h-10 rounded-xl border border-neutral-300 cursor-pointer p-0.5 bg-white shrink-0"
+                      />
+                      <input
+                        type="text"
+                        value={formData.secondaryColor || '#8B5CF6'}
+                        onChange={(e) =>
+                          setFormData({
+                            ...formData,
+                            secondaryColor: e.target.value.toUpperCase(),
+                          })
+                        }
+                        placeholder="#8B5CF6"
+                        className="w-full px-3 py-2 rounded-xl border border-neutral-300 text-xs font-mono uppercase focus:outline-none focus:ring-2 focus:ring-neutral-900"
+                      />
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* 3. PREVIEW DO GRADIENTE EM TEMPO REAL */}
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <label className="text-xs font-bold text-neutral-900 uppercase tracking-wider flex items-center gap-1.5">
+                    <Eye className="w-4 h-4 text-neutral-700" />
+                    Preview do Gradiente e Legibilidade
+                  </label>
+                  <span className="text-[11px] font-medium text-neutral-500">
+                    Ajuste automático de contraste
+                  </span>
+                </div>
+
+                {(() => {
+                  const pColor = sanitizeHex(formData.primaryColor, '#6D28D9')
+                  const sColor = sanitizeHex(formData.secondaryColor, '#8B5CF6')
+                  const currentGrad = `linear-gradient(135deg, ${pColor} 0%, ${sColor} 100%)`
+                  const previewContrast = getGradientContrastTextColor(pColor, sColor)
+                  const isDarkText = previewContrast === '#171717'
+
+                  return (
+                    <div className="rounded-2xl border border-neutral-200 overflow-hidden bg-neutral-950 shadow-md">
+                      {/* Faixa Superior simulando o Topo da Página */}
+                      <div
+                        className="p-5 sm:p-6 transition-all duration-300 relative overflow-hidden"
+                        style={{
+                          background: currentGrad,
+                          color: previewContrast,
+                        }}
+                      >
+                        {/* Efeitos de luz no gradiente */}
+                        <div className="absolute -right-6 -top-6 w-32 h-32 rounded-full bg-white/20 blur-xl pointer-events-none" />
+                        <div className="absolute right-10 bottom-0 w-24 h-24 rounded-full bg-black/15 blur-lg pointer-events-none" />
+
+                        <div className="relative z-10 space-y-4">
+                          <div className="flex items-center justify-between flex-wrap gap-2">
+                            <span
+                              className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-bold tracking-wide uppercase shadow-xs border"
+                              style={{
+                                backgroundColor: isDarkText
+                                  ? 'rgba(0,0,0,0.08)'
+                                  : 'rgba(255,255,255,0.2)',
+                                borderColor: isDarkText
+                                  ? 'rgba(0,0,0,0.12)'
+                                  : 'rgba(255,255,255,0.3)',
+                                color: previewContrast,
+                              }}
+                            >
+                              <Sparkles className="w-3 h-3" />
+                              Topo & Destaques da Página Pública
+                            </span>
+
+                            <span
+                              className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-mono font-bold"
+                              style={{
+                                backgroundColor: isDarkText
+                                  ? 'rgba(0,0,0,0.12)'
+                                  : 'rgba(255,255,255,0.22)',
+                                color: previewContrast,
+                              }}
+                            >
+                              Contraste automático: {isDarkText ? 'Texto Preto' : 'Texto Branco'}
+                            </span>
+                          </div>
+
+                          {/* Simulação do Card de Destaque */}
+                          <div
+                            className="p-4 rounded-2xl border transition-all"
+                            style={{
+                              backgroundColor: isDarkText
+                                ? 'rgba(0,0,0,0.07)'
+                                : 'rgba(255,255,255,0.18)',
+                              borderColor: isDarkText
+                                ? 'rgba(0,0,0,0.14)'
+                                : 'rgba(255,255,255,0.25)',
+                            }}
+                          >
+                            <div className="flex items-center gap-3">
+                              <div
+                                className="w-10 h-10 rounded-xl flex items-center justify-center font-bold text-base shadow-sm shrink-0 border"
+                                style={{
+                                  backgroundColor: isDarkText ? '#171717' : '#ffffff',
+                                  color: isDarkText ? '#ffffff' : '#171717',
+                                  borderColor: isDarkText
+                                    ? 'transparent'
+                                    : 'rgba(255,255,255,0.4)',
+                                }}
+                              >
+                                <Gift className="w-5 h-5" />
+                              </div>
+                              <div className="min-w-0 flex-1">
+                                <h5 className="font-extrabold text-sm tracking-tight truncate">
+                                  {formData.name || 'Nome do Estabelecimento'}
+                                </h5>
+                                <p
+                                  className="text-xs truncate mt-0.5"
+                                  style={{
+                                    color: isDarkText
+                                      ? 'rgba(23,23,23,0.8)'
+                                      : 'rgba(255,255,255,0.88)',
+                                  }}
+                                >
+                                  {formData.tagline || 'Cartão Fidelidade & Ações em Destaque'}
+                                </p>
+                              </div>
+                              {/* Botão com contraste invertido */}
+                              <div
+                                className="px-3 py-1.5 rounded-xl text-xs font-bold shadow-sm shrink-0 flex items-center gap-1"
+                                style={{
+                                  backgroundColor: isDarkText ? '#171717' : '#ffffff',
+                                  color: isDarkText ? '#ffffff' : '#171717',
+                                }}
+                              >
+                                <span>Acessar</span>
+                                <ArrowRight className="w-3 h-3 stroke-[2.5]" />
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Rodapé informativo do preview */}
+                      <div className="px-4 py-2.5 bg-neutral-900 border-t border-neutral-800 flex items-center justify-between text-[11px] text-neutral-400 font-mono">
+                        <span className="truncate">
+                          linear-gradient(135deg, {pColor} 0%, {sColor} 100%)
+                        </span>
+                        <span className="text-emerald-400 font-sans font-semibold shrink-0 flex items-center gap-1">
+                          <CheckCircle2 className="w-3.5 h-3.5" /> Salvo no Firestore por ID
+                        </span>
+                      </div>
+                    </div>
+                  )
+                })()}
+              </div>
+            </div>
+
             {/* Links and Contact Details */}
             <div className="bg-white rounded-3xl border border-neutral-200/80 shadow-sm p-6 space-y-4">
               <h3 className="font-bold text-neutral-900 text-sm">
@@ -1575,7 +1920,7 @@ export const CompanyPanelView: React.FC<CompanyPanelViewProps> = ({
                   </label>
                   <input
                     type="text"
-                    value={formData.whatsapp}
+                    value={formData.whatsapp || ''}
                     onChange={(e) => setFormData({ ...formData, whatsapp: e.target.value })}
                     placeholder="62999999999"
                     className="w-full px-3 py-2 rounded-xl border border-neutral-300 text-xs font-mono"
@@ -1588,7 +1933,7 @@ export const CompanyPanelView: React.FC<CompanyPanelViewProps> = ({
                   </label>
                   <input
                     type="text"
-                    value={formData.instagram}
+                    value={formData.instagram || ''}
                     onChange={(e) => setFormData({ ...formData, instagram: e.target.value })}
                     placeholder="seuestabelecimento"
                     className="w-full px-3 py-2 rounded-xl border border-neutral-300 text-xs"
@@ -1601,7 +1946,7 @@ export const CompanyPanelView: React.FC<CompanyPanelViewProps> = ({
                   </label>
                   <input
                     type="url"
-                    value={formData.googleReviewUrl}
+                    value={formData.googleReviewUrl || ''}
                     onChange={(e) => setFormData({ ...formData, googleReviewUrl: e.target.value })}
                     placeholder="https://g.page/r/.../review"
                     className="w-full px-3 py-2 rounded-xl border border-neutral-300 text-xs font-mono"
@@ -1614,7 +1959,7 @@ export const CompanyPanelView: React.FC<CompanyPanelViewProps> = ({
                   </label>
                   <input
                     type="url"
-                    value={formData.menuUrl}
+                    value={formData.menuUrl || ''}
                     onChange={(e) => setFormData({ ...formData, menuUrl: e.target.value })}
                     placeholder="https://cardapio.meusite.com.br"
                     className="w-full px-3 py-2 rounded-xl border border-neutral-300 text-xs font-mono"
@@ -1627,7 +1972,7 @@ export const CompanyPanelView: React.FC<CompanyPanelViewProps> = ({
                   </label>
                   <input
                     type="url"
-                    value={formData.locationUrl}
+                    value={formData.locationUrl || ''}
                     onChange={(e) => setFormData({ ...formData, locationUrl: e.target.value })}
                     placeholder="https://maps.google.com/?q=..."
                     className="w-full px-3 py-2 rounded-xl border border-neutral-300 text-xs font-mono"
@@ -1649,11 +1994,11 @@ export const CompanyPanelView: React.FC<CompanyPanelViewProps> = ({
                   </label>
                   <input
                     type="text"
-                    value={formData.wifi.ssid}
+                    value={formData.wifi?.ssid || ''}
                     onChange={(e) =>
                       setFormData({
                         ...formData,
-                        wifi: { ...formData.wifi, ssid: e.target.value },
+                        wifi: { ...(formData.wifi || { security: 'WPA/WPA2' }), ssid: e.target.value },
                       })
                     }
                     placeholder="Ex: MinhaEmpresa_Clientes"
@@ -1667,11 +2012,11 @@ export const CompanyPanelView: React.FC<CompanyPanelViewProps> = ({
                   </label>
                   <input
                     type="text"
-                    value={formData.wifi.password || ''}
+                    value={formData.wifi?.password || ''}
                     onChange={(e) =>
                       setFormData({
                         ...formData,
-                        wifi: { ...formData.wifi, password: e.target.value },
+                        wifi: { ...(formData.wifi || { ssid: '', security: 'WPA/WPA2' }), password: e.target.value },
                       })
                     }
                     placeholder="Senha do Wi-Fi"
@@ -1684,12 +2029,12 @@ export const CompanyPanelView: React.FC<CompanyPanelViewProps> = ({
                     Segurança
                   </label>
                   <select
-                    value={formData.wifi.security}
+                    value={formData.wifi?.security || 'WPA/WPA2'}
                     onChange={(e) =>
                       setFormData({
                         ...formData,
                         wifi: {
-                          ...formData.wifi,
+                          ...(formData.wifi || { ssid: '' }),
                           security: e.target.value as WifiSecurity,
                         },
                       })
@@ -1700,6 +2045,83 @@ export const CompanyPanelView: React.FC<CompanyPanelViewProps> = ({
                     <option value="WEP">WEP</option>
                     <option value="OPEN">Aberta (Sem Senha)</option>
                   </select>
+                </div>
+              </div>
+            </div>
+
+            {/* Credenciais e Senha de Acesso do Estabelecimento */}
+            <div className="bg-white rounded-3xl border border-neutral-200/80 shadow-sm p-6 space-y-4">
+              <div className="flex items-center gap-2.5">
+                <div className="w-8 h-8 rounded-xl bg-violet-100 text-violet-700 flex items-center justify-center">
+                  <KeyRound className="w-4 h-4" />
+                </div>
+                <div>
+                  <h3 className="font-bold text-neutral-900 text-sm">
+                    Credenciais e Senha de Acesso ao Painel
+                  </h3>
+                  <p className="text-xs text-neutral-500">
+                    Altere o usuário e a senha utilizados para entrar no painel de controle desta empresa.
+                  </p>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 pt-1">
+                <div>
+                  <label className="block text-xs font-semibold text-neutral-700 mb-1">
+                    Usuário de Acesso
+                  </label>
+                  <input
+                    type="text"
+                    value={ownerUsername || ''}
+                    onChange={(e) => setOwnerUsername(e.target.value)}
+                    placeholder="usuario.empresa"
+                    className="w-full px-3 py-2 rounded-xl border border-neutral-300 text-xs font-mono text-neutral-900 focus:outline-none focus:ring-2 focus:ring-violet-500"
+                  />
+                  <p className="text-[10px] text-neutral-400 mt-1">
+                    Login utilizado na tela de acesso.
+                  </p>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-semibold text-neutral-700 mb-1">
+                    Nova Senha de Acesso
+                  </label>
+                  <div className="relative">
+                    <input
+                      type={showPassword ? 'text' : 'password'}
+                      value={newPassword || ''}
+                      onChange={(e) => setNewPassword(e.target.value)}
+                      placeholder="Deixe em branco para manter"
+                      className="w-full px-3 py-2 pr-9 rounded-xl border border-neutral-300 text-xs font-mono text-neutral-900 focus:outline-none focus:ring-2 focus:ring-violet-500"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowPassword(!showPassword)}
+                      className="absolute right-2.5 top-1/2 -translate-y-1/2 text-neutral-400 hover:text-neutral-700 transition-colors"
+                      title={showPassword ? 'Ocultar senha' : 'Ver senha'}
+                    >
+                      {showPassword ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+                    </button>
+                  </div>
+                  <p className="text-[10px] text-neutral-400 mt-1">
+                    Mínimo de 4 caracteres.
+                  </p>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-semibold text-neutral-700 mb-1">
+                    Confirmar Nova Senha
+                  </label>
+                  <input
+                    type={showPassword ? 'text' : 'password'}
+                    value={confirmPassword || ''}
+                    onChange={(e) => setConfirmPassword(e.target.value)}
+                    placeholder="Repita a nova senha"
+                    className="w-full px-3 py-2 rounded-xl border border-neutral-300 text-xs font-mono text-neutral-900 focus:outline-none focus:ring-2 focus:ring-violet-500"
+                  />
+                  <p className="text-[10px] text-neutral-400 mt-1">
+                    Deve coincidir com a nova senha.
+                  </p>
                 </div>
               </div>
             </div>

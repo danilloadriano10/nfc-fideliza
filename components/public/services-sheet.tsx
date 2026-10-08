@@ -146,7 +146,8 @@ export const ServicesSheet: React.FC<ServicesSheetProps> = ({
             filtered.map((srv) => {
               const isConsult = srv.priceType === 'consult' || srv.price == null
               const isExpanded = expandedServiceId === srv.id
-              const hasPhoto = Boolean(srv.photoUrl && !srv.photoUrl.startsWith('data:'))
+              const servicePhoto = srv.photoUrl || (srv as unknown as { imageUrl?: string }).imageUrl || ''
+              const hasPhoto = Boolean(servicePhoto && servicePhoto.trim().length > 0)
 
               return (
                 <div
@@ -156,17 +157,17 @@ export const ServicesSheet: React.FC<ServicesSheetProps> = ({
                   <div className="flex gap-3 items-start">
                     {/* Thumbnail */}
                     {hasPhoto ? (
-                      <div className="relative w-16 h-16 rounded-xl overflow-hidden shrink-0 bg-neutral-200 shadow-2xs">
+                      <div className="relative w-16 h-16 sm:w-18 sm:h-18 rounded-2xl overflow-hidden shrink-0 bg-neutral-200 shadow-2xs border border-neutral-200/80">
                         {/* eslint-disable-next-line @next/next/no-img-element */}
                         <img
-                          src={srv.photoUrl}
+                          src={servicePhoto}
                           alt={srv.name}
                           className="w-full h-full object-cover"
                           loading="lazy"
                         />
                       </div>
                     ) : (
-                      <div className="w-16 h-16 rounded-xl bg-violet-100/60 text-violet-700 flex items-center justify-center shrink-0 border border-violet-200/50">
+                      <div className="w-16 h-16 sm:w-18 sm:h-18 rounded-2xl bg-violet-100/60 text-violet-700 flex items-center justify-center shrink-0 border border-violet-200/50">
                         <Scissors className="w-6 h-6 opacity-70" />
                       </div>
                     )}

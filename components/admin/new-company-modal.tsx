@@ -97,6 +97,7 @@ export const NewCompanyModal: React.FC<NewCompanyModalProps> = ({
 
   // 3. EXPERIÊNCIA NFC & MÓDULOS
   const [modules, setModules] = useState({
+    services: true,
     loyalty: true,
     googleReview: true,
     menu: true,
@@ -147,17 +148,18 @@ export const NewCompanyModal: React.FC<NewCompanyModalProps> = ({
       setWifiSsid(companyToEdit.wifi?.ssid || '')
       setWifiPassword(companyToEdit.wifi?.password || '')
       setWifiSecurity(companyToEdit.wifi?.security || 'WPA/WPA2')
-      setOwnerUsername(companyToEdit.ownerAuth?.username || companyToEdit.slug)
+      setOwnerUsername(companyToEdit.ownerAuth?.username || companyToEdit.slug || '')
       setOwnerPassword(companyToEdit.ownerAuth?.password || 'empresa123')
-      setModules(companyToEdit.modules || {
-        loyalty: true,
-        googleReview: true,
-        menu: true,
-        wifi: true,
-        whatsapp: true,
-        location: true,
-        feedback: true,
-        instagram: true,
+      setModules({
+        services: companyToEdit.modules?.services ?? true,
+        loyalty: companyToEdit.modules?.loyalty ?? true,
+        googleReview: companyToEdit.modules?.googleReview ?? true,
+        menu: companyToEdit.modules?.menu ?? true,
+        wifi: companyToEdit.modules?.wifi ?? true,
+        whatsapp: companyToEdit.modules?.whatsapp ?? true,
+        location: companyToEdit.modules?.location ?? true,
+        feedback: companyToEdit.modules?.feedback ?? true,
+        instagram: companyToEdit.modules?.instagram ?? true,
       })
       setLoyaltyName(companyToEdit.loyaltyProgram?.campaignName || 'Cartão Fidelidade')
       setLoyaltyGoal(companyToEdit.loyaltyProgram?.goalPoints || 10)
@@ -187,6 +189,7 @@ export const NewCompanyModal: React.FC<NewCompanyModalProps> = ({
       setOwnerUsername('')
       setOwnerPassword('')
       setModules({
+        services: true,
         loyalty: true,
         googleReview: true,
         menu: true,
@@ -283,7 +286,7 @@ export const NewCompanyModal: React.FC<NewCompanyModalProps> = ({
     }
 
     const cleanOwnerUser = ownerUsername.trim() || cleanSlug
-    const cleanOwnerPass = ownerPassword.trim() || 'empresa123'
+    const cleanOwnerPass = ownerPassword.trim() || (isEditing ? (companyToEdit?.ownerAuth?.password || 'empresa123') : 'empresa123')
     const targetCompanyId = companyToEdit?.id || `comp_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`
 
     setIsSubmitting(true)
@@ -601,7 +604,7 @@ export const NewCompanyModal: React.FC<NewCompanyModalProps> = ({
                       type="text"
                       required
                       placeholder="Ex: Café Central Bistrô"
-                      value={name}
+                      value={name ?? ''}
                       onChange={(e) => handleNameChange(e.target.value)}
                       className="w-full px-3 py-2 text-xs rounded-xl border border-neutral-200 focus:outline-none focus:ring-1 focus:ring-violet-600 bg-white"
                     />
@@ -612,7 +615,7 @@ export const NewCompanyModal: React.FC<NewCompanyModalProps> = ({
                       Categoria
                     </label>
                     <select
-                      value={category}
+                      value={category || 'Cafeteria / Bistrô'}
                       onChange={(e) => setCategory(e.target.value)}
                       className="w-full px-3 py-2 text-xs rounded-xl border border-neutral-200 focus:outline-none focus:ring-1 focus:ring-violet-600 bg-white"
                     >
@@ -638,7 +641,7 @@ export const NewCompanyModal: React.FC<NewCompanyModalProps> = ({
                         type="text"
                         required
                         placeholder="cafe-central"
-                        value={slug}
+                        value={slug ?? ''}
                         onChange={(e) => setSlug(slugify(e.target.value))}
                         className="w-full px-3 py-2 text-xs rounded-r-xl border border-neutral-200 font-mono focus:outline-none focus:ring-1 focus:ring-violet-600 bg-white"
                       />
@@ -652,7 +655,7 @@ export const NewCompanyModal: React.FC<NewCompanyModalProps> = ({
                     <input
                       type="text"
                       placeholder="Ex: Cafés especiais e momentos únicos"
-                      value={tagline}
+                      value={tagline ?? ''}
                       onChange={(e) => setTagline(e.target.value)}
                       className="w-full px-3 py-2 text-xs rounded-xl border border-neutral-200 focus:outline-none focus:ring-1 focus:ring-violet-600 bg-white"
                     />
@@ -722,7 +725,7 @@ export const NewCompanyModal: React.FC<NewCompanyModalProps> = ({
                             <input
                               type="url"
                               placeholder="https://exemplo.com/logo.png"
-                              value={logoUrl}
+                              value={logoUrl ?? ''}
                               onChange={(e) => {
                                 const val = e.target.value
                                 setLogoUrl(val)
@@ -847,7 +850,7 @@ export const NewCompanyModal: React.FC<NewCompanyModalProps> = ({
                           <input
                             type="url"
                             placeholder="https://exemplo.com/minha-capa.jpg"
-                            value={coverUrl}
+                            value={coverUrl ?? ''}
                             onChange={(e) => {
                               const val = e.target.value
                               setCoverUrl(val)
@@ -882,13 +885,13 @@ export const NewCompanyModal: React.FC<NewCompanyModalProps> = ({
                     <div className="flex items-center gap-2">
                       <input
                         type="color"
-                        value={primaryColor}
+                        value={primaryColor || '#6D28D9'}
                         onChange={(e) => setPrimaryColor(e.target.value)}
                         className="w-8 h-8 rounded-lg border border-neutral-200 cursor-pointer p-0"
                       />
                       <input
                         type="text"
-                        value={primaryColor}
+                        value={primaryColor || '#6D28D9'}
                         onChange={(e) => setPrimaryColor(e.target.value)}
                         className="flex-1 px-3 py-1.5 text-xs rounded-xl border border-neutral-200 font-mono uppercase bg-white"
                       />
@@ -901,13 +904,13 @@ export const NewCompanyModal: React.FC<NewCompanyModalProps> = ({
                     <div className="flex items-center gap-2">
                       <input
                         type="color"
-                        value={secondaryColor}
+                        value={secondaryColor || '#18181B'}
                         onChange={(e) => setSecondaryColor(e.target.value)}
                         className="w-8 h-8 rounded-lg border border-neutral-200 cursor-pointer p-0"
                       />
                       <input
                         type="text"
-                        value={secondaryColor}
+                        value={secondaryColor || '#18181B'}
                         onChange={(e) => setSecondaryColor(e.target.value)}
                         className="flex-1 px-3 py-1.5 text-xs rounded-xl border border-neutral-200 font-mono uppercase bg-white"
                       />
@@ -936,7 +939,7 @@ export const NewCompanyModal: React.FC<NewCompanyModalProps> = ({
                     <input
                       type="text"
                       placeholder="Ex: 62999998888"
-                      value={whatsapp}
+                      value={whatsapp ?? ''}
                       onChange={(e) => setWhatsapp(e.target.value)}
                       className="w-full px-3 py-2 text-xs rounded-xl border border-neutral-200 focus:outline-none focus:ring-1 focus:ring-violet-600 bg-white"
                     />
@@ -948,7 +951,7 @@ export const NewCompanyModal: React.FC<NewCompanyModalProps> = ({
                     <input
                       type="text"
                       placeholder="Ex: cafecentral"
-                      value={instagram}
+                      value={instagram ?? ''}
                       onChange={(e) => setInstagram(e.target.value)}
                       className="w-full px-3 py-2 text-xs rounded-xl border border-neutral-200 focus:outline-none focus:ring-1 focus:ring-violet-600 bg-white"
                     />
@@ -963,7 +966,7 @@ export const NewCompanyModal: React.FC<NewCompanyModalProps> = ({
                     <input
                       type="text"
                       placeholder="Ex: Av. Central, 123 - Setor Bueno, Goiânia - GO"
-                      value={addressText}
+                      value={addressText ?? ''}
                       onChange={(e) => setAddressText(e.target.value)}
                       className="w-full px-3 py-2 text-xs rounded-xl border border-neutral-200 focus:outline-none focus:ring-1 focus:ring-violet-600 bg-white"
                     />
@@ -975,7 +978,7 @@ export const NewCompanyModal: React.FC<NewCompanyModalProps> = ({
                     <input
                       type="text"
                       placeholder="https://maps.app.goo.gl/... ou https://google.com/maps?q=..."
-                      value={locationUrl}
+                      value={locationUrl ?? ''}
                       onChange={(e) => setLocationUrl(e.target.value)}
                       className="w-full px-3 py-2 text-xs rounded-xl border border-neutral-200 focus:outline-none focus:ring-1 focus:ring-violet-600 bg-white"
                     />
@@ -1014,7 +1017,7 @@ export const NewCompanyModal: React.FC<NewCompanyModalProps> = ({
                     >
                       <input
                         type="checkbox"
-                        checked={modules[mod.key as keyof typeof modules]}
+                        checked={Boolean(modules[mod.key as keyof typeof modules] ?? false)}
                         onChange={(e) =>
                           setModules({
                             ...modules,
@@ -1037,7 +1040,7 @@ export const NewCompanyModal: React.FC<NewCompanyModalProps> = ({
                     <input
                       type="text"
                       placeholder="https://search.google.com/local/writereview?placeid=..."
-                      value={googleReviewUrl}
+                      value={googleReviewUrl ?? ''}
                       onChange={(e) => setGoogleReviewUrl(e.target.value)}
                       className="w-full px-3 py-2 text-xs rounded-xl border border-neutral-200 bg-white"
                     />
@@ -1049,7 +1052,7 @@ export const NewCompanyModal: React.FC<NewCompanyModalProps> = ({
                     <input
                       type="text"
                       placeholder="https://menu.empresa.com"
-                      value={menuUrl}
+                      value={menuUrl ?? ''}
                       onChange={(e) => setMenuUrl(e.target.value)}
                       className="w-full px-3 py-2 text-xs rounded-xl border border-neutral-200 bg-white"
                     />
@@ -1068,7 +1071,7 @@ export const NewCompanyModal: React.FC<NewCompanyModalProps> = ({
                       <input
                         type="text"
                         placeholder="Ex: Cafe_Central_Clientes"
-                        value={wifiSsid}
+                        value={wifiSsid ?? ''}
                         onChange={(e) => setWifiSsid(e.target.value)}
                         className="w-full px-2.5 py-1.5 rounded-lg border border-neutral-200 bg-white"
                       />
@@ -1078,7 +1081,7 @@ export const NewCompanyModal: React.FC<NewCompanyModalProps> = ({
                       <input
                         type="text"
                         placeholder="Ex: cafezinho2026"
-                        value={wifiPassword}
+                        value={wifiPassword ?? ''}
                         onChange={(e) => setWifiPassword(e.target.value)}
                         className="w-full px-2.5 py-1.5 rounded-lg border border-neutral-200 bg-white"
                       />
@@ -1086,7 +1089,7 @@ export const NewCompanyModal: React.FC<NewCompanyModalProps> = ({
                     <div>
                       <label className="block text-[11px] text-neutral-500 mb-0.5">Segurança</label>
                       <select
-                        value={wifiSecurity}
+                        value={wifiSecurity || 'WPA/WPA2'}
                         onChange={(e) => setWifiSecurity(e.target.value as WifiSecurity)}
                         className="w-full px-2.5 py-1.5 rounded-lg border border-neutral-200 bg-white"
                       >
@@ -1110,7 +1113,7 @@ export const NewCompanyModal: React.FC<NewCompanyModalProps> = ({
                       <input
                         type="text"
                         placeholder="Ex: Clube do Café"
-                        value={loyaltyName}
+                        value={loyaltyName ?? ''}
                         onChange={(e) => setLoyaltyName(e.target.value)}
                         className="w-full px-2.5 py-1.5 rounded-lg border border-neutral-200 bg-white"
                       />
@@ -1121,7 +1124,7 @@ export const NewCompanyModal: React.FC<NewCompanyModalProps> = ({
                         type="number"
                         min={1}
                         max={50}
-                        value={loyaltyGoal}
+                        value={loyaltyGoal ?? 10}
                         onChange={(e) => setLoyaltyGoal(Number(e.target.value))}
                         className="w-full px-2.5 py-1.5 rounded-lg border border-neutral-200 bg-white font-mono"
                       />
@@ -1131,7 +1134,7 @@ export const NewCompanyModal: React.FC<NewCompanyModalProps> = ({
                       <input
                         type="text"
                         placeholder="Ex: 1 Cappuccino Especial"
-                        value={loyaltyReward}
+                        value={loyaltyReward ?? ''}
                         onChange={(e) => setLoyaltyReward(e.target.value)}
                         className="w-full px-2.5 py-1.5 rounded-lg border border-neutral-200 bg-white"
                       />
@@ -1164,7 +1167,7 @@ export const NewCompanyModal: React.FC<NewCompanyModalProps> = ({
                       type="text"
                       required
                       placeholder="Ex: cafecentral"
-                      value={ownerUsername}
+                      value={ownerUsername ?? ''}
                       onChange={(e) => setOwnerUsername(e.target.value)}
                       className="w-full px-3 py-2 text-xs rounded-xl border border-neutral-300 bg-white font-mono focus:outline-none focus:ring-1 focus:ring-violet-600"
                     />
@@ -1178,7 +1181,7 @@ export const NewCompanyModal: React.FC<NewCompanyModalProps> = ({
                       type="text"
                       required
                       placeholder="Ex: cafe123"
-                      value={ownerPassword}
+                      value={ownerPassword ?? ''}
                       onChange={(e) => setOwnerPassword(e.target.value)}
                       className="w-full px-3 py-2 text-xs rounded-xl border border-neutral-300 bg-white font-mono focus:outline-none focus:ring-1 focus:ring-violet-600"
                     />

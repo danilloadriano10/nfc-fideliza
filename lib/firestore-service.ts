@@ -48,6 +48,7 @@ const SETTINGS_COLLECTION = 'settings'
 const SERVICES_COLLECTION = 'services'
 const APPOINTMENTS_COLLECTION = 'appointments'
 const PROFESSIONALS_COLLECTION = 'professionals'
+const DELETED_COMPANIES_COLLECTION = 'deleted_companies'
 
 let migrationPromise: Promise<void> | null = null
 
@@ -75,6 +76,13 @@ export async function ensureFirestoreInitialized(): Promise<void> {
 
       console.log('🔄 Iniciando migração de dados do platform-db.json para o Firebase Cloud Firestore...')
 
+      // Query any companies previously registered as deleted so they are never recreated
+      const deletedIds = new Set<string>()
+      try {
+        const deletedSnap = await getDocs(collection(db, DELETED_COMPANIES_COLLECTION))
+        deletedSnap.forEach((d) => deletedIds.add(d.id))
+      } catch {}
+
       // 2. Load existing data from data/platform-db.json or initial seeds
       let legacyData: {
         companies: Company[]
@@ -90,8 +98,11 @@ export async function ensureFirestoreInitialized(): Promise<void> {
         feedbacks: INITIAL_FEEDBACKS,
       }
 
-      // 3. Migrate Companies to Firestore
+      // 3. Migrate Companies to Firestore (skip if previously deleted)
       for (const comp of legacyData.companies) {
+        if (deletedIds.has(comp.id)) {
+          continue // Never resurrect deleted company
+        }
         const compRef = doc(db, COMPANIES_COLLECTION, comp.id)
         const compDoc = await getDoc(compRef)
         if (!compDoc.exists()) {
@@ -189,9 +200,19 @@ export async function getFirestoreCompanies(): Promise<Company[]> {
   try {
     const collRef = collection(db, COMPANIES_COLLECTION)
     const snapshot = await getDocs(collRef)
+
+    const deletedIds = new Set<string>()
+    try {
+      const delSnap = await getDocs(collection(db, DELETED_COMPANIES_COLLECTION))
+      delSnap.forEach((d) => deletedIds.add(d.id))
+    } catch {}
+
     const companies: Company[] = []
     snapshot.forEach((d) => {
-      companies.push(d.data() as Company)
+      const comp = d.data() as Company
+      if (!deletedIds.has(comp.id)) {
+        companies.push(comp)
+      }
     })
     return companies.sort((a, b) => (a.name || '').localeCompare(b.name || ''))
   } catch (err) {
@@ -208,7 +229,15 @@ export async function getFirestoreCompanyBySlug(slug: string): Promise<Company |
     const q = query(collRef, where('slug', '==', clean))
     const snapshot = await getDocs(q)
     if (snapshot.empty) return null
-    return snapshot.docs[0].data() as Company
+    const comp = snapshot.docs[0].data() as Company
+
+    // Check if company is marked as deleted
+    try {
+      const delSnap = await getDoc(doc(db, DELETED_COMPANIES_COLLECTION, comp.id))
+      if (delSnap.exists()) return null
+    } catch {}
+
+    return comp
   } catch (err) {
     handleFirestoreError(err, OperationType.GET, `${COMPANIES_COLLECTION}?slug=${clean}`)
   }
@@ -229,7 +258,7 @@ export async function getFirestoreCompanyById(id: string): Promise<Company | nul
 
 export async function saveFirestoreCompany(
   company: Company
-): Promise<{ success: boolean; error?: string }> {
+): Promise<{ success: boolean; company?: Company; error?: string }> {
   await ensureFirestoreInitialized()
   const cleanSlug = company.slug.toLowerCase().trim()
 
@@ -264,24 +293,32 @@ export async function saveFirestoreCompany(
       finalCompany.slug = existing.slug
     }
     // Hash password if updated and not already a hash
-    if (company.ownerAuth?.password) {
-      if (company.ownerAuth.password !== existing.ownerAuth?.password) {
+    if (company.ownerAuth?.password && typeof company.ownerAuth.password === 'string' && company.ownerAuth.password.trim()) {
+      const inputPass = company.ownerAuth.password.trim()
+      const isAlreadyHashed = /^[0-9a-f]{64}$/i.test(inputPass)
+
+      if (isAlreadyHashed) {
+        // Password sent is already the SHA-256 hash: keep it intact
         finalCompany.ownerAuth = {
           ...existing.ownerAuth,
           ...company.ownerAuth,
-          username: company.ownerAuth.username || company.slug,
-          password: hashPassword(company.ownerAuth.password),
+          username: company.ownerAuth.username || existing.ownerAuth?.username || company.slug,
+          password: inputPass,
         }
       } else {
+        // Plaintext password provided: hash it with system salt and save
         finalCompany.ownerAuth = {
           ...existing.ownerAuth,
           ...company.ownerAuth,
+          username: company.ownerAuth.username || existing.ownerAuth?.username || company.slug,
+          password: hashPassword(inputPass),
         }
       }
     } else if (existing.ownerAuth) {
       finalCompany.ownerAuth = {
         ...existing.ownerAuth,
         ...(company.ownerAuth || {}),
+        password: existing.ownerAuth.password,
       }
     }
     if (company.origin === undefined && existing.origin) {
@@ -296,9 +333,11 @@ export async function saveFirestoreCompany(
     finalCompany.origin = company.origin || 'admin'
     finalCompany.onboardingCompleted = company.onboardingCompleted ?? false
     if (finalCompany.ownerAuth?.password) {
+      const pass = finalCompany.ownerAuth.password.trim()
+      const isAlreadyHashed = /^[0-9a-f]{64}$/i.test(pass)
       finalCompany.ownerAuth = {
         ...finalCompany.ownerAuth,
-        password: hashPassword(finalCompany.ownerAuth.password),
+        password: isAlreadyHashed ? pass : hashPassword(pass),
       }
     }
   }
@@ -314,7 +353,7 @@ export async function saveFirestoreCompany(
 
   try {
     await setDoc(docRef, finalCompany, { merge: true })
-    return { success: true }
+    return { success: true, company: finalCompany }
   } catch (err) {
     handleFirestoreError(err, OperationType.WRITE, `${COMPANIES_COLLECTION}/${company.id}`)
   }
@@ -329,23 +368,31 @@ export async function deleteFirestoreCompany(companyId: string): Promise<boolean
     const compRef = doc(db, COMPANIES_COLLECTION, companyId)
     await deleteDoc(compRef)
 
-    // 2. Cascade delete customers
+    // 2. Mark as permanently deleted in deleted_companies to prevent resurrection
+    const delRef = doc(db, DELETED_COMPANIES_COLLECTION, companyId)
+    await setDoc(delRef, {
+      id: companyId,
+      companyId,
+      deletedAt: new Date().toISOString(),
+    })
+
+    // 3. Cascade delete customers
     const custColl = collection(db, CUSTOMERS_COLLECTION)
     const custSnap = await getDocs(query(custColl, where('companyId', '==', companyId)))
     const batch = writeBatch(db)
     custSnap.forEach((d) => batch.delete(d.ref))
 
-    // 3. Cascade delete requests
+    // 4. Cascade delete requests
     const reqColl = collection(db, REQUESTS_COLLECTION)
     const reqSnap = await getDocs(query(reqColl, where('companyId', '==', companyId)))
     reqSnap.forEach((d) => batch.delete(d.ref))
 
-    // 4. Cascade delete feedbacks
+    // 5. Cascade delete feedbacks
     const feedColl = collection(db, FEEDBACKS_COLLECTION)
     const feedSnap = await getDocs(query(feedColl, where('companyId', '==', companyId)))
     feedSnap.forEach((d) => batch.delete(d.ref))
 
-    // 5. Cascade delete logs
+    // 6. Cascade delete logs
     const logColl = collection(db, LOGS_COLLECTION)
     const logSnap = await getDocs(query(logColl, where('companyId', '==', companyId)))
     logSnap.forEach((d) => batch.delete(d.ref))
@@ -1068,9 +1115,21 @@ export async function saveFirestoreService(
     return { success: false, error: 'companyId é obrigatório.' }
   }
 
-  // Ensure no base64 in photoUrl
-  if (service.photoUrl && isBase64Image(service.photoUrl)) {
-    return { success: false, error: 'Foto não pode ser Base64. Utilize o upload oficial.' }
+  // Handle photoUrl with base64 defense and conversion
+  let finalPhoto = service.photoUrl?.trim() || undefined
+  if (finalPhoto && isBase64Image(finalPhoto)) {
+    try {
+      const { uploadCompanyFileServer } = await import('@/lib/storage-service')
+      const matches = finalPhoto.match(/^data:([A-Za-z-+\/]+);base64,(.+)$/)
+      if (matches && matches[2]) {
+        const mime = matches[1]
+        const buf = Buffer.from(matches[2], 'base64')
+        const up = await uploadCompanyFileServer(service.companyId, 'service', buf, 'service.jpg', mime)
+        finalPhoto = up.url || undefined
+      }
+    } catch {
+      finalPhoto = undefined
+    }
   }
 
   await ensureFirestoreInitialized()
@@ -1089,9 +1148,7 @@ export async function saveFirestoreService(
     createdAt: service.createdAt || now,
   }
 
-  if (service.photoUrl && typeof service.photoUrl === 'string' && service.photoUrl.trim()) {
-    serviceToSave.photoUrl = service.photoUrl.trim()
-  }
+  serviceToSave.photoUrl = finalPhoto || ''
 
   try {
     const docRef = doc(db, SERVICES_COLLECTION, service.id)

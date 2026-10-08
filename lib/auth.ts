@@ -1,5 +1,6 @@
 import { Company } from '@/types/platform'
 import { getAllCompanies } from './storage'
+import { verifyPassword } from './auth-crypto'
 
 export const AUTH_CHANGE_EVENT = 'nfc_auth_change_event_v1'
 
@@ -153,9 +154,9 @@ export function loginOwner(
 
   // Company specific owner credentials
   const expectedUser = company.ownerAuth?.username?.toLowerCase() || company.slug
-  const expectedPass = company.ownerAuth?.password || '123456'
+  const storedCredential = company.ownerAuth?.password || ''
 
-  if (cleanUser === expectedUser && (cleanPass === expectedPass || !expectedPass)) {
+  if (cleanUser === expectedUser && (!storedCredential || verifyPassword(cleanPass, storedCredential))) {
     if (typeof window !== 'undefined') {
       localStorage.setItem(`${OWNER_STORAGE_KEY_PREFIX}${company.id}`, 'true')
       notifyAuthChange()
@@ -222,8 +223,8 @@ export function findCompanyByOwnerLogin(
   const companies = getAllCompanies()
   for (const c of companies) {
     const expectedUser = c.ownerAuth?.username?.toLowerCase() || c.slug
-    const expectedPass = c.ownerAuth?.password || '123456'
-    if (cleanUser === expectedUser && cleanPass === expectedPass) {
+    const storedCredential = c.ownerAuth?.password || ''
+    if (cleanUser === expectedUser && (!storedCredential || verifyPassword(cleanPass, storedCredential))) {
       return c
     }
   }

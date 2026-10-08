@@ -75,7 +75,7 @@ export async function getServerCompanyById(id: string): Promise<Company | null> 
 
 export async function saveServerCompany(
   company: Company
-): Promise<{ success: boolean; error?: string }> {
+): Promise<{ success: boolean; company?: Company; error?: string }> {
   return await saveFirestoreCompany(company)
 }
 

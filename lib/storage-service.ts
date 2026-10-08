@@ -29,7 +29,7 @@ export function isBase64Image(val?: string | null): boolean {
  */
 async function uploadToImgBB(
   companyId: string,
-  type: 'logo' | 'cover',
+  type: 'logo' | 'cover' | 'service' | string,
   fileBuffer: Buffer,
   fileName: string,
   apiKey: string
@@ -69,7 +69,7 @@ async function uploadToImgBB(
  */
 async function uploadToCloudinary(
   companyId: string,
-  type: 'logo' | 'cover',
+  type: 'logo' | 'cover' | 'service' | string,
   fileBuffer: Buffer,
   mimeType: string,
   cloudName: string,
@@ -134,7 +134,7 @@ async function uploadToCloudinary(
  */
 async function uploadToFirestoreStorage(
   companyId: string,
-  type: 'logo' | 'cover',
+  type: 'logo' | 'cover' | 'service' | string,
   fileBuffer: Buffer,
   originalName: string,
   mimeType: string
@@ -220,7 +220,7 @@ async function uploadToFirestoreStorage(
  */
 export async function uploadCompanyFileServer(
   companyId: string,
-  type: 'logo' | 'cover',
+  type: 'logo' | 'cover' | 'service' | string,
   fileBuffer: Buffer,
   originalName: string,
   mimeType: string

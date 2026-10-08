@@ -278,7 +278,7 @@ export const CompanyOnboardingModal: React.FC<CompanyOnboardingModalProps> = ({
                 <input
                   type="text"
                   placeholder="Ex: O melhor café artesanal da cidade"
-                  value={tagline}
+                  value={tagline || ''}
                   onChange={(e) => setTagline(e.target.value)}
                   className="w-full px-3 py-2 text-xs rounded-xl border border-neutral-300 focus:border-violet-600 bg-white"
                 />
@@ -338,13 +338,13 @@ export const CompanyOnboardingModal: React.FC<CompanyOnboardingModalProps> = ({
                   <div className="flex items-center gap-2">
                     <input
                       type="color"
-                      value={primaryColor}
+                      value={primaryColor || '#6D28D9'}
                       onChange={(e) => setPrimaryColor(e.target.value)}
                       className="w-8 h-8 rounded-lg border border-neutral-200 cursor-pointer p-0"
                     />
                     <input
                       type="text"
-                      value={primaryColor}
+                      value={primaryColor || '#6D28D9'}
                       onChange={(e) => setPrimaryColor(e.target.value)}
                       className="flex-1 px-3 py-1.5 text-xs rounded-xl border border-neutral-300 font-mono uppercase bg-white"
                     />
@@ -358,13 +358,13 @@ export const CompanyOnboardingModal: React.FC<CompanyOnboardingModalProps> = ({
                   <div className="flex items-center gap-2">
                     <input
                       type="color"
-                      value={secondaryColor}
+                      value={secondaryColor || '#18181B'}
                       onChange={(e) => setSecondaryColor(e.target.value)}
                       className="w-8 h-8 rounded-lg border border-neutral-200 cursor-pointer p-0"
                     />
                     <input
                       type="text"
-                      value={secondaryColor}
+                      value={secondaryColor || '#18181B'}
                       onChange={(e) => setSecondaryColor(e.target.value)}
                       className="flex-1 px-3 py-1.5 text-xs rounded-xl border border-neutral-300 font-mono uppercase bg-white"
                     />
@@ -387,7 +387,7 @@ export const CompanyOnboardingModal: React.FC<CompanyOnboardingModalProps> = ({
                   <input
                     type="text"
                     placeholder="Ex: 11999998888"
-                    value={whatsapp}
+                    value={whatsapp || ''}
                     onChange={(e) => setWhatsapp(e.target.value)}
                     className="w-full px-3 py-2 text-xs rounded-xl border border-neutral-300 focus:border-violet-600 bg-white"
                   />
@@ -400,7 +400,7 @@ export const CompanyOnboardingModal: React.FC<CompanyOnboardingModalProps> = ({
                   <input
                     type="text"
                     placeholder="Ex: suamarca"
-                    value={instagram}
+                    value={instagram || ''}
                     onChange={(e) => setInstagram(e.target.value)}
                     className="w-full px-3 py-2 text-xs rounded-xl border border-neutral-300 focus:border-violet-600 bg-white"
                   />
@@ -414,7 +414,7 @@ export const CompanyOnboardingModal: React.FC<CompanyOnboardingModalProps> = ({
                 <input
                   type="text"
                   placeholder="Ex: Av. Paulista, 1000 - Bela Vista, São Paulo - SP"
-                  value={addressText}
+                  value={addressText || ''}
                   onChange={(e) => setAddressText(e.target.value)}
                   className="w-full px-3 py-2 text-xs rounded-xl border border-neutral-300 focus:border-violet-600 bg-white"
                 />
@@ -427,7 +427,7 @@ export const CompanyOnboardingModal: React.FC<CompanyOnboardingModalProps> = ({
                 <input
                   type="url"
                   placeholder="https://maps.app.goo.gl/... ou https://google.com/maps?q=..."
-                  value={locationUrl}
+                  value={locationUrl || ''}
                   onChange={(e) => setLocationUrl(e.target.value)}
                   className="w-full px-3 py-2 text-xs rounded-xl border border-neutral-300 focus:border-violet-600 bg-white"
                 />
@@ -463,7 +463,7 @@ export const CompanyOnboardingModal: React.FC<CompanyOnboardingModalProps> = ({
                     >
                       <input
                         type="checkbox"
-                        checked={modules[mod.key as keyof typeof modules]}
+                        checked={Boolean(modules[mod.key as keyof typeof modules] ?? false)}
                         onChange={(e) =>
                           setModules({
                             ...modules,
@@ -491,7 +491,7 @@ export const CompanyOnboardingModal: React.FC<CompanyOnboardingModalProps> = ({
                       <input
                         type="text"
                         placeholder="Ex: MinhaRede_Clientes"
-                        value={wifiSsid}
+                        value={wifiSsid || ''}
                         onChange={(e) => setWifiSsid(e.target.value)}
                         className="w-full px-2.5 py-1.5 rounded-lg border border-neutral-300 bg-white"
                       />
@@ -501,7 +501,7 @@ export const CompanyOnboardingModal: React.FC<CompanyOnboardingModalProps> = ({
                       <input
                         type="text"
                         placeholder="Ex: senha123"
-                        value={wifiPassword}
+                        value={wifiPassword || ''}
                         onChange={(e) => setWifiPassword(e.target.value)}
                         className="w-full px-2.5 py-1.5 rounded-lg border border-neutral-300 bg-white"
                       />
@@ -519,7 +519,7 @@ export const CompanyOnboardingModal: React.FC<CompanyOnboardingModalProps> = ({
                   <input
                     type="url"
                     placeholder="https://search.google.com/local/writereview?placeid=..."
-                    value={googleReviewUrl}
+                    value={googleReviewUrl || ''}
                     onChange={(e) => setGoogleReviewUrl(e.target.value)}
                     className="w-full px-3 py-2 text-xs rounded-xl border border-neutral-300 focus:border-violet-600 bg-white"
                   />
@@ -561,7 +561,7 @@ export const CompanyOnboardingModal: React.FC<CompanyOnboardingModalProps> = ({
                     <input
                       type="text"
                       placeholder="Ex: Clube Fidelidade VIP"
-                      value={loyaltyName}
+                      value={loyaltyName || ''}
                       onChange={(e) => setLoyaltyName(e.target.value)}
                       className="w-full px-3 py-2 text-xs rounded-xl border border-neutral-300 focus:border-violet-600 bg-white"
                     />
@@ -576,7 +576,7 @@ export const CompanyOnboardingModal: React.FC<CompanyOnboardingModalProps> = ({
                         type="number"
                         min={1}
                         max={50}
-                        value={loyaltyGoal}
+                        value={loyaltyGoal ?? 10}
                         onChange={(e) => setLoyaltyGoal(Number(e.target.value))}
                         className="w-full px-3 py-2 text-xs rounded-xl border border-neutral-300 focus:border-violet-600 bg-white font-mono"
                       />
@@ -589,7 +589,7 @@ export const CompanyOnboardingModal: React.FC<CompanyOnboardingModalProps> = ({
                       <input
                         type="text"
                         placeholder="Ex: 1 Café Especial Grátis"
-                        value={loyaltyReward}
+                        value={loyaltyReward || ''}
                         onChange={(e) => setLoyaltyReward(e.target.value)}
                         className="w-full px-3 py-2 text-xs rounded-xl border border-neutral-300 focus:border-violet-600 bg-white"
                       />

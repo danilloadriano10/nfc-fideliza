@@ -30,6 +30,7 @@ const STORAGE_KEYS = {
   SERVICES: 'nfc_tenant_services_v1',
   APPOINTMENTS: 'nfc_tenant_appointments_v1',
   PROFESSIONALS: 'nfc_tenant_professionals_v1',
+  DELETED_COMPANIES: 'nfc_tenant_deleted_companies_v1',
   CURRENT_CUSTOMER_PREFIX: 'nfc_client_session_',
 }
 
@@ -58,6 +59,37 @@ let memoryProfessionals: CompanyProfessional[] = [...INITIAL_PROFESSIONALS]
 
 function isBrowser(): boolean {
   return typeof window !== 'undefined'
+}
+
+export function getDeletedCompanyIds(): string[] {
+  if (!isBrowser()) return []
+  return getItem<string[]>(STORAGE_KEYS.DELETED_COMPANIES, [])
+}
+
+export function recordDeletedCompanyId(companyId: string, slug?: string): void {
+  if (!isBrowser() || !companyId) return
+  const current = getDeletedCompanyIds()
+  const toAdd = [companyId]
+  if (slug) {
+    toAdd.push(slug.toLowerCase().trim())
+  }
+  const updated = Array.from(new Set([...current, ...toAdd]))
+  setItem(STORAGE_KEYS.DELETED_COMPANIES, updated)
+}
+
+export function mergeDeletedCompanyIds(ids: string[]): void {
+  if (!isBrowser() || !Array.isArray(ids)) return
+  const current = getDeletedCompanyIds()
+  const cleaned = ids.map((id) => (typeof id === 'string' ? id.trim() : '')).filter(Boolean)
+  const updated = Array.from(new Set([...current, ...cleaned]))
+  setItem(STORAGE_KEYS.DELETED_COMPANIES, updated)
+}
+
+export function isCompanyDeleted(idOrSlug: string): boolean {
+  if (!idOrSlug) return false
+  const deleted = getDeletedCompanyIds()
+  const clean = idOrSlug.toLowerCase().trim()
+  return deleted.some((d) => d.toLowerCase().trim() === clean)
 }
 
 function getItem<T>(key: string, defaultValue: T): T {
@@ -89,8 +121,14 @@ function setItem<T>(key: string, value: T): void {
 // ==========================================
 
 export function getAllCompanies(): Company[] {
-  if (!isBrowser()) return memoryCompanies
-  return getItem<Company[]>(STORAGE_KEYS.COMPANIES, INITIAL_COMPANIES)
+  const deletedIds = getDeletedCompanyIds()
+  let list: Company[]
+  if (!isBrowser()) {
+    list = memoryCompanies
+  } else {
+    list = getItem<Company[]>(STORAGE_KEYS.COMPANIES, INITIAL_COMPANIES)
+  }
+  return list.filter((c) => !deletedIds.includes(c.id))
 }
 
 export function getAllPointRequests(): PointRequest[] {
@@ -169,9 +207,9 @@ export function saveCompany(updated: Company): { success: boolean; error?: strin
   return { success: true }
 }
 
-export async function saveCompanyAsync(company: Company): Promise<{ success: boolean; error?: string }> {
+export async function saveCompanyAsync(company: Company): Promise<{ success: boolean; company?: Company; error?: string }> {
   const cleanSlug = company.slug.toLowerCase().trim()
-  const updated: Company = {
+  let updated: Company = {
     ...company,
     slug: cleanSlug,
   }
@@ -187,6 +225,9 @@ export async function saveCompanyAsync(company: Company): Promise<{ success: boo
       if (!res.ok || !data.success) {
         return { success: false, error: data.error || 'Erro ao salvar no servidor.' }
       }
+      if (data.company) {
+        updated = data.company
+      }
     } catch (err) {
       console.error('Error saving company to server:', err)
       return { success: false, error: 'Falha de comunicação com o servidor.' }
@@ -194,7 +235,7 @@ export async function saveCompanyAsync(company: Company): Promise<{ success: boo
   }
 
   saveCompany(updated)
-  return { success: true }
+  return { success: true, company: updated }
 }
 
 export async function registerCompanySelfServiceAsync(data: {
@@ -256,12 +297,16 @@ export function toggleCompanyStatus(companyId: string): boolean {
 }
 
 export function deleteCompany(companyId: string): boolean {
-  const companies = getAllCompanies()
-  const filtered = companies.filter((c) => c.id !== companyId)
-  if (filtered.length === companies.length) return false
+  if (!companyId) return false
+  recordDeletedCompanyId(companyId)
 
+  // Remove from memory
+  memoryCompanies = memoryCompanies.filter((c) => c.id !== companyId)
+
+  // Remove from localStorage
+  const currentRaw = getItem<Company[]>(STORAGE_KEYS.COMPANIES, INITIAL_COMPANIES)
+  const filtered = currentRaw.filter((c) => c.id !== companyId)
   setItem(STORAGE_KEYS.COMPANIES, filtered)
-  memoryCompanies = filtered
 
   // Cascade delete isolated company data
   const customers = getItem<Customer[]>(STORAGE_KEYS.CUSTOMERS, INITIAL_CUSTOMERS).filter(
@@ -296,6 +341,9 @@ export function deleteCompany(companyId: string): boolean {
 }
 
 export async function deleteCompanyAsync(companyId: string): Promise<boolean> {
+  // Always immediately purge locally and record tombstone
+  deleteCompany(companyId)
+
   if (isBrowser()) {
     try {
       const res = await fetch(`/api/companies?id=${encodeURIComponent(companyId)}`, {
@@ -303,14 +351,13 @@ export async function deleteCompanyAsync(companyId: string): Promise<boolean> {
       })
       const data = await res.json()
       if (res.ok && data.success) {
-        deleteCompany(companyId)
         return true
       }
     } catch (err) {
       console.error('Error deleting company on server:', err)
     }
   }
-  return deleteCompany(companyId)
+  return true
 }
 
 // ==========================================
@@ -1153,15 +1200,17 @@ export async function fetchFeedbacksForCompany(companyId: string): Promise<Priva
 
 export async function syncCompaniesFromServer(): Promise<Company[]> {
   if (!isBrowser()) return memoryCompanies
+  const deletedIds = getDeletedCompanyIds()
   try {
     const res = await fetch('/api/companies')
     if (res.ok) {
       const data = await res.json()
-      if (Array.isArray(data.companies) && data.companies.length > 0) {
-        setItem(STORAGE_KEYS.COMPANIES, data.companies)
-        memoryCompanies = data.companies
+      if (Array.isArray(data.companies)) {
+        const filtered = data.companies.filter((c: Company) => !deletedIds.includes(c.id))
+        setItem(STORAGE_KEYS.COMPANIES, filtered)
+        memoryCompanies = filtered
         notifyDataChange()
-        return data.companies
+        return filtered
       }
     }
   } catch (err) {
@@ -1278,7 +1327,10 @@ export async function saveCompanyServiceOnServerApi(
   service: CompanyService,
   isEdit = false
 ): Promise<{ success: boolean; service?: CompanyService; error?: string }> {
-  saveCompanyServiceLocally(service)
+  // Only cache locally immediately if not raw large base64
+  if (!service.photoUrl || !service.photoUrl.startsWith('data:')) {
+    saveCompanyServiceLocally(service)
+  }
   try {
     const res = await fetch('/api/services', {
       method: isEdit ? 'PUT' : 'POST',
@@ -1294,6 +1346,7 @@ export async function saveCompanyServiceOnServerApi(
     }
     return { success: false, error: data.error || 'Erro ao salvar serviço no servidor.' }
   } catch {
+    saveCompanyServiceLocally(service)
     return { success: true, service }
   }
 }

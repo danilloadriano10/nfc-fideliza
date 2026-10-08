@@ -79,7 +79,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ success: false, error: res.error }, { status: 400 })
     }
 
-    return NextResponse.json({ success: true, company })
+    return NextResponse.json({ success: true, company: res.company || company })
   } catch (err) {
     console.error('Error saving company in Firestore:', err)
     return NextResponse.json(

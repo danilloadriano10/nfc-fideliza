@@ -84,6 +84,7 @@ export const ServicesTab: React.FC<ServicesTabProps> = ({ company, onEnableModul
   const [photoUrl, setPhotoUrl] = useState('')
   const [photoPreview, setPhotoPreview] = useState('')
   const [photoFile, setPhotoFile] = useState<File | null>(null)
+  const [photoMode, setPhotoMode] = useState<'upload' | 'url'>('upload')
   const [isActive, setIsActive] = useState(true)
 
   const showToast = (type: 'success' | 'error', text: string) => {
@@ -126,6 +127,7 @@ export const ServicesTab: React.FC<ServicesTabProps> = ({ company, onEnableModul
     setPhotoUrl('')
     setPhotoPreview('')
     setPhotoFile(null)
+    setPhotoMode('upload')
     setIsActive(true)
     setIsModalOpen(true)
   }
@@ -146,9 +148,11 @@ export const ServicesTab: React.FC<ServicesTabProps> = ({ company, onEnableModul
     setPriceType(srv.priceType || (srv.price != null ? 'fixed' : 'consult'))
     setPrice(srv.price != null ? String(srv.price) : '')
     setDurationMinutes(srv.durationMinutes ?? '')
-    setPhotoUrl(srv.photoUrl || '')
-    setPhotoPreview(srv.photoUrl || '')
+    const currentPhoto = srv.photoUrl || (srv as unknown as { imageUrl?: string }).imageUrl || ''
+    setPhotoUrl(currentPhoto)
+    setPhotoPreview(currentPhoto)
     setPhotoFile(null)
+    setPhotoMode(currentPhoto && !currentPhoto.startsWith('data:') && !currentPhoto.startsWith('/api/') ? 'url' : 'upload')
     setIsActive(srv.isActive !== false)
     setIsModalOpen(true)
   }
@@ -162,8 +166,13 @@ export const ServicesTab: React.FC<ServicesTabProps> = ({ company, onEnableModul
       return
     }
     setPhotoFile(file)
-    const localUrl = URL.createObjectURL(file)
-    setPhotoPreview(localUrl)
+    const reader = new FileReader()
+    reader.onload = (ev) => {
+      if (typeof ev.target?.result === 'string') {
+        setPhotoPreview(ev.target.result)
+      }
+    }
+    reader.readAsDataURL(file)
   }
 
   // Submit Save
@@ -175,7 +184,7 @@ export const ServicesTab: React.FC<ServicesTabProps> = ({ company, onEnableModul
     }
 
     setIsSaving(true)
-    let finalPhotoUrl = photoUrl
+    let finalPhotoUrl = photoUrl.trim()
 
     // Upload image if a new file was chosen
     if (photoFile) {
@@ -183,17 +192,20 @@ export const ServicesTab: React.FC<ServicesTabProps> = ({ company, onEnableModul
         const uploadRes = await uploadCompanyImageFromClient(company.id, 'service', photoFile)
         if (uploadRes.success && uploadRes.url) {
           finalPhotoUrl = uploadRes.url
+        } else if (photoPreview && photoPreview.startsWith('data:')) {
+          // Pass data url so server converts it via uploadCompanyFileServer
+          finalPhotoUrl = photoPreview
         } else {
-          showToast('error', 'Erro ao fazer upload da foto. O serviço será salvo sem foto.')
+          showToast('error', uploadRes.error || 'Erro ao fazer upload da foto. Tentando salvar...')
         }
       } catch (err) {
         console.error('Photo upload error:', err)
+        if (photoPreview && photoPreview.startsWith('data:')) {
+          finalPhotoUrl = photoPreview
+        }
       }
-    }
-
-    // Double check: NEVER save Base64
-    if (isBase64Image(finalPhotoUrl)) {
-      finalPhotoUrl = ''
+    } else if (photoPreview && !finalPhotoUrl) {
+      finalPhotoUrl = photoPreview
     }
 
     let parsedPrice: number | null = null
@@ -414,7 +426,8 @@ export const ServicesTab: React.FC<ServicesTabProps> = ({ company, onEnableModul
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
           {filteredServices.map((srv) => {
-            const hasPhoto = Boolean(srv.photoUrl && !isBase64Image(srv.photoUrl))
+            const servicePhoto = srv.photoUrl || (srv as unknown as { imageUrl?: string }).imageUrl || ''
+            const hasPhoto = Boolean(servicePhoto && servicePhoto.trim().length > 0)
             const isConsult = srv.priceType === 'consult' || srv.price == null
             return (
               <div
@@ -428,7 +441,7 @@ export const ServicesTab: React.FC<ServicesTabProps> = ({ company, onEnableModul
                   {hasPhoto ? (
                     // eslint-disable-next-line @next/next/no-img-element
                     <img
-                      src={srv.photoUrl}
+                      src={servicePhoto}
                       alt={srv.name}
                       className="w-full h-full object-cover"
                       loading="lazy"
@@ -565,7 +578,7 @@ export const ServicesTab: React.FC<ServicesTabProps> = ({ company, onEnableModul
                   type="text"
                   required
                   placeholder="Ex: Corte Degrade, Escova Modelada, Consultoria..."
-                  value={name}
+                  value={name ?? ''}
                   onChange={(e) => setName(e.target.value)}
                   className="w-full px-3.5 py-2.5 rounded-xl border border-neutral-300 text-xs text-neutral-900 focus:outline-none focus:border-violet-600 shadow-2xs"
                 />
@@ -578,7 +591,7 @@ export const ServicesTab: React.FC<ServicesTabProps> = ({ company, onEnableModul
                     Categoria
                   </label>
                   <select
-                    value={category}
+                    value={category ?? 'Geral'}
                     onChange={(e) => setCategory(e.target.value)}
                     className="w-full px-3.5 py-2.5 rounded-xl border border-neutral-300 text-xs text-neutral-900 bg-white focus:outline-none focus:border-violet-600"
                   >
@@ -599,7 +612,7 @@ export const ServicesTab: React.FC<ServicesTabProps> = ({ company, onEnableModul
                     <input
                       type="text"
                       placeholder="Digite a categoria..."
-                      value={customCategory}
+                      value={customCategory ?? ''}
                       onChange={(e) => setCustomCategory(e.target.value)}
                       className="w-full px-3.5 py-2.5 rounded-xl border border-neutral-300 text-xs text-neutral-900 focus:outline-none focus:border-violet-600 shadow-2xs"
                     />
@@ -632,7 +645,7 @@ export const ServicesTab: React.FC<ServicesTabProps> = ({ company, onEnableModul
                       step="0.01"
                       min="0"
                       placeholder="0,00"
-                      value={price}
+                      value={price ?? ''}
                       onChange={(e) => setPrice(e.target.value)}
                       className="w-full pl-9 pr-3.5 py-2 bg-white rounded-xl border border-neutral-300 text-xs text-neutral-900 font-mono focus:outline-none focus:border-violet-600"
                     />
@@ -651,7 +664,7 @@ export const ServicesTab: React.FC<ServicesTabProps> = ({ company, onEnableModul
                   <span className="text-[10px] text-neutral-400 font-normal">Opcional</span>
                 </label>
                 <select
-                  value={durationMinutes}
+                  value={durationMinutes ?? ''}
                   onChange={(e) => {
                     const val = e.target.value
                     setDurationMinutes(val === '' ? '' : parseInt(val, 10))
@@ -676,48 +689,78 @@ export const ServicesTab: React.FC<ServicesTabProps> = ({ company, onEnableModul
                 <textarea
                   rows={2}
                   placeholder="Explique o que inclui o serviço, benefícios ou recomendações..."
-                  value={description}
+                  value={description ?? ''}
                   onChange={(e) => setDescription(e.target.value)}
                   className="w-full px-3.5 py-2 rounded-xl border border-neutral-300 text-xs text-neutral-900 focus:outline-none focus:border-violet-600 shadow-2xs"
                 />
               </div>
 
-              {/* Foto do Serviço (Upload com ImgBB) */}
-              <div>
-                <label className="block text-xs font-semibold text-neutral-700 mb-1.5 flex items-center justify-between">
-                  <span>Foto do Serviço</span>
-                  <span className="text-[10px] text-neutral-400 font-normal">Opcional</span>
-                </label>
+              {/* Foto do Serviço */}
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <label className="block text-xs font-semibold text-neutral-700">
+                    Foto do Serviço <span className="text-[10px] text-neutral-400 font-normal">(Opcional)</span>
+                  </label>
+                  <div className="flex bg-neutral-100 p-0.5 rounded-lg text-[10px] font-medium">
+                    <button
+                      type="button"
+                      onClick={() => setPhotoMode('upload')}
+                      className={`px-2 py-0.5 rounded-md transition-all ${
+                        photoMode === 'upload'
+                          ? 'bg-white text-neutral-900 shadow-2xs font-semibold'
+                          : 'text-neutral-500 hover:text-neutral-900'
+                      }`}
+                    >
+                      Enviar Arquivo
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setPhotoMode('url')}
+                      className={`px-2 py-0.5 rounded-md transition-all ${
+                        photoMode === 'url'
+                          ? 'bg-white text-neutral-900 shadow-2xs font-semibold'
+                          : 'text-neutral-500 hover:text-neutral-900'
+                      }`}
+                    >
+                      Link / URL
+                    </button>
+                  </div>
+                </div>
 
                 {photoPreview ? (
-                  <div className="relative w-full h-32 rounded-xl overflow-hidden border border-neutral-200 group">
+                  <div className="relative w-full h-36 rounded-2xl overflow-hidden border border-neutral-200 bg-neutral-100 group shadow-2xs">
                     {/* eslint-disable-next-line @next/next/no-img-element */}
                     <img
                       src={photoPreview}
                       alt="Preview"
                       className="w-full h-full object-cover"
                     />
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setPhotoUrl('')
-                        setPhotoPreview('')
-                        setPhotoFile(null)
-                      }}
-                      className="absolute top-2 right-2 p-1.5 rounded-lg bg-black/70 hover:bg-black text-white text-xs transition-colors cursor-pointer"
-                      title="Remover foto"
-                    >
-                      <X className="w-3.5 h-3.5" />
-                    </button>
+                    <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setPhotoUrl('')
+                          setPhotoPreview('')
+                          setPhotoFile(null)
+                        }}
+                        className="px-3 py-1.5 rounded-xl bg-red-600 hover:bg-red-700 text-white text-xs font-semibold shadow-md flex items-center gap-1 transition-colors cursor-pointer"
+                        title="Remover foto"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                        <span>Remover Foto</span>
+                      </button>
+                    </div>
                   </div>
-                ) : (
-                  <label className="flex flex-col items-center justify-center p-4 border-2 border-dashed border-neutral-200 hover:border-violet-400 rounded-xl cursor-pointer bg-neutral-50/50 hover:bg-violet-50/30 transition-all text-center">
-                    <Upload className="w-5 h-5 text-neutral-400 mb-1" />
-                    <span className="text-xs font-medium text-neutral-700">
-                      Clique para enviar uma foto
+                ) : photoMode === 'upload' ? (
+                  <label className="flex flex-col items-center justify-center p-5 border-2 border-dashed border-neutral-300 hover:border-violet-500 rounded-2xl cursor-pointer bg-neutral-50 hover:bg-violet-50/30 transition-all text-center group">
+                    <div className="w-10 h-10 rounded-xl bg-white border border-neutral-200 flex items-center justify-center text-neutral-500 group-hover:text-violet-600 group-hover:border-violet-300 transition-colors shadow-2xs mb-1.5">
+                      <Upload className="w-5 h-5" />
+                    </div>
+                    <span className="text-xs font-semibold text-neutral-800 group-hover:text-violet-900">
+                      Clique para escolher a foto do serviço
                     </span>
-                    <span className="text-[10px] text-neutral-400">
-                      PNG, JPG ou WebP (máx. 5MB)
+                    <span className="text-[10px] text-neutral-400 mt-0.5">
+                      PNG, JPG ou WebP (compressão e salvamento automáticos)
                     </span>
                     <input
                       type="file"
@@ -726,6 +769,23 @@ export const ServicesTab: React.FC<ServicesTabProps> = ({ company, onEnableModul
                       className="hidden"
                     />
                   </label>
+                ) : (
+                  <div>
+                    <input
+                      type="url"
+                      placeholder="https://exemplo.com/foto-do-servico.jpg"
+                      value={photoUrl ?? ''}
+                      onChange={(e) => {
+                        const val = e.target.value
+                        setPhotoUrl(val)
+                        setPhotoPreview(val)
+                      }}
+                      className="w-full px-3.5 py-2.5 rounded-xl border border-neutral-300 text-xs text-neutral-900 font-mono focus:outline-none focus:border-violet-600 shadow-2xs"
+                    />
+                    <p className="text-[10px] text-neutral-400 mt-1">
+                      Cole o link direto da imagem na internet (ex: Unsplash, banco de imagens ou seu site).
+                    </p>
+                  </div>
                 )}
               </div>
 
@@ -741,7 +801,7 @@ export const ServicesTab: React.FC<ServicesTabProps> = ({ company, onEnableModul
                 </div>
                 <input
                   type="checkbox"
-                  checked={isActive}
+                  checked={Boolean(isActive ?? true)}
                   onChange={(e) => setIsActive(e.target.checked)}
                   className="w-4 h-4 accent-violet-600 rounded cursor-pointer"
                 />

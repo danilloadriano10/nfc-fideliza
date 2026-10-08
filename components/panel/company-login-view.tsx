@@ -127,7 +127,7 @@ export const CompanyLoginView: React.FC<CompanyLoginViewProps> = ({
               required
               autoFocus
               placeholder="Ex: cafecentral"
-              value={username}
+              value={username || ''}
               onChange={(e) => setUsername(e.target.value)}
               className="w-full px-3.5 py-2.5 bg-white border border-neutral-300 focus:border-violet-600 rounded-xl text-neutral-900 text-xs font-mono focus:outline-none transition-colors shadow-xs"
             />
@@ -142,7 +142,7 @@ export const CompanyLoginView: React.FC<CompanyLoginViewProps> = ({
               type="password"
               required
               placeholder="••••••••"
-              value={password}
+              value={password || ''}
               onChange={(e) => setPassword(e.target.value)}
               className="w-full px-3.5 py-2.5 bg-white border border-neutral-300 focus:border-violet-600 rounded-xl text-neutral-900 text-xs font-mono focus:outline-none transition-colors shadow-xs"
             />

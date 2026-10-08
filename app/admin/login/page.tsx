@@ -5,6 +5,8 @@ import { useRouter } from 'next/navigation'
 import { AdminLoginView } from '@/components/admin/admin-login-view'
 import { isAdminAuthenticated } from '@/lib/auth'
 
+export const dynamic = 'force-dynamic'
+
 export default function AdminLoginPage() {
   const router = useRouter()
   const [checking, setChecking] = useState(true)

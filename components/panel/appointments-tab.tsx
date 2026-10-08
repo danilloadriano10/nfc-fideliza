@@ -420,7 +420,7 @@ export const AppointmentsTab: React.FC<AppointmentsTabProps> = ({
             <div className="flex items-center gap-2">
               <input
                 type="date"
-                value={dateFilter}
+                value={dateFilter || ''}
                 onChange={(e) => setDateFilter(e.target.value)}
                 className="px-3 py-1.5 bg-neutral-50 border border-neutral-200 rounded-xl text-xs text-neutral-800 focus:outline-none focus:border-violet-600 cursor-pointer"
               />
@@ -655,7 +655,7 @@ export const AppointmentsTab: React.FC<AppointmentsTabProps> = ({
                     <label className="flex items-center gap-3 cursor-pointer min-w-[140px]">
                       <input
                         type="checkbox"
-                        checked={dayConfig.isOpen}
+                        checked={Boolean(dayConfig?.isOpen ?? false)}
                         onChange={(e) => handleToggleDay(e.target.checked)}
                         className="w-4 h-4 accent-violet-600 rounded"
                       />
@@ -754,7 +754,7 @@ export const AppointmentsTab: React.FC<AppointmentsTabProps> = ({
               <div className="flex items-center gap-2 max-w-sm">
                 <input
                   type="date"
-                  value={newBlockedDate}
+                  value={newBlockedDate || ''}
                   onChange={(e) => setNewBlockedDate(e.target.value)}
                   className="flex-1 px-3 py-2 bg-neutral-50 border border-neutral-300 rounded-xl text-xs text-neutral-800 focus:outline-none focus:border-violet-600"
                 />
@@ -931,7 +931,7 @@ export const AppointmentsTab: React.FC<AppointmentsTabProps> = ({
                   type="text"
                   required
                   placeholder="Ex: Carlos Silva, Dra. Juliana..."
-                  value={profName}
+                  value={profName ?? ''}
                   onChange={(e) => setProfName(e.target.value)}
                   className="w-full px-3.5 py-2.5 rounded-xl border border-neutral-300 text-xs text-neutral-900 focus:outline-none focus:border-violet-600"
                 />
@@ -944,7 +944,7 @@ export const AppointmentsTab: React.FC<AppointmentsTabProps> = ({
                 <input
                   type="text"
                   placeholder="Ex: Barbeiro Especialista, Esteticista..."
-                  value={profRole}
+                  value={profRole ?? ''}
                   onChange={(e) => setProfRole(e.target.value)}
                   className="w-full px-3.5 py-2.5 rounded-xl border border-neutral-300 text-xs text-neutral-900 focus:outline-none focus:border-violet-600"
                 />
