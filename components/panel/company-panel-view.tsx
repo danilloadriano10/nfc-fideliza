@@ -101,6 +101,7 @@ type TabType =
   | 'rewards'
   | 'feedbacks'
   | 'settings'
+  | 'appearance'
 
 export const CompanyPanelView: React.FC<CompanyPanelViewProps> = ({
   initialCompany,
@@ -570,13 +571,24 @@ export const CompanyPanelView: React.FC<CompanyPanelViewProps> = ({
             },
             { id: 'feedbacks', label: 'Feedbacks', count: totalFeedbacks, icon: MessageSquare },
             { id: 'settings', label: 'Configurações', icon: Settings },
+            { id: 'appearance', label: 'Aparência da Página', icon: Palette },
           ].map((tab) => {
             const Icon = tab.icon
             const isActive = activeTab === tab.id
             return (
               <button
                 key={tab.id}
-                onClick={() => setActiveTab(tab.id as TabType)}
+                onClick={() => {
+                  if (tab.id === 'appearance') {
+                    setActiveTab('settings')
+                    setTimeout(() => {
+                      const el = document.getElementById('secao-aparencia')
+                      if (el) el.scrollIntoView({ behavior: 'smooth' })
+                    }, 50)
+                  } else {
+                    setActiveTab(tab.id as TabType)
+                  }
+                }}
                 className={`px-3 py-2 rounded-xl text-xs font-semibold flex items-center gap-2 whitespace-nowrap transition-all ${
                   isActive
                     ? 'bg-violet-600 text-white shadow-xs'
@@ -1243,7 +1255,48 @@ export const CompanyPanelView: React.FC<CompanyPanelViewProps> = ({
         {/* ============================================== */}
         {activeTab === 'settings' && (
           <form onSubmit={handleSaveSettings} className="space-y-6">
-            <div className="bg-white rounded-3xl border border-neutral-200/80 shadow-sm p-6 space-y-5">
+            {/* Atalhos Rápidos de Navegação das Configurações */}
+            <div className="bg-white p-2 rounded-2xl flex items-center gap-1.5 overflow-x-auto border border-neutral-200/80 shadow-xs">
+              <a
+                href="#secao-identidade"
+                className="px-3 py-1.5 rounded-xl text-xs font-semibold text-neutral-600 hover:text-neutral-900 hover:bg-neutral-100 transition-all whitespace-nowrap"
+              >
+                1. Identidade & Dados
+              </a>
+              <a
+                href="#secao-fotos"
+                className="px-3 py-1.5 rounded-xl text-xs font-semibold text-neutral-600 hover:text-neutral-900 hover:bg-neutral-100 transition-all whitespace-nowrap"
+              >
+                2. Fotos (Logo & Capa)
+              </a>
+              <a
+                href="#secao-aparencia"
+                className="px-3.5 py-1.5 rounded-xl text-xs font-bold bg-violet-600 text-white shadow-xs flex items-center gap-1.5 whitespace-nowrap hover:bg-violet-700 transition-all"
+              >
+                <Palette className="w-3.5 h-3.5" />
+                <span>3. Aparência da Página (Tema Escuro / Claro)</span>
+              </a>
+              <a
+                href="#secao-contatos"
+                className="px-3 py-1.5 rounded-xl text-xs font-semibold text-neutral-600 hover:text-neutral-900 hover:bg-neutral-100 transition-all whitespace-nowrap"
+              >
+                4. Contatos & Redes
+              </a>
+              <a
+                href="#secao-modulos"
+                className="px-3 py-1.5 rounded-xl text-xs font-semibold text-neutral-600 hover:text-neutral-900 hover:bg-neutral-100 transition-all whitespace-nowrap"
+              >
+                5. Módulos Ativos
+              </a>
+              <a
+                href="#secao-seguranca"
+                className="px-3 py-1.5 rounded-xl text-xs font-semibold text-neutral-600 hover:text-neutral-900 hover:bg-neutral-100 transition-all whitespace-nowrap"
+              >
+                6. Acesso & Senha
+              </a>
+            </div>
+
+            <div id="secao-identidade" className="bg-white rounded-3xl border border-neutral-200/80 shadow-sm p-6 space-y-5">
               <div>
                 <h2 className="text-base font-bold text-neutral-900">
                   Identidade e Dados do Estabelecimento
@@ -1309,7 +1362,7 @@ export const CompanyPanelView: React.FC<CompanyPanelViewProps> = ({
             </div>
 
             {/* Foto da Logo e Foto de Capa (Identidade Visual) */}
-            <div className="bg-white rounded-3xl border border-neutral-200/80 shadow-sm p-6 space-y-6">
+            <div id="secao-fotos" className="bg-white rounded-3xl border border-neutral-200/80 shadow-sm p-6 space-y-6">
               <div className="flex items-center justify-between pb-3 border-b border-neutral-100">
                 <div className="flex items-center gap-2.5">
                   <div className="p-2 rounded-xl bg-neutral-900 text-white shadow-sm">
@@ -1600,7 +1653,7 @@ export const CompanyPanelView: React.FC<CompanyPanelViewProps> = ({
             {/* =================================================== */}
             {/* SEÇÃO: APARÊNCIA DA PÁGINA (PERSONALIZAÇÃO DE CORES) */}
             {/* =================================================== */}
-            <div className="bg-white rounded-3xl border border-neutral-200/80 shadow-sm p-6 space-y-6">
+            <div id="secao-aparencia" className="bg-white rounded-3xl border-2 border-violet-100 shadow-sm p-6 space-y-6">
               <div className="flex items-center justify-between pb-3 border-b border-neutral-100">
                 <div className="flex items-center gap-2.5">
                   <div className="p-2 rounded-xl bg-neutral-900 text-white shadow-sm">
@@ -1618,19 +1671,19 @@ export const CompanyPanelView: React.FC<CompanyPanelViewProps> = ({
               </div>
 
               {/* TEMA DA PÁGINA (ESCURO / CLARO) */}
-              <div className="p-4 rounded-2xl bg-neutral-50/80 border border-neutral-200/80 space-y-3">
-                <div className="flex items-center justify-between">
+              <div className="p-5 rounded-2xl bg-neutral-950 text-white shadow-md border border-neutral-800 space-y-4">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
                   <div>
-                    <label className="text-xs font-black text-neutral-900 uppercase tracking-wider flex items-center gap-1.5">
-                      <Sparkles className="w-4 h-4 text-violet-600" />
+                    <label className="text-xs font-black text-white uppercase tracking-wider flex items-center gap-2">
+                      <Sparkles className="w-4 h-4 text-amber-400" />
                       TEMA DA PÁGINA
                     </label>
-                    <p className="text-[11px] text-neutral-500 mt-0.5">
-                      Defina a experiência visual dos seus clientes na Página Pública.
+                    <p className="text-xs text-neutral-400 mt-0.5">
+                      Defina a experiência visual dos seus clientes na Página Pública da sua empresa.
                     </p>
                   </div>
-                  <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-neutral-200 text-neutral-700">
-                    Individual por Empresa
+                  <span className="text-[10px] font-bold px-2.5 py-1 rounded-full bg-neutral-800 text-neutral-300 border border-neutral-700 self-start sm:self-auto">
+                    Individual por Empresa (Firestore)
                   </span>
                 </div>
 
@@ -1713,6 +1766,44 @@ export const CompanyPanelView: React.FC<CompanyPanelViewProps> = ({
                     >
                       Fundo branco limpo clássico com cards suaves e alto contraste.
                     </p>
+                  </button>
+                </div>
+
+                {/* Barra de ação rápida para salvar o tema imediatamente */}
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-3 border-t border-neutral-800">
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs text-neutral-400 font-medium">Tema Ativo da Empresa:</span>
+                    <span
+                      className={`text-xs font-bold px-2.5 py-0.5 rounded-full ${
+                        (formData.theme || 'dark') === 'dark'
+                          ? 'bg-neutral-800 text-amber-400 border border-neutral-700'
+                          : 'bg-amber-400 text-neutral-950 font-extrabold'
+                      }`}
+                    >
+                      {(formData.theme || 'dark') === 'dark' ? '🌙 Escuro (Preto/Grafite)' : '☀️ Claro (Branco)'}
+                    </span>
+                  </div>
+                  <button
+                    type="button"
+                    disabled={isSaving}
+                    onClick={async () => {
+                      setIsSaving(true)
+                      const res = await saveCompanyAsync(formData)
+                      setIsSaving(false)
+                      if (res.success) {
+                        setCompany(formData)
+                        showToast(
+                          'success',
+                          `Tema ${formData.theme === 'light' ? 'Claro' : 'Escuro'} salvo com sucesso no Firestore!`
+                        )
+                      } else {
+                        showToast('error', res.error || 'Erro ao salvar tema.')
+                      }
+                    }}
+                    className="px-5 py-2.5 rounded-xl bg-violet-600 hover:bg-violet-500 text-white text-xs font-bold shadow-md flex items-center justify-center gap-2 transition-all cursor-pointer"
+                  >
+                    <Save className="w-4 h-4" />
+                    <span>{isSaving ? 'Salvando...' : 'Salvar Escolha de Tema'}</span>
                   </button>
                 </div>
               </div>
