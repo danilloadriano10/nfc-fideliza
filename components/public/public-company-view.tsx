@@ -51,15 +51,17 @@ interface PublicCompanyViewProps {
 interface FeatureItem {
   id: string
   title: string
-  subtitle: string
+  subtitle?: string
   badgeText?: string
   icon: React.ReactNode
-  featuredBadge: string
-  featuredTitle: string
-  featuredDescription: string
-  featuredCta: string
-  featuredIcon: React.ReactNode
-  themeBg: string
+  iconContainerClass?: string
+  iconContainerStyle?: React.CSSProperties
+  featuredBadge?: string
+  featuredTitle?: string
+  featuredDescription?: string
+  featuredCta?: string
+  featuredIcon?: React.ReactNode
+  themeBg?: string
   onClick: () => void
 }
 
@@ -204,6 +206,16 @@ export const PublicCompanyView: React.FC<PublicCompanyViewProps> = ({ company })
     }
   }, [company.locationUrl, company.addressText])
 
+  // Open Instagram
+  const handleOpenInstagram = useCallback(() => {
+    if (!company.instagram) return
+    const raw = company.instagram.trim().replace(/^@/, '')
+    const targetUrl = /^https?:\/\//i.test(company.instagram.trim())
+      ? company.instagram.trim()
+      : `https://instagram.com/${raw}`
+    window.open(targetUrl, '_blank', 'noopener,noreferrer')
+  }, [company.instagram])
+
   // Share Page Link
   const handleShare = useCallback(() => {
     if (typeof window !== 'undefined') {
@@ -270,9 +282,14 @@ export const PublicCompanyView: React.FC<PublicCompanyViewProps> = ({ company })
     )
   }, [company.loyaltyProgram])
 
+  // Active services list
   const activeServicesList = useMemo(() => {
     return services.filter((s) => s.isActive !== false)
   }, [services])
+
+  // Flags to detect if full dedicated sections are present on page
+  const hasFullServicesSection = Boolean(activeModules.services && activeServicesList.length > 0)
+  const hasFullLoyaltySection = Boolean(activeModules.loyalty && company.loyaltyProgram?.isActive)
 
   // Build items catalog for active modules
   const allFeatureItems = useMemo<FeatureItem[]>(() => {
@@ -283,12 +300,15 @@ export const PublicCompanyView: React.FC<PublicCompanyViewProps> = ({ company })
         id: 'appointments',
         title: 'Agendamento',
         subtitle: 'Reserve online',
-        icon: <Calendar className="w-4.5 h-4.5" />,
-        featuredBadge: '📅 Agendamento Online',
+        icon: <Calendar className="w-5 h-5" />,
+        iconContainerClass: isDark
+          ? 'bg-indigo-500/15 text-indigo-400 border border-indigo-500/25'
+          : 'bg-indigo-50 text-indigo-600 border border-indigo-200/80',
+        iconContainerStyle: { color: '#6366F1' },
         featuredTitle: 'Agendar Horário',
-        featuredDescription: 'Escolha seu serviço, profissional e horário ideal em poucos segundos.',
+        featuredDescription: 'Escolha seu serviço e horário em poucos segundos.',
         featuredCta: 'Agendar Agora',
-        featuredIcon: <Calendar className="w-5 h-5 stroke-[2]" />,
+        featuredIcon: <Calendar className="w-5 h-5 stroke-[2.2]" />,
         themeBg: 'bg-violet-50 text-violet-700 border-violet-100',
         onClick: () => {
           setBookingService(null)
@@ -302,8 +322,11 @@ export const PublicCompanyView: React.FC<PublicCompanyViewProps> = ({ company })
         id: 'services',
         title: 'Serviços',
         subtitle: activeServicesList.length > 0 ? `${activeServicesList.length} opções` : 'Ver catálogo',
-        icon: <Scissors className="w-4.5 h-4.5" />,
-        featuredBadge: '✂️ Catálogo de Serviços',
+        icon: <Scissors className="w-5 h-5" />,
+        iconContainerClass: isDark
+          ? 'bg-purple-500/15 text-purple-400 border border-purple-500/25'
+          : 'bg-purple-50 text-purple-600 border border-purple-200/80',
+        iconContainerStyle: { color: '#8B5CF6' },
         featuredTitle: 'Nossos Serviços',
         featuredDescription: 'Confira a tabela completa de opções, valores e detalhes de cada serviço.',
         featuredCta: 'Ver Serviços',
@@ -322,8 +345,11 @@ export const PublicCompanyView: React.FC<PublicCompanyViewProps> = ({ company })
             ? `${customerPoints}/${loyaltyProgram.goalPoints} pts`
             : 'Ganhe prêmios',
         badgeText: hasAvailableReward ? 'Prêmio!' : undefined,
-        icon: <Gift className="w-4.5 h-4.5" />,
-        featuredBadge: hasAvailableReward ? '🎉 Prêmio Pronto para Resgate!' : '🎁 Clube Fidelidade',
+        icon: <Gift className="w-5 h-5" />,
+        iconContainerClass: isDark
+          ? 'bg-orange-500/15 text-orange-400 border border-orange-500/25'
+          : 'bg-orange-50 text-orange-600 border border-orange-200/80',
+        iconContainerStyle: { color: '#F97316' },
         featuredTitle: 'Cartão Fidelidade Digital',
         featuredDescription:
           customerPoints !== null
@@ -340,9 +366,12 @@ export const PublicCompanyView: React.FC<PublicCompanyViewProps> = ({ company })
       items.push({
         id: 'whatsapp',
         title: 'WhatsApp',
-        subtitle: 'Fale conosco',
-        icon: <MessageCircle className="w-4.5 h-4.5" />,
-        featuredBadge: '💬 Atendimento Direto',
+        subtitle: 'Mensagem',
+        icon: <MessageCircle className="w-5 h-5" />,
+        iconContainerClass: isDark
+          ? 'bg-emerald-500/15 text-emerald-400 border border-emerald-500/25'
+          : 'bg-emerald-50 text-emerald-600 border border-emerald-200/80',
+        iconContainerStyle: { color: '#25D366' },
         featuredTitle: 'Falar no WhatsApp',
         featuredDescription: 'Converse agora com nossa equipe para tirar dúvidas ou fazer pedidos.',
         featuredCta: 'Chamar no WhatsApp',
@@ -356,9 +385,12 @@ export const PublicCompanyView: React.FC<PublicCompanyViewProps> = ({ company })
       items.push({
         id: 'googleReview',
         title: 'Avaliações',
-        subtitle: 'Avaliar no Google',
-        icon: <Star className="w-4.5 h-4.5 fill-amber-400 text-amber-400" />,
-        featuredBadge: '⭐ Avaliação Google',
+        subtitle: `${company.rating ? company.rating.toFixed(1) : '4.9'}★ Google`,
+        icon: <Star className="w-5 h-5 fill-amber-400 text-amber-400" />,
+        iconContainerClass: isDark
+          ? 'bg-amber-500/15 text-amber-400 border border-amber-500/25'
+          : 'bg-amber-50 text-amber-600 border border-amber-200/80',
+        iconContainerStyle: { color: '#F59E0B' },
         featuredTitle: 'Avalie Nossa Empresa',
         featuredDescription: 'Sua opinião é fundamental para nós. Conte como foi sua experiência!',
         featuredCta: 'Deixar Avaliação',
@@ -372,9 +404,12 @@ export const PublicCompanyView: React.FC<PublicCompanyViewProps> = ({ company })
       items.push({
         id: 'menu',
         title: 'Cardápio',
-        subtitle: 'Ver especialidades',
-        icon: <BookOpen className="w-4.5 h-4.5" />,
-        featuredBadge: '📖 Cardápio Digital',
+        subtitle: 'Ver opções',
+        icon: <BookOpen className="w-5 h-5" />,
+        iconContainerClass: isDark
+          ? 'bg-teal-500/15 text-teal-400 border border-teal-500/25'
+          : 'bg-teal-50 text-teal-600 border border-teal-200/80',
+        iconContainerStyle: { color: '#0D9488' },
         featuredTitle: 'Cardápio Completo',
         featuredDescription: 'Confira todas as nossas opções, pratos e novidades preparadas para você.',
         featuredCta: 'Abrir Cardápio',
@@ -388,9 +423,12 @@ export const PublicCompanyView: React.FC<PublicCompanyViewProps> = ({ company })
       items.push({
         id: 'wifi',
         title: 'Wi-Fi',
-        subtitle: 'Conectar à rede',
-        icon: <Wifi className="w-4.5 h-4.5" />,
-        featuredBadge: '📶 Conexão Rápida',
+        subtitle: 'Conectar',
+        icon: <Wifi className="w-5 h-5" />,
+        iconContainerClass: isDark
+          ? 'bg-sky-500/15 text-sky-400 border border-sky-500/25'
+          : 'bg-sky-50 text-sky-600 border border-sky-200/80',
+        iconContainerStyle: { color: '#0284C7' },
         featuredTitle: 'Conectar ao Wi-Fi',
         featuredDescription: `Acesse a rede "${company.wifi?.ssid}" em um toque sem complicação.`,
         featuredCta: 'Conectar Agora',
@@ -404,9 +442,12 @@ export const PublicCompanyView: React.FC<PublicCompanyViewProps> = ({ company })
       items.push({
         id: 'feedback',
         title: 'Feedback',
-        subtitle: 'Canal privado',
-        icon: <MessageSquareHeart className="w-4.5 h-4.5" />,
-        featuredBadge: '💭 Canal Confidencial',
+        subtitle: 'Privado',
+        icon: <MessageSquareHeart className="w-5 h-5" />,
+        iconContainerClass: isDark
+          ? 'bg-pink-500/15 text-pink-400 border border-pink-500/25'
+          : 'bg-pink-50 text-pink-600 border border-pink-200/80',
+        iconContainerStyle: { color: '#EC4899' },
         featuredTitle: 'Deixe sua Sugestão',
         featuredDescription: 'Envie um recado privado diretamente para a gerência do estabelecimento.',
         featuredCta: 'Enviar Mensagem',
@@ -424,6 +465,7 @@ export const PublicCompanyView: React.FC<PublicCompanyViewProps> = ({ company })
     hasAvailableReward,
     loyaltyProgram,
     company,
+    isDark,
     handleGoogleReview,
     handleOpenMenu,
     handleOpenWhatsApp,
@@ -451,11 +493,181 @@ export const PublicCompanyView: React.FC<PublicCompanyViewProps> = ({ company })
     return allFeatureItems[0] || null
   }, [allFeatureItems, company.highlightModule])
 
-  // Compact quick access items (all active modules or excluding hero to avoid exact duplicate)
+  // Acessos Rápidos: ações secundárias compactas SEM duplicar o que já tem seção dedicada
   const quickAccessItems = useMemo(() => {
-    if (!featuredItem) return allFeatureItems
-    return allFeatureItems.filter((item) => item.id !== featuredItem.id)
-  }, [allFeatureItems, featuredItem])
+    const list: FeatureItem[] = []
+
+    // 1. WhatsApp (Verde Oficial)
+    if (activeModules.whatsapp) {
+      list.push({
+        id: 'whatsapp',
+        title: 'WhatsApp',
+        subtitle: 'Mensagem',
+        icon: <MessageCircle className="w-5 h-5 text-[#25D366]" />,
+        iconContainerClass: isDark
+          ? 'bg-emerald-500/15 text-emerald-400 border border-emerald-500/25'
+          : 'bg-emerald-50 text-emerald-600 border border-emerald-200/80',
+        iconContainerStyle: { color: '#25D366' },
+        onClick: handleOpenWhatsApp,
+      })
+    }
+
+    // 2. Avaliações (Amarelo / Dourado Google)
+    if (activeModules.googleReview) {
+      list.push({
+        id: 'googleReview',
+        title: 'Avaliações',
+        subtitle: `${company.rating ? company.rating.toFixed(1) : '4.9'}★ Google`,
+        icon: <Star className="w-5 h-5 fill-amber-400 text-amber-400" />,
+        iconContainerClass: isDark
+          ? 'bg-amber-500/15 text-amber-400 border border-amber-500/25'
+          : 'bg-amber-50 text-amber-600 border border-amber-200/80',
+        iconContainerStyle: { color: '#F59E0B' },
+        onClick: handleGoogleReview,
+      })
+    }
+
+    // 3. Instagram (Gradiente Característico Original)
+    if (activeModules.instagram && company.instagram) {
+      const cleanInsta = company.instagram.replace(/^@/, '').trim()
+      list.push({
+        id: 'instagram',
+        title: 'Instagram',
+        subtitle: `@${cleanInsta}`,
+        icon: <Instagram className="w-5 h-5 text-white" />,
+        iconContainerClass: 'shadow-xs border border-white/10',
+        iconContainerStyle: {
+          background: 'linear-gradient(45deg, #f09433 0%, #e6683c 25%, #dc2743 50%, #cc2366 75%, #bc1888 100%)',
+          color: '#ffffff',
+        },
+        onClick: handleOpenInstagram,
+      })
+    }
+
+    // 4. Rotas / Localização (Vermelho / Rosa Maps)
+    if (activeModules.location && (company.locationUrl || company.addressText)) {
+      list.push({
+        id: 'location',
+        title: 'Rotas',
+        subtitle: 'Como chegar',
+        icon: <Navigation className="w-5 h-5 text-[#EA4335]" />,
+        iconContainerClass: isDark
+          ? 'bg-rose-500/15 text-rose-400 border border-rose-500/25'
+          : 'bg-rose-50 text-rose-600 border border-rose-200/80',
+        iconContainerStyle: { color: '#EA4335' },
+        onClick: handleOpenLocation,
+      })
+    }
+
+    // 5. Wi-Fi (Azul)
+    if (activeModules.wifi && company.wifi?.ssid) {
+      list.push({
+        id: 'wifi',
+        title: 'Wi-Fi',
+        subtitle: 'Conectar',
+        icon: <Wifi className="w-5 h-5 text-[#0284C7]" />,
+        iconContainerClass: isDark
+          ? 'bg-sky-500/15 text-sky-400 border border-sky-500/25'
+          : 'bg-sky-50 text-sky-600 border border-sky-200/80',
+        iconContainerStyle: { color: '#0284C7' },
+        onClick: handleOpenWifi,
+      })
+    }
+
+    // 6. Feedback (Rosa / Magenta)
+    if (activeModules.feedback) {
+      list.push({
+        id: 'feedback',
+        title: 'Feedback',
+        subtitle: 'Privado',
+        icon: <MessageSquareHeart className="w-5 h-5 text-[#EC4899]" />,
+        iconContainerClass: isDark
+          ? 'bg-pink-500/15 text-pink-400 border border-pink-500/25'
+          : 'bg-pink-50 text-pink-600 border border-pink-200/80',
+        iconContainerStyle: { color: '#EC4899' },
+        onClick: () => setIsFeedbackOpen(true),
+      })
+    }
+
+    // 7. Cardápio (Teal) se ativo
+    if (activeModules.menu && company.menuUrl) {
+      list.push({
+        id: 'menu',
+        title: 'Cardápio',
+        subtitle: 'Ver cardápio',
+        icon: <BookOpen className="w-5 h-5" />,
+        iconContainerClass: isDark
+          ? 'bg-teal-500/15 text-teal-400 border border-teal-500/25'
+          : 'bg-teal-50 text-teal-600 border border-teal-200/80',
+        iconContainerStyle: { color: '#0D9488' },
+        onClick: handleOpenMenu,
+      })
+    }
+
+    // 8. Serviços (Roxo) - SOMENTE se NÃO houver a vitrine completa de serviços na página
+    if (activeModules.services && !hasFullServicesSection) {
+      list.push({
+        id: 'services',
+        title: 'Serviços',
+        subtitle: 'Ver opções',
+        icon: <Scissors className="w-5 h-5" />,
+        iconContainerClass: isDark
+          ? 'bg-purple-500/15 text-purple-400 border border-purple-500/25'
+          : 'bg-purple-50 text-purple-600 border border-purple-200/80',
+        iconContainerStyle: { color: '#8B5CF6' },
+        onClick: () => setIsServicesOpen(true),
+      })
+    }
+
+    // 9. Fidelidade (Laranja / Dourado) - SOMENTE se NÃO houver o cartão de fidelidade completo na página
+    if (activeModules.loyalty && !hasFullLoyaltySection) {
+      list.push({
+        id: 'loyalty',
+        title: 'Fidelidade',
+        subtitle: 'Clube VIP',
+        icon: <Gift className="w-5 h-5" />,
+        iconContainerClass: isDark
+          ? 'bg-orange-500/15 text-orange-400 border border-orange-500/25'
+          : 'bg-orange-50 text-orange-600 border border-orange-200/80',
+        iconContainerStyle: { color: '#F97316' },
+        onClick: () => setIsLoyaltyOpen(true),
+      })
+    }
+
+    // 10. Agendamento (Azul / Roxo) - SOMENTE se NÃO for o Destaque Principal
+    if (activeModules.appointments && featuredItem?.id !== 'appointments') {
+      list.push({
+        id: 'appointments',
+        title: 'Agendar',
+        subtitle: 'Horários',
+        icon: <Calendar className="w-5 h-5" />,
+        iconContainerClass: isDark
+          ? 'bg-indigo-500/15 text-indigo-400 border border-indigo-500/25'
+          : 'bg-indigo-50 text-indigo-600 border border-indigo-200/80',
+        iconContainerStyle: { color: '#6366F1' },
+        onClick: () => {
+          setBookingService(null)
+          setIsBookingOpen(true)
+        },
+      })
+    }
+
+    // Não repetir o item de Destaque Principal em Acessos Rápidos
+    return list.filter((item) => !featuredItem || item.id !== featuredItem.id)
+  }, [
+    activeModules,
+    hasFullServicesSection,
+    hasFullLoyaltySection,
+    featuredItem,
+    company,
+    isDark,
+    handleOpenWhatsApp,
+    handleGoogleReview,
+    handleOpenInstagram,
+    handleOpenLocation,
+    handleOpenWifi,
+    handleOpenMenu,
+  ])
 
   // Calculate loyalty percentage
   const loyaltyProgressPercent = useMemo(() => {
@@ -499,21 +711,14 @@ export const PublicCompanyView: React.FC<PublicCompanyViewProps> = ({ company })
                   referrerPolicy="no-referrer"
                   onError={() => setCoverError(true)}
                 />
-                {/* Tonalidade sutil da marca sobreposta à foto de capa */}
+                {/* Gradiente escuro concentrado APENAS na base da foto para transição suave com o fundo */}
                 <div
-                  className="absolute inset-0 opacity-20 pointer-events-none mix-blend-overlay"
-                  style={{ background: gradientBg }}
-                />
-                {/* Gradiente vertical para fusão perfeita e sem corte seco */}
-                <div
-                  className={`absolute inset-0 pointer-events-none ${
+                  className={`absolute bottom-0 left-0 right-0 h-12 sm:h-14 pointer-events-none ${
                     isDark
-                      ? 'bg-gradient-to-t from-[#0d0d12] via-[#0d0d12]/70 to-transparent'
-                      : 'bg-gradient-to-t from-white via-white/60 to-transparent'
+                      ? 'bg-gradient-to-t from-[#0d0d12] via-[#0d0d12]/50 to-transparent'
+                      : 'bg-gradient-to-t from-white via-white/50 to-transparent'
                   }`}
                 />
-                {/* Vinheta superior para contraste das ações flutuantes */}
-                <div className="absolute inset-0 bg-gradient-to-b from-black/50 via-transparent to-transparent pointer-events-none" />
               </>
             ) : (
               <div
@@ -676,59 +881,39 @@ export const PublicCompanyView: React.FC<PublicCompanyViewProps> = ({ company })
         <div className="px-4 sm:px-5 mt-5 flex-1 flex flex-col space-y-6">
 
           {/* ======================================================= */}
-          {/* 2. DESTAQUE PRINCIPAL (HERO CARD COM GRADIENTE)         */}
+          {/* 2. DESTAQUE PRINCIPAL (HERO CARD COMPACTO & CONVERSÃO)  */}
           {/* ======================================================= */}
           {featuredItem && (
             <div
               onClick={featuredItem.onClick}
-              className="w-full relative overflow-hidden rounded-3xl p-5 shadow-xl cursor-pointer active:scale-[0.985] transition-all duration-200 group border select-none"
+              className="w-full relative overflow-hidden rounded-2xl sm:rounded-3xl p-3.5 sm:p-4 shadow-lg cursor-pointer active:scale-[0.985] transition-all duration-200 group border select-none"
               style={{
                 background: gradientBg,
                 color: contrastText,
                 borderColor: isDark
-                  ? 'rgba(255,255,255,0.22)'
+                  ? 'rgba(255,255,255,0.18)'
                   : isLightContrast
                   ? 'rgba(0,0,0,0.08)'
                   : 'rgba(255,255,255,0.2)',
-                boxShadow: `0 16px 36px -10px ${hexToRgba(primaryColor, isDark ? 0.55 : 0.42)}`,
+                boxShadow: `0 10px 24px -6px ${hexToRgba(primaryColor, isDark ? 0.5 : 0.35)}`,
                 WebkitTapHighlightColor: 'transparent',
               }}
             >
               {/* Efeitos de iluminação modernos sobre o gradiente */}
               <div
-                className="absolute -right-8 -top-8 w-36 h-36 rounded-full blur-2xl pointer-events-none opacity-35"
+                className="absolute -right-6 -top-6 w-28 h-28 rounded-full blur-xl pointer-events-none opacity-30"
                 style={{ backgroundColor: secondaryColor }}
               />
               <div
-                className="absolute right-0 bottom-0 w-28 h-28 rounded-full blur-xl pointer-events-none opacity-30"
+                className="absolute right-0 bottom-0 w-24 h-24 rounded-full blur-lg pointer-events-none opacity-25"
                 style={{ backgroundColor: primaryColor }}
               />
 
               <div className="relative z-10 flex flex-col items-start text-left">
-                {/* Badge no topo com backdrop blur */}
-                <div
-                  className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-bold tracking-wide backdrop-blur-md mb-3 border"
-                  style={{
-                    backgroundColor: isLightContrast
-                      ? 'rgba(0, 0, 0, 0.08)'
-                      : 'rgba(255, 255, 255, 0.2)',
-                    borderColor: isLightContrast
-                      ? 'rgba(0, 0, 0, 0.12)'
-                      : 'rgba(255, 255, 255, 0.25)',
-                    color: contrastText,
-                  }}
-                >
-                  <Sparkles
-                    className="w-3 h-3"
-                    style={{ color: isLightContrast ? '#d97706' : '#fde047' }}
-                  />
-                  <span>{featuredItem.featuredBadge}</span>
-                </div>
-
-                {/* Ícone e Título */}
-                <div className="flex items-center gap-2.5 mb-2">
+                {/* Linha com Ícone e Título */}
+                <div className="flex items-center gap-2.5">
                   <div
-                    className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl backdrop-blur-md flex items-center justify-center shrink-0 shadow-inner border"
+                    className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl backdrop-blur-md flex items-center justify-center shrink-0 shadow-inner border"
                     style={{
                       backgroundColor: isLightContrast
                         ? 'rgba(0, 0, 0, 0.08)'
@@ -741,19 +926,17 @@ export const PublicCompanyView: React.FC<PublicCompanyViewProps> = ({ company })
                   >
                     {featuredItem.featuredIcon}
                   </div>
-                  <div>
-                    <h3
-                      className="text-base sm:text-lg font-black tracking-tight leading-tight"
-                      style={{ color: contrastText }}
-                    >
-                      {featuredItem.featuredTitle}
-                    </h3>
-                  </div>
+                  <h3
+                    className="text-base sm:text-lg font-black tracking-tight leading-tight"
+                    style={{ color: contrastText }}
+                  >
+                    {featuredItem.featuredTitle}
+                  </h3>
                 </div>
 
-                {/* Descrição */}
+                {/* Descrição Curta */}
                 <p
-                  className="text-xs leading-relaxed max-w-[320px] mb-4"
+                  className="text-xs leading-snug mt-1.5 mb-2.5 max-w-[340px]"
                   style={{
                     color: isLightContrast
                       ? 'rgba(23, 23, 23, 0.85)'
@@ -763,9 +946,9 @@ export const PublicCompanyView: React.FC<PublicCompanyViewProps> = ({ company })
                   {featuredItem.featuredDescription}
                 </p>
 
-                {/* Botão CTA com contraste automático perfeito */}
+                {/* Botão CTA Compacto */}
                 <div
-                  className="inline-flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold shadow-md transition-transform group-hover:scale-[1.02]"
+                  className="inline-flex items-center gap-1.5 px-3.5 py-1.5 sm:py-2 rounded-xl text-xs font-bold shadow-md transition-transform group-hover:scale-[1.02]"
                   style={{
                     backgroundColor: isLightContrast ? '#171717' : '#ffffff',
                     color: isLightContrast ? '#ffffff' : '#171717',
@@ -784,7 +967,7 @@ export const PublicCompanyView: React.FC<PublicCompanyViewProps> = ({ company })
           )}
 
           {/* ======================================================= */}
-          {/* 3. ACESSOS RÁPIDOS: ATALHOS COMPACTOS ESTILO APP ICONS   */}
+          {/* 3. ACESSOS RÁPIDOS: GRID 3 COLUNAS COM CORES REAIS      */}
           {/* ======================================================= */}
           {quickAccessItems.length > 0 && (
             <div className="space-y-2">
@@ -811,16 +994,16 @@ export const PublicCompanyView: React.FC<PublicCompanyViewProps> = ({ company })
                 </span>
               </div>
 
-              {/* Grid estilo ícones de aplicativo mobile (compacto e visual) */}
-              <div className="grid grid-cols-4 gap-2">
+              {/* Grid de 3 colunas no celular (3 em cima + 3 embaixo) preenchendo toda a largura */}
+              <div className="grid grid-cols-3 gap-2 sm:gap-2.5">
                 {quickAccessItems.map((item) => (
                   <button
                     key={item.id}
                     type="button"
                     onClick={item.onClick}
-                    className={`flex flex-col items-center justify-center p-2 rounded-2xl active:scale-95 transition-all duration-150 cursor-pointer group relative select-none ${
+                    className={`w-full flex flex-col items-center justify-center py-3 px-2 rounded-2xl active:scale-95 transition-all duration-150 cursor-pointer group relative select-none ${
                       isDark
-                        ? 'bg-[#141419] hover:bg-[#1a1a20] border border-white/[0.07] hover:border-white/15'
+                        ? 'bg-[#141419] hover:bg-[#1a1a22] border border-white/[0.07] hover:border-white/15'
                         : 'bg-neutral-50/90 hover:bg-neutral-100/90 border border-neutral-200/60'
                     }`}
                     style={{ WebkitTapHighlightColor: 'transparent' }}
@@ -832,20 +1015,19 @@ export const PublicCompanyView: React.FC<PublicCompanyViewProps> = ({ company })
                       </span>
                     )}
 
-                    {/* Ícone arredondado estilo App com tint da marca */}
+                    {/* Ícone com sua cor autêntica específica */}
                     <div
-                      className="w-11 h-11 rounded-2xl flex items-center justify-center shadow-xs transition-transform group-hover:scale-105"
-                      style={{
-                        backgroundColor: hexToRgba(primaryColor, isDark ? 0.18 : 0.1),
-                        color: primaryColor,
-                      }}
+                      className={`w-11 h-11 rounded-2xl flex items-center justify-center shadow-xs transition-transform group-hover:scale-105 ${
+                        item.iconContainerClass || ''
+                      }`}
+                      style={item.iconContainerStyle}
                     >
                       {item.icon}
                     </div>
 
                     {/* Rótulo Compacto */}
                     <span
-                      className={`mt-1.5 text-[11px] font-bold text-center truncate max-w-full ${
+                      className={`mt-2 text-xs font-bold text-center truncate max-w-full ${
                         isDark
                           ? 'text-neutral-200 group-hover:text-white'
                           : 'text-neutral-800 group-hover:text-neutral-950'
@@ -971,19 +1153,11 @@ export const PublicCompanyView: React.FC<PublicCompanyViewProps> = ({ company })
                           </div>
                         )}
 
-                        {/* Informações Completas do Serviço */}
-                        <div className="min-w-0 flex-1 flex flex-col justify-between self-stretch">
+                        {/* Informações Essenciais do Serviço: Nome, Duração, Preço e Botão */}
+                        <div className="min-w-0 flex-1 flex flex-col justify-between self-stretch py-0.5">
                           <div>
-                            {srv.category && (
-                              <span
-                                className="text-[10px] font-bold uppercase tracking-wider block mb-0.5"
-                                style={{ color: primaryColor }}
-                              >
-                                {srv.category}
-                              </span>
-                            )}
                             <h4
-                              className={`font-black text-sm sm:text-base leading-snug transition-colors ${
+                              className={`font-black text-sm sm:text-base leading-snug transition-colors line-clamp-2 ${
                                 isDark
                                   ? 'text-white group-hover:text-neutral-100'
                                   : 'text-neutral-900 group-hover:text-neutral-950'
@@ -991,14 +1165,15 @@ export const PublicCompanyView: React.FC<PublicCompanyViewProps> = ({ company })
                             >
                               {srv.name}
                             </h4>
-                            {srv.description && (
-                              <p
-                                className={`text-[11px] line-clamp-2 mt-1 leading-relaxed ${
+                            {srv.durationMinutes && (
+                              <div
+                                className={`inline-flex items-center gap-1 text-[11px] font-medium mt-1 ${
                                   isDark ? 'text-neutral-400' : 'text-neutral-500'
                                 }`}
                               >
-                                {srv.description}
-                              </p>
+                                <Clock className="w-3 h-3" />
+                                <span>{srv.durationMinutes} min</span>
+                              </div>
                             )}
                           </div>
 
@@ -1379,238 +1554,56 @@ export const PublicCompanyView: React.FC<PublicCompanyViewProps> = ({ company })
           )}
 
           {/* ======================================================= */}
-          {/* 7. LOCALIZAÇÃO E CONTATO (COMPACTO & ELEGANTE NO FINAL) */}
+          {/* 7. INFORMAÇÕES COMPLEMENTARES (COMPACTO NO FINAL)       */}
           {/* ======================================================= */}
-          {(activeModules.location ||
-            activeModules.whatsapp ||
-            activeModules.instagram ||
-            activeModules.wifi) && (
-            <div className="space-y-3 pt-1">
-              <div className="flex items-center justify-between px-0.5">
-                <div className="flex items-center gap-1.5">
-                  <span
-                    className="w-1.5 h-3 rounded-full"
-                    style={{ backgroundColor: primaryColor }}
-                  />
-                  <h3
-                    className={`text-xs font-extrabold uppercase tracking-wider ${
-                      isDark ? 'text-neutral-400' : 'text-neutral-600'
+          {company.addressText && (
+            <div className="pt-1">
+              <div
+                onClick={handleOpenLocation}
+                className={`w-full rounded-2xl p-3 flex items-center justify-between gap-3 active:scale-[0.99] transition-all cursor-pointer group ${
+                  isDark
+                    ? 'bg-[#141419] hover:bg-[#1a1a22] border border-white/[0.07] hover:border-white/15'
+                    : 'bg-white border border-neutral-200/80 hover:border-neutral-300 shadow-2xs hover:shadow-xs'
+                }`}
+                style={{ WebkitTapHighlightColor: 'transparent' }}
+              >
+                <div className="flex items-center gap-2.5 min-w-0">
+                  <div
+                    className={`w-8 h-8 rounded-xl flex items-center justify-center shrink-0 border ${
+                      isDark
+                        ? 'bg-rose-950/40 text-rose-400 border-rose-500/20'
+                        : 'bg-rose-50 text-rose-600 border-rose-100'
                     }`}
                   >
-                    Onde Estamos & Contato
-                  </h3>
+                    <MapPin className="w-4 h-4" />
+                  </div>
+                  <div className="min-w-0">
+                    <p
+                      className={`text-xs font-bold truncate ${
+                        isDark ? 'text-white' : 'text-neutral-900'
+                      }`}
+                    >
+                      Endereço
+                    </p>
+                    <p
+                      className={`text-[11px] truncate mt-0.5 ${
+                        isDark ? 'text-neutral-400' : 'text-neutral-500'
+                      }`}
+                    >
+                      {company.addressText}
+                    </p>
+                  </div>
                 </div>
-              </div>
-
-              <div className="space-y-2">
-                {/* Localização & Como Chegar */}
-                {activeModules.location && (
-                  <div
-                    onClick={handleOpenLocation}
-                    className={`w-full rounded-2xl p-3 flex items-center justify-between gap-3 active:scale-[0.99] transition-all cursor-pointer group ${
-                      isDark
-                        ? 'bg-[#141419] hover:bg-[#1a1a22] border border-white/[0.07] hover:border-white/15'
-                        : 'bg-white border border-neutral-200/80 hover:border-neutral-300 shadow-2xs hover:shadow-xs'
-                    }`}
-                    style={{ WebkitTapHighlightColor: 'transparent' }}
-                  >
-                    <div className="flex items-center gap-3 min-w-0">
-                      <div
-                        className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 border ${
-                          isDark
-                            ? 'bg-rose-950/40 text-rose-400 border-rose-500/20'
-                            : 'bg-rose-50 text-rose-600 border-rose-100'
-                        }`}
-                      >
-                        <MapPin className="w-4.5 h-4.5" />
-                      </div>
-                      <div className="min-w-0">
-                        <p
-                          className={`text-xs font-bold transition-colors truncate ${
-                            isDark
-                              ? 'text-white group-hover:text-rose-400'
-                              : 'text-neutral-900 group-hover:text-rose-600'
-                          }`}
-                        >
-                          Localização
-                        </p>
-                        <p
-                          className={`text-[11px] truncate mt-0.5 ${
-                            isDark ? 'text-neutral-400' : 'text-neutral-500'
-                          }`}
-                        >
-                          {company.addressText || 'Ver rota no Google Maps'}
-                        </p>
-                      </div>
-                    </div>
-                    <div
-                      className={`shrink-0 px-2.5 py-1 rounded-lg text-[11px] font-bold transition-colors flex items-center gap-1 ${
-                        isDark
-                          ? 'bg-rose-950/40 text-rose-300 border border-rose-500/30 group-hover:bg-rose-900/50'
-                          : 'bg-rose-50 text-rose-700 group-hover:bg-rose-100'
-                      }`}
-                    >
-                      <Navigation className="w-3 h-3" />
-                      <span>Rotas</span>
-                    </div>
-                  </div>
-                )}
-
-                {/* WhatsApp */}
-                {activeModules.whatsapp && (
-                  <div
-                    onClick={handleOpenWhatsApp}
-                    className={`w-full rounded-2xl p-3 flex items-center justify-between gap-3 active:scale-[0.99] transition-all cursor-pointer group ${
-                      isDark
-                        ? 'bg-[#141419] hover:bg-[#1a1a22] border border-white/[0.07] hover:border-white/15'
-                        : 'bg-white border border-neutral-200/80 hover:border-neutral-300 shadow-2xs hover:shadow-xs'
-                    }`}
-                    style={{ WebkitTapHighlightColor: 'transparent' }}
-                  >
-                    <div className="flex items-center gap-3 min-w-0">
-                      <div
-                        className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 border ${
-                          isDark
-                            ? 'bg-emerald-950/40 text-emerald-400 border-emerald-500/20'
-                            : 'bg-emerald-50 text-emerald-600 border-emerald-100'
-                        }`}
-                      >
-                        <MessageCircle className="w-4.5 h-4.5" />
-                      </div>
-                      <div className="min-w-0">
-                        <p
-                          className={`text-xs font-bold transition-colors truncate ${
-                            isDark
-                              ? 'text-white group-hover:text-emerald-400'
-                              : 'text-neutral-900 group-hover:text-emerald-600'
-                          }`}
-                        >
-                          WhatsApp Oficial
-                        </p>
-                        <p
-                          className={`text-[11px] truncate mt-0.5 font-mono ${
-                            isDark ? 'text-neutral-400' : 'text-neutral-500'
-                          }`}
-                        >
-                          {company.whatsapp || 'Atendimento rápido'}
-                        </p>
-                      </div>
-                    </div>
-                    <div
-                      className={`shrink-0 px-2.5 py-1 rounded-lg text-[11px] font-bold transition-colors flex items-center gap-1 ${
-                        isDark
-                          ? 'bg-emerald-950/40 text-emerald-300 border border-emerald-500/30 group-hover:bg-emerald-900/50'
-                          : 'bg-emerald-50 text-emerald-700 group-hover:bg-emerald-100'
-                      }`}
-                    >
-                      <span>Conversar</span>
-                      <ArrowRight className="w-3 h-3" />
-                    </div>
-                  </div>
-                )}
-
-                {/* Instagram */}
-                {activeModules.instagram && company.instagram && (
-                  <div
-                    onClick={(e) => {
-                      e.preventDefault()
-                      const clean = company.instagram.replace(/^@/, '').trim()
-                      window.open(`https://www.instagram.com/${clean}/`, '_blank', 'noopener,noreferrer')
-                    }}
-                    className={`w-full rounded-2xl p-3 flex items-center justify-between gap-3 active:scale-[0.99] transition-all cursor-pointer group ${
-                      isDark
-                        ? 'bg-[#141419] hover:bg-[#1a1a22] border border-white/[0.07] hover:border-white/15'
-                        : 'bg-white border border-neutral-200/80 hover:border-neutral-300 shadow-2xs hover:shadow-xs'
-                    }`}
-                    style={{ WebkitTapHighlightColor: 'transparent' }}
-                  >
-                    <div className="flex items-center gap-3 min-w-0">
-                      <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-[#f09433] via-[#e6683c] to-[#bc1888] text-white flex items-center justify-center shrink-0 shadow-2xs">
-                        <Instagram className="w-4.5 h-4.5" />
-                      </div>
-                      <div className="min-w-0">
-                        <p
-                          className={`text-xs font-bold transition-colors truncate ${
-                            isDark
-                              ? 'text-white group-hover:text-[#e6683c]'
-                              : 'text-neutral-900 group-hover:text-[#bc1888]'
-                          }`}
-                        >
-                          Instagram
-                        </p>
-                        <p
-                          className={`text-[11px] truncate mt-0.5 font-mono ${
-                            isDark ? 'text-neutral-400' : 'text-neutral-500'
-                          }`}
-                        >
-                          @{company.instagram.replace(/^@/, '')}
-                        </p>
-                      </div>
-                    </div>
-                    <div
-                      className={`shrink-0 px-2.5 py-1 rounded-lg text-[11px] font-bold transition-colors flex items-center gap-1 ${
-                        isDark
-                          ? 'bg-pink-950/40 text-pink-300 border border-pink-500/30 group-hover:bg-pink-900/50'
-                          : 'bg-pink-50 text-pink-700 group-hover:bg-pink-100'
-                      }`}
-                    >
-                      <span>Seguir</span>
-                      <ExternalLink className="w-3.5 h-3.5" />
-                    </div>
-                  </div>
-                )}
-
-                {/* Wi-Fi Rápido */}
-                {activeModules.wifi && company.wifi?.ssid && (
-                  <div
-                    onClick={handleOpenWifi}
-                    className={`w-full rounded-2xl p-3 flex items-center justify-between gap-3 active:scale-[0.99] transition-all cursor-pointer group ${
-                      isDark
-                        ? 'bg-[#141419] hover:bg-[#1a1a22] border border-white/[0.07] hover:border-white/15'
-                        : 'bg-white border border-neutral-200/80 hover:border-neutral-300 shadow-2xs hover:shadow-xs'
-                    }`}
-                    style={{ WebkitTapHighlightColor: 'transparent' }}
-                  >
-                    <div className="flex items-center gap-3 min-w-0">
-                      <div
-                        className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 border ${
-                          isDark
-                            ? 'bg-sky-950/40 text-sky-400 border-sky-500/20'
-                            : 'bg-sky-50 text-sky-600 border-sky-100'
-                        }`}
-                      >
-                        <Wifi className="w-4.5 h-4.5" />
-                      </div>
-                      <div className="min-w-0">
-                        <p
-                          className={`text-xs font-bold transition-colors truncate ${
-                            isDark
-                              ? 'text-white group-hover:text-sky-400'
-                              : 'text-neutral-900 group-hover:text-sky-600'
-                          }`}
-                        >
-                          Wi-Fi do Local
-                        </p>
-                        <p
-                          className={`text-[11px] truncate mt-0.5 ${
-                            isDark ? 'text-neutral-400' : 'text-neutral-500'
-                          }`}
-                        >
-                          Rede: {company.wifi.ssid}
-                        </p>
-                      </div>
-                    </div>
-                    <div
-                      className={`shrink-0 px-2.5 py-1 rounded-lg text-[11px] font-bold transition-colors ${
-                        isDark
-                          ? 'bg-sky-950/40 text-sky-300 border border-sky-500/30 group-hover:bg-sky-900/50'
-                          : 'bg-sky-50 text-sky-700 group-hover:bg-sky-100'
-                      }`}
-                    >
-                      Conectar
-                    </div>
-                  </div>
-                )}
+                <div
+                  className={`shrink-0 px-2.5 py-1 rounded-lg text-[11px] font-bold transition-colors flex items-center gap-1 ${
+                    isDark
+                      ? 'bg-rose-950/40 text-rose-300 border border-rose-500/30 group-hover:bg-rose-900/50'
+                      : 'bg-rose-50 text-rose-700 group-hover:bg-rose-100'
+                  }`}
+                >
+                  <Navigation className="w-3 h-3" />
+                  <span>Como Chegar</span>
+                </div>
               </div>
             </div>
           )}
