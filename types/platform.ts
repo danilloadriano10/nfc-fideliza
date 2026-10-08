@@ -117,6 +117,7 @@ export interface Company {
   modules: CompanyModules
   loyaltyProgram: LoyaltyProgramConfig
   highlightModule?: string // 'auto' | 'appointments' | 'services' | 'whatsapp' | 'loyalty' | 'googleReview' | 'menu' | etc.
+  theme?: 'dark' | 'light' // Public page appearance theme (Escuro / Claro)
   rating?: number
   reviewCount?: number
   bookingSettings?: BookingSettings

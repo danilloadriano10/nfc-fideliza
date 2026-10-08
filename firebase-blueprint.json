@@ -19,6 +19,7 @@
         "menuUrl": { "type": "string", "maxLength": 2048 },
         "addressText": { "type": "string", "maxLength": 300 },
         "locationUrl": { "type": "string", "maxLength": 2048 },
+        "theme": { "type": "string", "enum": ["dark", "light"] },
         "isActive": { "type": "boolean" },
         "createdAt": { "type": "string", "format": "date-time" },
         "updatedAt": { "type": "string", "format": "date-time" }

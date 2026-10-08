@@ -42,6 +42,8 @@ import {
   Eye,
   EyeOff,
   Palette,
+  Moon,
+  Sun,
 } from 'lucide-react'
 import confetti from 'canvas-confetti'
 import { BRAND_COLOR_PRESETS, sanitizeHex, getGradientContrastTextColor } from '@/lib/colors'
@@ -119,6 +121,7 @@ export const CompanyPanelView: React.FC<CompanyPanelViewProps> = ({
   // Settings form state
   const [formData, setFormData] = useState<Company>(() => ({
     ...initialCompany,
+    theme: initialCompany.theme || 'dark',
     primaryColor: initialCompany.primaryColor || '#6D28D9',
     secondaryColor: initialCompany.secondaryColor || '#8B5CF6',
     highlightModule: initialCompany.highlightModule || 'auto',
@@ -1608,9 +1611,109 @@ export const CompanyPanelView: React.FC<CompanyPanelViewProps> = ({
                       Aparência da Página
                     </h3>
                     <p className="text-xs text-neutral-500">
-                      Personalize a identidade de cores e o gradiente elegante da página pública da sua empresa (inspirado em cartões VIP de alta classe).
+                      Personalize o tema visual (Escuro / Claro) e as cores da página pública da sua empresa.
                     </p>
                   </div>
+                </div>
+              </div>
+
+              {/* TEMA DA PÁGINA (ESCURO / CLARO) */}
+              <div className="p-4 rounded-2xl bg-neutral-50/80 border border-neutral-200/80 space-y-3">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <label className="text-xs font-black text-neutral-900 uppercase tracking-wider flex items-center gap-1.5">
+                      <Sparkles className="w-4 h-4 text-violet-600" />
+                      TEMA DA PÁGINA
+                    </label>
+                    <p className="text-[11px] text-neutral-500 mt-0.5">
+                      Defina a experiência visual dos seus clientes na Página Pública.
+                    </p>
+                  </div>
+                  <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-neutral-200 text-neutral-700">
+                    Individual por Empresa
+                  </span>
+                </div>
+
+                <div className="grid grid-cols-2 gap-3 pt-1">
+                  {/* Opção ESCURO */}
+                  <button
+                    type="button"
+                    onClick={() => setFormData((prev) => ({ ...prev, theme: 'dark' }))}
+                    className={`relative p-3.5 rounded-2xl border text-left transition-all cursor-pointer flex flex-col gap-2 group ${
+                      (formData.theme || 'dark') === 'dark'
+                        ? 'bg-neutral-950 text-white border-neutral-950 ring-2 ring-neutral-950/20 shadow-md'
+                        : 'bg-white hover:bg-neutral-100 text-neutral-800 border-neutral-200'
+                    }`}
+                  >
+                    <div className="flex items-center justify-between w-full">
+                      <div className="flex items-center gap-2">
+                        <div
+                          className={`w-7 h-7 rounded-xl flex items-center justify-center transition-colors ${
+                            (formData.theme || 'dark') === 'dark'
+                              ? 'bg-neutral-800 text-amber-400'
+                              : 'bg-neutral-100 text-neutral-600'
+                          }`}
+                        >
+                          <Moon className="w-4 h-4" />
+                        </div>
+                        <span className="text-sm font-extrabold tracking-tight">Escuro</span>
+                      </div>
+                      {(formData.theme || 'dark') === 'dark' && (
+                        <div className="w-5 h-5 rounded-full bg-emerald-500 text-white flex items-center justify-center shadow-xs">
+                          <Check className="w-3 h-3 stroke-[3]" />
+                        </div>
+                      )}
+                    </div>
+                    <p
+                      className={`text-[11px] leading-relaxed ${
+                        (formData.theme || 'dark') === 'dark'
+                          ? 'text-neutral-400'
+                          : 'text-neutral-500'
+                      }`}
+                    >
+                      Preto profundo e grafite premium, visual moderno de app móvel.
+                    </p>
+                  </button>
+
+                  {/* Opção CLARO */}
+                  <button
+                    type="button"
+                    onClick={() => setFormData((prev) => ({ ...prev, theme: 'light' }))}
+                    className={`relative p-3.5 rounded-2xl border text-left transition-all cursor-pointer flex flex-col gap-2 group ${
+                      formData.theme === 'light'
+                        ? 'bg-neutral-900 text-white border-neutral-900 ring-2 ring-neutral-900/20 shadow-md'
+                        : 'bg-white hover:bg-neutral-50 text-neutral-800 border-neutral-200'
+                    }`}
+                  >
+                    <div className="flex items-center justify-between w-full">
+                      <div className="flex items-center gap-2">
+                        <div
+                          className={`w-7 h-7 rounded-xl flex items-center justify-center transition-colors ${
+                            formData.theme === 'light'
+                              ? 'bg-neutral-800 text-amber-400'
+                              : 'bg-amber-50 text-amber-600'
+                          }`}
+                        >
+                          <Sun className="w-4 h-4" />
+                        </div>
+                        <span className="text-sm font-extrabold tracking-tight">Claro</span>
+                      </div>
+                      {formData.theme === 'light' && (
+                        <div className="w-5 h-5 rounded-full bg-emerald-500 text-white flex items-center justify-center shadow-xs">
+                          <Check className="w-3 h-3 stroke-[3]" />
+                        </div>
+                      )}
+                    </div>
+                    <p
+                      className={`text-[11px] leading-relaxed ${
+                        formData.theme === 'light'
+                          ? 'text-neutral-400'
+                          : 'text-neutral-500'
+                      }`}
+                    >
+                      Fundo branco limpo clássico com cards suaves e alto contraste.
+                    </p>
+                  </button>
                 </div>
               </div>
 

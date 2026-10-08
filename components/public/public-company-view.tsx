@@ -19,6 +19,11 @@ import {
   Instagram,
   Clock,
   ChevronRight,
+  Award,
+  Navigation,
+  CheckCircle2,
+  Share2,
+  Check,
 } from 'lucide-react'
 import { Company, CompanyService } from '@/types/platform'
 import { LoyaltySheet } from './loyalty-sheet'
@@ -59,6 +64,7 @@ interface FeatureItem {
 }
 
 export const PublicCompanyView: React.FC<PublicCompanyViewProps> = ({ company }) => {
+  const isDark = (company.theme || 'dark') === 'dark'
   const primaryColor = useMemo(
     () => sanitizeHex(company.primaryColor, '#6D28D9'),
     [company.primaryColor]
@@ -86,6 +92,7 @@ export const PublicCompanyView: React.FC<PublicCompanyViewProps> = ({ company })
   const [services, setServices] = useState<CompanyService[]>([])
   const [coverError, setCoverError] = useState(false)
   const [logoError, setLogoError] = useState(false)
+  const [copiedLink, setCopiedLink] = useState(false)
 
   const [customerSession, setCustomerSession] = useState<{
     phone: string | null
@@ -98,9 +105,8 @@ export const PublicCompanyView: React.FC<PublicCompanyViewProps> = ({ company })
     hasReward: false,
   })
 
-  // Synchronize on platform data events
+  // Synchronize customer session on platform data events
   useEffect(() => {
-    // Populate client session on mount
     const savedPhone = getLocalCustomerSession(company.id)
     if (savedPhone) {
       const cust = getCustomerByPhone(company.id, savedPhone)
@@ -198,6 +204,24 @@ export const PublicCompanyView: React.FC<PublicCompanyViewProps> = ({ company })
     }
   }, [company.locationUrl, company.addressText])
 
+  // Share Page Link
+  const handleShare = useCallback(() => {
+    if (typeof window !== 'undefined') {
+      const currentUrl = window.location.href
+      if (navigator.share) {
+        navigator.share({
+          title: company.name,
+          text: `Conheça ${company.name} na DiretoLink`,
+          url: currentUrl,
+        }).catch(() => {})
+      } else {
+        navigator.clipboard.writeText(currentUrl)
+        setCopiedLink(true)
+        setTimeout(() => setCopiedLink(false), 2200)
+      }
+    }
+  }, [company.name])
+
   // Open / Connect Wi-Fi
   const handleOpenWifi = useCallback(() => {
     if (!company.wifi?.ssid) return
@@ -208,7 +232,6 @@ export const PublicCompanyView: React.FC<PublicCompanyViewProps> = ({ company })
     const type = security === 'OPEN' || !password ? 'nopass' : 'WPA'
     const wifiPayload = `WIFI:S:${ssid};T:${type};P:${password};;`
 
-    // Try direct connection on supported devices
     try {
       const link = document.createElement('a')
       link.href = wifiPayload
@@ -259,14 +282,14 @@ export const PublicCompanyView: React.FC<PublicCompanyViewProps> = ({ company })
       items.push({
         id: 'appointments',
         title: 'Agendamento',
-        subtitle: 'Reserve seu horário online',
-        icon: <Calendar className="w-5 h-5" />,
+        subtitle: 'Reserve online',
+        icon: <Calendar className="w-4.5 h-4.5" />,
         featuredBadge: '📅 Agendamento Online',
         featuredTitle: 'Agendar Horário',
         featuredDescription: 'Escolha seu serviço, profissional e horário ideal em poucos segundos.',
         featuredCta: 'Agendar Agora',
-        featuredIcon: <Calendar className="w-6 h-6 stroke-[2]" />,
-        themeBg: 'bg-violet-100/80 text-violet-700',
+        featuredIcon: <Calendar className="w-5 h-5 stroke-[2]" />,
+        themeBg: 'bg-violet-50 text-violet-700 border-violet-100',
         onClick: () => {
           setBookingService(null)
           setIsBookingOpen(true)
@@ -278,14 +301,14 @@ export const PublicCompanyView: React.FC<PublicCompanyViewProps> = ({ company })
       items.push({
         id: 'services',
         title: 'Serviços',
-        subtitle: activeServicesList.length > 0 ? `${activeServicesList.length} opções` : 'Valores e detalhes',
-        icon: <Scissors className="w-5 h-5" />,
+        subtitle: activeServicesList.length > 0 ? `${activeServicesList.length} opções` : 'Ver catálogo',
+        icon: <Scissors className="w-4.5 h-4.5" />,
         featuredBadge: '✂️ Catálogo de Serviços',
         featuredTitle: 'Nossos Serviços',
         featuredDescription: 'Confira a tabela completa de opções, valores e detalhes de cada serviço.',
         featuredCta: 'Ver Serviços',
-        featuredIcon: <Scissors className="w-6 h-6 stroke-[2]" />,
-        themeBg: 'bg-purple-100/80 text-purple-700',
+        featuredIcon: <Scissors className="w-5 h-5 stroke-[2]" />,
+        themeBg: 'bg-purple-50 text-purple-700 border-purple-100',
         onClick: () => setIsServicesOpen(true),
       })
     }
@@ -296,10 +319,10 @@ export const PublicCompanyView: React.FC<PublicCompanyViewProps> = ({ company })
         title: 'Fidelidade',
         subtitle:
           customerPoints !== null
-            ? `${customerPoints}/${loyaltyProgram.goalPoints} pontos`
-            : 'Ganhe pontos e prêmios',
-        badgeText: hasAvailableReward ? 'Prêmio Pronto!' : undefined,
-        icon: <Gift className="w-5 h-5" />,
+            ? `${customerPoints}/${loyaltyProgram.goalPoints} pts`
+            : 'Ganhe prêmios',
+        badgeText: hasAvailableReward ? 'Prêmio!' : undefined,
+        icon: <Gift className="w-4.5 h-4.5" />,
         featuredBadge: hasAvailableReward ? '🎉 Prêmio Pronto para Resgate!' : '🎁 Clube Fidelidade',
         featuredTitle: 'Cartão Fidelidade Digital',
         featuredDescription:
@@ -307,8 +330,8 @@ export const PublicCompanyView: React.FC<PublicCompanyViewProps> = ({ company })
             ? `Você já tem ${customerPoints} de ${loyaltyProgram.goalPoints} pontos acumulados.`
             : `Acumule pontos em cada visita e ganhe "${loyaltyProgram.rewardDescription}" sem baixar nada!`,
         featuredCta: hasAvailableReward ? 'Resgatar Prêmio' : 'Ver Meu Cartão',
-        featuredIcon: <Gift className="w-6 h-6 stroke-[2]" />,
-        themeBg: 'bg-amber-100/80 text-amber-700',
+        featuredIcon: <Gift className="w-5 h-5 stroke-[2]" />,
+        themeBg: 'bg-amber-50 text-amber-700 border-amber-100',
         onClick: () => setIsLoyaltyOpen(true),
       })
     }
@@ -317,14 +340,14 @@ export const PublicCompanyView: React.FC<PublicCompanyViewProps> = ({ company })
       items.push({
         id: 'whatsapp',
         title: 'WhatsApp',
-        subtitle: 'Atendimento direto',
-        icon: <MessageCircle className="w-5 h-5" />,
+        subtitle: 'Fale conosco',
+        icon: <MessageCircle className="w-4.5 h-4.5" />,
         featuredBadge: '💬 Atendimento Direto',
         featuredTitle: 'Falar no WhatsApp',
         featuredDescription: 'Converse agora com nossa equipe para tirar dúvidas ou fazer pedidos.',
         featuredCta: 'Chamar no WhatsApp',
-        featuredIcon: <MessageCircle className="w-6 h-6 stroke-[2]" />,
-        themeBg: 'bg-emerald-100/80 text-emerald-700',
+        featuredIcon: <MessageCircle className="w-5 h-5 stroke-[2]" />,
+        themeBg: 'bg-emerald-50 text-emerald-700 border-emerald-100',
         onClick: handleOpenWhatsApp,
       })
     }
@@ -333,14 +356,14 @@ export const PublicCompanyView: React.FC<PublicCompanyViewProps> = ({ company })
       items.push({
         id: 'googleReview',
         title: 'Avaliações',
-        subtitle: 'Avalie no Google',
-        icon: <Star className="w-5 h-5 fill-amber-400 text-amber-400" />,
+        subtitle: 'Avaliar no Google',
+        icon: <Star className="w-4.5 h-4.5 fill-amber-400 text-amber-400" />,
         featuredBadge: '⭐ Avaliação Google',
         featuredTitle: 'Avalie Nossa Empresa',
         featuredDescription: 'Sua opinião é fundamental para nós. Conte como foi sua experiência!',
         featuredCta: 'Deixar Avaliação',
-        featuredIcon: <Star className="w-6 h-6 fill-current stroke-[2]" />,
-        themeBg: 'bg-amber-100/80 text-amber-600',
+        featuredIcon: <Star className="w-5 h-5 fill-current stroke-[2]" />,
+        themeBg: 'bg-amber-50 text-amber-600 border-amber-100',
         onClick: handleGoogleReview,
       })
     }
@@ -349,14 +372,14 @@ export const PublicCompanyView: React.FC<PublicCompanyViewProps> = ({ company })
       items.push({
         id: 'menu',
         title: 'Cardápio',
-        subtitle: 'Opções e especialidades',
-        icon: <BookOpen className="w-5 h-5" />,
+        subtitle: 'Ver especialidades',
+        icon: <BookOpen className="w-4.5 h-4.5" />,
         featuredBadge: '📖 Cardápio Digital',
         featuredTitle: 'Cardápio Completo',
         featuredDescription: 'Confira todas as nossas opções, pratos e novidades preparadas para você.',
         featuredCta: 'Abrir Cardápio',
-        featuredIcon: <BookOpen className="w-6 h-6 stroke-[2]" />,
-        themeBg: 'bg-teal-100/80 text-teal-700',
+        featuredIcon: <BookOpen className="w-5 h-5 stroke-[2]" />,
+        themeBg: 'bg-teal-50 text-teal-700 border-teal-100',
         onClick: handleOpenMenu,
       })
     }
@@ -365,14 +388,14 @@ export const PublicCompanyView: React.FC<PublicCompanyViewProps> = ({ company })
       items.push({
         id: 'wifi',
         title: 'Wi-Fi',
-        subtitle: 'Conecte-se à rede',
-        icon: <Wifi className="w-5 h-5" />,
+        subtitle: 'Conectar à rede',
+        icon: <Wifi className="w-4.5 h-4.5" />,
         featuredBadge: '📶 Conexão Rápida',
         featuredTitle: 'Conectar ao Wi-Fi',
         featuredDescription: `Acesse a rede "${company.wifi?.ssid}" em um toque sem complicação.`,
         featuredCta: 'Conectar Agora',
-        featuredIcon: <Wifi className="w-6 h-6 stroke-[2]" />,
-        themeBg: 'bg-sky-100/80 text-sky-700',
+        featuredIcon: <Wifi className="w-5 h-5 stroke-[2]" />,
+        themeBg: 'bg-sky-50 text-sky-700 border-sky-100',
         onClick: handleOpenWifi,
       })
     }
@@ -381,14 +404,14 @@ export const PublicCompanyView: React.FC<PublicCompanyViewProps> = ({ company })
       items.push({
         id: 'feedback',
         title: 'Feedback',
-        subtitle: 'Canal direto privado',
-        icon: <MessageSquareHeart className="w-5 h-5" />,
+        subtitle: 'Canal privado',
+        icon: <MessageSquareHeart className="w-4.5 h-4.5" />,
         featuredBadge: '💭 Canal Confidencial',
         featuredTitle: 'Deixe sua Sugestão',
         featuredDescription: 'Envie um recado privado diretamente para a gerência do estabelecimento.',
         featuredCta: 'Enviar Mensagem',
-        featuredIcon: <MessageSquareHeart className="w-6 h-6 stroke-[2]" />,
-        themeBg: 'bg-pink-100/80 text-pink-700',
+        featuredIcon: <MessageSquareHeart className="w-5 h-5 stroke-[2]" />,
+        themeBg: 'bg-pink-50 text-pink-700 border-pink-100',
         onClick: () => setIsFeedbackOpen(true),
       })
     }
@@ -408,7 +431,6 @@ export const PublicCompanyView: React.FC<PublicCompanyViewProps> = ({ company })
   ])
 
   // Resolve configurable featured module
-  // If configured module is active, use it. Otherwise, automatic fallback to the top active module.
   const featuredItem = useMemo<FeatureItem | null>(() => {
     if (allFeatureItems.length === 0) return null
 
@@ -429,162 +451,263 @@ export const PublicCompanyView: React.FC<PublicCompanyViewProps> = ({ company })
     return allFeatureItems[0] || null
   }, [allFeatureItems, company.highlightModule])
 
-  // Remaining active items for the 2-column grid (excluding the featured one)
-  const gridItems = useMemo(() => {
+  // Compact quick access items (all active modules or excluding hero to avoid exact duplicate)
+  const quickAccessItems = useMemo(() => {
     if (!featuredItem) return allFeatureItems
     return allFeatureItems.filter((item) => item.id !== featuredItem.id)
   }, [allFeatureItems, featuredItem])
 
+  // Calculate loyalty percentage
+  const loyaltyProgressPercent = useMemo(() => {
+    if (customerPoints === null) return 0
+    const goal = loyaltyProgram.goalPoints || 10
+    return Math.min(100, Math.round((customerPoints / goal) * 100))
+  }, [customerPoints, loyaltyProgram.goalPoints])
+
   return (
-    <div className="min-h-screen bg-neutral-100 flex justify-center selection:bg-neutral-900 selection:text-white">
-      {/* Mobile-first Container constraint */}
-      <main className="w-full max-w-md bg-white min-h-screen shadow-xl relative pb-10 flex flex-col">
-        {/* 1. CAPA MENOR NO TOPO (Sleek Compact Cover com Gradiente Elegante) */}
-        <div className="relative w-full h-36 sm:h-40 bg-neutral-950 overflow-hidden">
-          {/* Faixa decorativa superior com o gradiente */}
-          <div
-            className="absolute top-0 left-0 right-0 h-1.5 z-30"
-            style={{ background: gradientBg }}
-          />
-
-          {company.coverUrl && !coverError ? (
-            <>
-              <Image
-                src={company.coverUrl}
-                alt={company.name}
-                fill
-                priority
-                className="object-cover"
-                sizes="(max-width: 480px) 100vw, 448px"
-                referrerPolicy="no-referrer"
-                onError={() => setCoverError(true)}
-              />
-              {/* Tonalidade sutil das cores da marca sobreposta à foto de capa */}
-              <div
-                className="absolute inset-0 opacity-20 pointer-events-none mix-blend-color"
-                style={{ background: gradientBg }}
-              />
-              {/* Scrim gradiente para contraste e legibilidade */}
-              <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/25 to-black/30" />
-            </>
-          ) : (
-            <div
-              className="w-full h-full flex items-center justify-center relative overflow-hidden"
-              style={{ background: gradientBg }}
-            >
-              {/* Efeitos de iluminação elegantes no gradiente */}
-              <div className="absolute -right-8 -top-8 w-36 h-36 rounded-full bg-white/15 blur-xl pointer-events-none" />
-              <div className="absolute right-0 bottom-0 w-28 h-28 rounded-full bg-black/20 blur-xl pointer-events-none" />
-              <Store className="w-10 h-10 opacity-35" style={{ color: contrastText }} />
-            </div>
-          )}
-        </div>
-
-        {/* 2. LOGO SOBREPOSTO & IDENTIDADE COMPACTA */}
-        <div className="px-5 -mt-11 relative z-20 flex flex-col items-center text-center">
-          {/* Logo sobreposto compacto com moldura no gradiente da marca */}
-          <div
-            className="relative w-20 h-20 sm:w-22 sm:h-22 rounded-2xl p-[2.5px] shadow-lg overflow-hidden flex items-center justify-center transition-transform hover:scale-105"
-            style={{ background: gradientBg }}
-          >
-            <div className="w-full h-full rounded-[14px] bg-white p-1 overflow-hidden flex items-center justify-center">
-              {company.logoUrl && !logoError ? (
+    <div
+      className={`min-h-screen sm:py-6 flex justify-center transition-colors duration-200 ${
+        isDark
+          ? 'bg-[#070709] selection:bg-neutral-800 selection:text-white'
+          : 'bg-neutral-100/90 selection:bg-neutral-900 selection:text-white'
+      }`}
+    >
+      {/* Mobile-first App Container */}
+      <main
+        className={`w-full max-w-md sm:rounded-3xl shadow-2xl overflow-hidden relative pb-28 sm:pb-24 flex flex-col transition-colors duration-200 ${
+          isDark
+            ? 'bg-[#0d0d12] border-x sm:border border-white/[0.08] text-white'
+            : 'bg-white border-x sm:border border-neutral-200/80 text-neutral-900'
+        }`}
+      >
+        
+        {/* ========================================================= */}
+        {/* 1. TOPO DA EMPRESA: HERO IMERSIVO COM IDENTIDADE DA MARCA */}
+        {/* ========================================================= */}
+        <div className="relative w-full">
+          {/* Foto de Capa Imersiva & Integração com o Fundo */}
+          <div className="relative w-full h-48 sm:h-52 bg-neutral-950 overflow-hidden">
+            {company.coverUrl && !coverError ? (
+              <>
                 <Image
-                  src={company.logoUrl}
-                  alt={`${company.name} logo`}
-                  width={80}
-                  height={80}
-                  className="w-full h-full object-cover rounded-xl"
+                  src={company.coverUrl}
+                  alt={company.name}
+                  fill
+                  priority
+                  className="object-cover"
+                  sizes="(max-width: 480px) 100vw, 448px"
                   referrerPolicy="no-referrer"
-                  onError={() => setLogoError(true)}
+                  onError={() => setCoverError(true)}
                 />
-              ) : (
+                {/* Tonalidade sutil da marca sobreposta à foto de capa */}
                 <div
-                  className="w-full h-full rounded-xl flex items-center justify-center text-lg font-extrabold shadow-inner"
-                  style={{
-                    background: gradientBg,
-                    color: contrastText,
-                  }}
-                >
-                  {company.name.slice(0, 2).toUpperCase()}
-                </div>
-              )}
-            </div>
-          </div>
-
-          {/* Business Name */}
-          <h1 className="mt-2.5 text-lg sm:text-xl font-extrabold text-neutral-900 tracking-tight leading-tight">
-            {company.name}
-          </h1>
-
-          {/* Categoria / Tagline & Avaliação compactas */}
-          <div className="flex items-center justify-center flex-wrap gap-2 mt-1">
-            {(company.category || company.tagline) && (
-              <span className="text-xs text-neutral-500 font-medium truncate max-w-[200px]">
-                {company.category || company.tagline}
-              </span>
+                  className="absolute inset-0 opacity-20 pointer-events-none mix-blend-overlay"
+                  style={{ background: gradientBg }}
+                />
+                {/* Gradiente vertical para fusão perfeita e sem corte seco */}
+                <div
+                  className={`absolute inset-0 pointer-events-none ${
+                    isDark
+                      ? 'bg-gradient-to-t from-[#0d0d12] via-[#0d0d12]/70 to-transparent'
+                      : 'bg-gradient-to-t from-white via-white/60 to-transparent'
+                  }`}
+                />
+                {/* Vinheta superior para contraste das ações flutuantes */}
+                <div className="absolute inset-0 bg-gradient-to-b from-black/50 via-transparent to-transparent pointer-events-none" />
+              </>
+            ) : (
+              <div
+                className="w-full h-full flex items-center justify-center relative overflow-hidden"
+                style={{ background: gradientBg }}
+              >
+                <div className="absolute -right-8 -top-8 w-36 h-36 rounded-full bg-white/20 blur-xl pointer-events-none" />
+                <div className="absolute right-0 bottom-0 w-28 h-28 rounded-full bg-black/25 blur-xl pointer-events-none" />
+                <Store className="w-10 h-10 opacity-35" style={{ color: contrastText }} />
+                <div
+                  className={`absolute inset-0 pointer-events-none ${
+                    isDark
+                      ? 'bg-gradient-to-t from-[#0d0d12] via-[#0d0d12]/60 to-transparent'
+                      : 'bg-gradient-to-t from-white via-white/50 to-transparent'
+                  }`}
+                />
+              </div>
             )}
 
-            {/* Avaliação compacta com estrelas */}
-            <button
-              type="button"
-              onClick={activeModules.googleReview ? handleGoogleReview : undefined}
-              className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-amber-50 border border-amber-200/60 text-[11px] font-bold text-amber-800 transition-colors ${
-                activeModules.googleReview ? 'hover:bg-amber-100 cursor-pointer' : 'cursor-default'
-              }`}
-              title={activeModules.googleReview ? 'Avaliar no Google' : undefined}
-            >
-              <Star className="w-3 h-3 fill-amber-400 text-amber-400 shrink-0" />
-              <span>{company.rating ? company.rating.toFixed(1) : '4.9'}</span>
-              <span className="text-amber-600/80 font-normal text-[10px]">
-                ({company.reviewCount || '120+'})
-              </span>
-            </button>
+            {/* Ações rápidas flutuantes no topo da capa */}
+            <div className="absolute top-2.5 right-3 z-20 flex items-center gap-1.5">
+              <button
+                type="button"
+                onClick={handleShare}
+                className="w-8 h-8 rounded-full bg-black/45 backdrop-blur-md text-white/90 hover:text-white hover:bg-black/60 flex items-center justify-center transition-all cursor-pointer shadow-xs border border-white/10 active:scale-95"
+                title="Compartilhar página"
+              >
+                {copiedLink ? (
+                  <Check className="w-3.5 h-3.5 text-emerald-400" />
+                ) : (
+                  <Share2 className="w-3.5 h-3.5" />
+                )}
+              </button>
+            </div>
           </div>
 
-          {/* Endereço compacto */}
-          {company.addressText && (
-            <button
-              type="button"
-              onClick={handleOpenLocation}
-              className="flex items-center justify-center gap-1 text-[11px] text-neutral-400 hover:text-neutral-700 transition-colors mt-1 max-w-xs cursor-pointer group"
-              title="Abrir no Google Maps"
+          {/* Logo sobreposto & Identidade da Empresa */}
+          <div className="px-5 -mt-14 sm:-mt-16 relative z-20 flex flex-col items-center text-center">
+            {/* Moldura do Logo com Gradiente e Contraste */}
+            <div
+              className="relative w-22 h-22 sm:w-24 sm:h-24 rounded-2xl p-[3px] shadow-2xl overflow-hidden flex items-center justify-center transition-transform hover:scale-105"
+              style={{
+                background: gradientBg,
+                boxShadow: `0 12px 28px -4px ${hexToRgba(primaryColor, isDark ? 0.55 : 0.4)}`,
+              }}
             >
-              <MapPin className="w-3 h-3 shrink-0 text-neutral-400 group-hover:text-rose-600 transition-colors" />
-              <span className="truncate">{company.addressText}</span>
-            </button>
-          )}
+              <div
+                className={`w-full h-full rounded-[13px] p-1 overflow-hidden flex items-center justify-center ${
+                  isDark ? 'bg-[#141419]' : 'bg-white'
+                }`}
+              >
+                {company.logoUrl && !logoError ? (
+                  <Image
+                    src={company.logoUrl}
+                    alt={`${company.name} logo`}
+                    width={88}
+                    height={88}
+                    className="w-full h-full object-cover rounded-xl"
+                    referrerPolicy="no-referrer"
+                    onError={() => setLogoError(true)}
+                  />
+                ) : (
+                  <div
+                    className="w-full h-full rounded-xl flex items-center justify-center text-xl font-black shadow-inner"
+                    style={{
+                      background: gradientBg,
+                      color: contrastText,
+                    }}
+                  >
+                    {company.name.slice(0, 2).toUpperCase()}
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Nome da Empresa */}
+            <h1
+              className={`mt-3 text-xl sm:text-2xl font-black tracking-tight leading-tight ${
+                isDark ? 'text-white' : 'text-neutral-900'
+              }`}
+            >
+              {company.name}
+            </h1>
+
+            {/* Tagline da Empresa (Categoria removida da interface pública conforme solicitação) */}
+            {company.tagline && (
+              <p
+                className={`text-xs font-medium max-w-xs mt-1 leading-snug ${
+                  isDark ? 'text-neutral-400' : 'text-neutral-500'
+                }`}
+              >
+                {company.tagline}
+              </p>
+            )}
+
+            {/* Linha de Metadados: Avaliação no Google & Status */}
+            <div className="flex items-center justify-center flex-wrap gap-2 mt-2.5">
+              {/* Avaliação Google */}
+              <button
+                type="button"
+                onClick={activeModules.googleReview ? handleGoogleReview : undefined}
+                className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-bold transition-all ${
+                  isDark
+                    ? 'bg-[#16161c] border border-white/[0.08] text-amber-300 hover:border-amber-400/40 shadow-xs'
+                    : 'bg-amber-50/90 border border-amber-200/70 text-amber-900 hover:bg-amber-100'
+                } ${
+                  activeModules.googleReview ? 'hover:scale-[1.02] cursor-pointer' : 'cursor-default'
+                }`}
+                title={activeModules.googleReview ? 'Ver avaliações no Google' : undefined}
+              >
+                <Star className="w-3.5 h-3.5 fill-amber-400 text-amber-400 shrink-0" />
+                <span>{company.rating ? company.rating.toFixed(1) : '4.9'}</span>
+                <span
+                  className={`font-normal text-[10px] ${
+                    isDark ? 'text-neutral-400' : 'text-amber-700/80'
+                  }`}
+                >
+                  ({company.reviewCount || '120+'})
+                </span>
+              </button>
+
+              {/* Status do Estabelecimento */}
+              <div
+                className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-semibold ${
+                  isDark
+                    ? 'bg-[#0f1b14] border border-emerald-500/30 text-emerald-300 shadow-xs'
+                    : 'bg-emerald-50 border border-emerald-200/70 text-emerald-800'
+                }`}
+              >
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                <span>Atendimento Ativo</span>
+              </div>
+            </div>
+
+            {/* Endereço Compacto */}
+            {company.addressText && (
+              <button
+                type="button"
+                onClick={handleOpenLocation}
+                className={`inline-flex items-center justify-center gap-1 text-[11px] transition-colors mt-2 max-w-xs cursor-pointer group px-2 py-0.5 rounded-lg ${
+                  isDark
+                    ? 'text-neutral-400 hover:text-neutral-200 hover:bg-white/[0.05]'
+                    : 'text-neutral-500 hover:text-neutral-900 hover:bg-neutral-100'
+                }`}
+                title="Abrir no Google Maps"
+              >
+                <MapPin
+                  className="w-3.5 h-3.5 shrink-0 group-hover:scale-110 transition-transform"
+                  style={{ color: primaryColor }}
+                />
+                <span className="truncate">{company.addressText}</span>
+              </button>
+            )}
+          </div>
         </div>
 
-        {/* 3. CONTEÚDO PRINCIPAL (Compacto & Premium) */}
-        <div className="px-4 sm:px-5 mt-5 flex-1 flex flex-col">
-          {/* GRANDE CARD DE DESTAQUE PRINCIPAL (GRADIENTE ELEGANTE & CONTRASTE DINÂMICO) */}
+        {/* ========================================================= */}
+        {/* CORPO PRINCIPAL COM CONTEÚDO PREMIUM                     */}
+        {/* ========================================================= */}
+        <div className="px-4 sm:px-5 mt-5 flex-1 flex flex-col space-y-6">
+
+          {/* ======================================================= */}
+          {/* 2. DESTAQUE PRINCIPAL (HERO CARD COM GRADIENTE)         */}
+          {/* ======================================================= */}
           {featuredItem && (
             <div
               onClick={featuredItem.onClick}
-              className="w-full relative overflow-hidden rounded-3xl p-4.5 sm:p-5 shadow-xl cursor-pointer active:scale-[0.985] transition-all duration-200 group border"
+              className="w-full relative overflow-hidden rounded-3xl p-5 shadow-xl cursor-pointer active:scale-[0.985] transition-all duration-200 group border select-none"
               style={{
                 background: gradientBg,
                 color: contrastText,
-                borderColor: isLightContrast ? 'rgba(0,0,0,0.08)' : 'rgba(255,255,255,0.18)',
-                boxShadow: `0 16px 36px -10px ${hexToRgba(primaryColor, 0.4)}`,
+                borderColor: isDark
+                  ? 'rgba(255,255,255,0.22)'
+                  : isLightContrast
+                  ? 'rgba(0,0,0,0.08)'
+                  : 'rgba(255,255,255,0.2)',
+                boxShadow: `0 16px 36px -10px ${hexToRgba(primaryColor, isDark ? 0.55 : 0.42)}`,
                 WebkitTapHighlightColor: 'transparent',
               }}
             >
-              {/* Efeitos decorativos sutis nas cores personalizadas */}
+              {/* Efeitos de iluminação modernos sobre o gradiente */}
               <div
-                className="absolute -right-8 -top-8 w-36 h-36 rounded-full blur-2xl pointer-events-none opacity-30"
+                className="absolute -right-8 -top-8 w-36 h-36 rounded-full blur-2xl pointer-events-none opacity-35"
                 style={{ backgroundColor: secondaryColor }}
               />
               <div
-                className="absolute right-0 bottom-0 w-28 h-28 rounded-full blur-xl pointer-events-none opacity-25"
+                className="absolute right-0 bottom-0 w-28 h-28 rounded-full blur-xl pointer-events-none opacity-30"
                 style={{ backgroundColor: primaryColor }}
               />
 
               <div className="relative z-10 flex flex-col items-start text-left">
-                {/* Badge no topo com transparência dinâmica */}
+                {/* Badge no topo com backdrop blur */}
                 <div
-                  className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-bold tracking-wide backdrop-blur-md mb-2.5 border"
+                  className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-bold tracking-wide backdrop-blur-md mb-3 border"
                   style={{
                     backgroundColor: isLightContrast
                       ? 'rgba(0, 0, 0, 0.08)'
@@ -603,7 +726,7 @@ export const PublicCompanyView: React.FC<PublicCompanyViewProps> = ({ company })
                 </div>
 
                 {/* Ícone e Título */}
-                <div className="flex items-center gap-2.5 mb-1.5">
+                <div className="flex items-center gap-2.5 mb-2">
                   <div
                     className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl backdrop-blur-md flex items-center justify-center shrink-0 shadow-inner border"
                     style={{
@@ -620,7 +743,7 @@ export const PublicCompanyView: React.FC<PublicCompanyViewProps> = ({ company })
                   </div>
                   <div>
                     <h3
-                      className="text-base sm:text-[17px] font-extrabold tracking-tight leading-tight"
+                      className="text-base sm:text-lg font-black tracking-tight leading-tight"
                       style={{ color: contrastText }}
                     >
                       {featuredItem.featuredTitle}
@@ -628,21 +751,21 @@ export const PublicCompanyView: React.FC<PublicCompanyViewProps> = ({ company })
                   </div>
                 </div>
 
-                {/* Descrição legível */}
+                {/* Descrição */}
                 <p
-                  className="text-[11px] sm:text-xs leading-snug max-w-[310px] mb-3.5"
+                  className="text-xs leading-relaxed max-w-[320px] mb-4"
                   style={{
                     color: isLightContrast
-                      ? 'rgba(23, 23, 23, 0.82)'
-                      : 'rgba(255, 255, 255, 0.9)',
+                      ? 'rgba(23, 23, 23, 0.85)'
+                      : 'rgba(255, 255, 255, 0.92)',
                   }}
                 >
                   {featuredItem.featuredDescription}
                 </p>
 
-                {/* Botão CTA destacado com contraste garantido */}
+                {/* Botão CTA com contraste automático perfeito */}
                 <div
-                  className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-bold shadow-md transition-colors"
+                  className="inline-flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold shadow-md transition-transform group-hover:scale-[1.02]"
                   style={{
                     backgroundColor: isLightContrast ? '#171717' : '#ffffff',
                     color: isLightContrast ? '#ffffff' : '#171717',
@@ -660,86 +783,143 @@ export const PublicCompanyView: React.FC<PublicCompanyViewProps> = ({ company })
             </div>
           )}
 
-          {/* 4. TÍTULO: “O QUE VOCÊ PRECISA HOJE?” */}
-          {gridItems.length > 0 && (
-            <div className="mt-5 mb-2.5 px-0.5 flex items-center justify-between">
-              <h2 className="text-[13px] font-bold text-neutral-800 tracking-tight">
-                O que você precisa hoje?
-              </h2>
-            </div>
-          )}
-
-          {/* 5. GRADE DE 2 COLUNAS PARA OS DEMAIS RECURSOS ATIVOS */}
-          {gridItems.length > 0 && (
-            <div className="grid grid-cols-2 gap-2.5">
-              {gridItems.map((item) => (
-                <div
-                  key={item.id}
-                  role="button"
-                  tabIndex={0}
-                  onClick={item.onClick}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter' || e.key === ' ') {
-                      e.preventDefault()
-                      item.onClick()
-                    }
-                  }}
-                  className="bg-white border border-neutral-200/80 hover:border-violet-300 rounded-2xl p-3.5 flex flex-col justify-between text-left shadow-2xs hover:shadow-xs active:scale-[0.98] transition-all duration-150 group cursor-pointer select-none min-h-[105px]"
-                  style={{ WebkitTapHighlightColor: 'transparent' }}
+          {/* ======================================================= */}
+          {/* 3. ACESSOS RÁPIDOS: ATALHOS COMPACTOS ESTILO APP ICONS   */}
+          {/* ======================================================= */}
+          {quickAccessItems.length > 0 && (
+            <div className="space-y-2">
+              <div className="flex items-center justify-between px-0.5">
+                <div className="flex items-center gap-1.5">
+                  <span
+                    className="w-1.5 h-3 rounded-full"
+                    style={{ backgroundColor: primaryColor }}
+                  />
+                  <h2
+                    className={`text-xs font-extrabold uppercase tracking-wider ${
+                      isDark ? 'text-neutral-400' : 'text-neutral-600'
+                    }`}
+                  >
+                    Acessos Rápidos
+                  </h2>
+                </div>
+                <span
+                  className={`text-[10px] font-medium ${
+                    isDark ? 'text-neutral-500' : 'text-neutral-400'
+                  }`}
                 >
-                  <div className="flex items-start justify-between gap-1 w-full">
-                    <div className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 ${item.themeBg}`}>
-                      {item.icon}
-                    </div>
+                  Toque para abrir
+                </span>
+              </div>
+
+              {/* Grid estilo ícones de aplicativo mobile (compacto e visual) */}
+              <div className="grid grid-cols-4 gap-2">
+                {quickAccessItems.map((item) => (
+                  <button
+                    key={item.id}
+                    type="button"
+                    onClick={item.onClick}
+                    className={`flex flex-col items-center justify-center p-2 rounded-2xl active:scale-95 transition-all duration-150 cursor-pointer group relative select-none ${
+                      isDark
+                        ? 'bg-[#141419] hover:bg-[#1a1a20] border border-white/[0.07] hover:border-white/15'
+                        : 'bg-neutral-50/90 hover:bg-neutral-100/90 border border-neutral-200/60'
+                    }`}
+                    style={{ WebkitTapHighlightColor: 'transparent' }}
+                  >
+                    {/* Badge flutuante quando houver */}
                     {item.badgeText && (
-                      <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-md bg-neutral-100 text-neutral-600 truncate max-w-[80px]">
+                      <span className="absolute -top-1 -right-1 px-1.5 py-0.2 rounded-full text-[8px] font-black bg-amber-500 text-white shadow-2xs">
                         {item.badgeText}
                       </span>
                     )}
-                  </div>
 
-                  <div className="mt-2.5">
-                    <h4 className="text-xs font-bold text-neutral-900 group-hover:text-violet-700 transition-colors truncate">
+                    {/* Ícone arredondado estilo App com tint da marca */}
+                    <div
+                      className="w-11 h-11 rounded-2xl flex items-center justify-center shadow-xs transition-transform group-hover:scale-105"
+                      style={{
+                        backgroundColor: hexToRgba(primaryColor, isDark ? 0.18 : 0.1),
+                        color: primaryColor,
+                      }}
+                    >
+                      {item.icon}
+                    </div>
+
+                    {/* Rótulo Compacto */}
+                    <span
+                      className={`mt-1.5 text-[11px] font-bold text-center truncate max-w-full ${
+                        isDark
+                          ? 'text-neutral-200 group-hover:text-white'
+                          : 'text-neutral-800 group-hover:text-neutral-950'
+                      }`}
+                    >
                       {item.title}
-                    </h4>
-                    <p className="text-[11px] text-neutral-500 truncate mt-0.5">
-                      {item.subtitle}
-                    </p>
-                  </div>
-                </div>
-              ))}
+                    </span>
+                  </button>
+                ))}
+              </div>
             </div>
           )}
 
-          {/* 5.1 SEÇÃO VISUAL: NOSSOS SERVIÇOS COM FOTO */}
+          {/* ======================================================= */}
+          {/* 4. NOSSOS SERVIÇOS: VITRINE VISUAL COM FOTOS GRANDES     */}
+          {/* ======================================================= */}
           {activeServicesList.length > 0 && (
-            <div className="mt-5 space-y-2.5">
+            <div className="space-y-3 pt-1">
               <div className="flex items-center justify-between px-0.5">
                 <div className="flex items-center gap-1.5">
-                  <Scissors className="w-3.5 h-3.5" style={{ color: primaryColor }} />
-                  <h3 className="text-[13px] font-bold text-neutral-800 tracking-tight">
+                  <span
+                    className="w-1.5 h-3 rounded-full"
+                    style={{ backgroundColor: primaryColor }}
+                  />
+                  <h3
+                    className={`text-sm font-black tracking-tight ${
+                      isDark ? 'text-white' : 'text-neutral-900'
+                    }`}
+                  >
                     Nossos Serviços
                   </h3>
+                  <span
+                    className={`text-[11px] font-bold px-2 py-0.2 rounded-full ${
+                      isDark ? 'border border-white/[0.08]' : ''
+                    }`}
+                    style={{
+                      backgroundColor: hexToRgba(primaryColor, isDark ? 0.2 : 0.1),
+                      color: isDark ? '#ffffff' : primaryColor,
+                    }}
+                  >
+                    {activeServicesList.length}
+                  </span>
                 </div>
+
                 <button
                   type="button"
                   onClick={() => setIsServicesOpen(true)}
-                  className="text-[11px] font-semibold flex items-center gap-0.5 cursor-pointer hover:opacity-80 transition-opacity"
+                  className="text-xs font-bold flex items-center gap-0.5 cursor-pointer hover:opacity-80 transition-opacity"
                   style={{ color: primaryColor }}
                 >
-                  <span>Ver todos ({activeServicesList.length})</span>
-                  <ChevronRight className="w-3 h-3" />
+                  <span>Ver todos</span>
+                  <ChevronRight className="w-3.5 h-3.5" />
                 </button>
               </div>
 
-              {/* Cards com foto dos serviços */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+              {/* Vitrine de Serviços: Cards Visuais com Fotos Maiores e Layout Moderno */}
+              <div className="space-y-3">
                 {activeServicesList.slice(0, 4).map((srv) => {
                   const srvPhoto = srv.photoUrl || (srv as unknown as { imageUrl?: string }).imageUrl || ''
                   const isConsult = srv.priceType === 'consult' || srv.price == null
+
                   return (
                     <div
                       key={srv.id}
+                      className={`rounded-3xl p-3 sm:p-3.5 flex flex-col sm:flex-row gap-3 transition-all cursor-pointer group relative overflow-hidden ${
+                        isDark
+                          ? 'bg-[#141419] hover:bg-[#191920] border border-white/[0.07] hover:border-white/15 shadow-md'
+                          : 'bg-white hover:border-neutral-300 border border-neutral-200/90 shadow-xs hover:shadow-md'
+                      }`}
+                      style={{
+                        boxShadow: isDark
+                          ? `0 6px 20px -4px rgba(0,0,0,0.5)`
+                          : `0 4px 16px -4px ${hexToRgba(primaryColor, 0.08)}`,
+                      }}
                       onClick={() => {
                         if (activeModules.appointments) {
                           setBookingService(srv)
@@ -748,142 +928,867 @@ export const PublicCompanyView: React.FC<PublicCompanyViewProps> = ({ company })
                           setIsServicesOpen(true)
                         }
                       }}
-                      className="bg-white border border-neutral-200/80 hover:border-violet-300 rounded-2xl p-2.5 flex items-center gap-3 shadow-2xs hover:shadow-xs transition-all cursor-pointer group"
                     >
-                      {/* Foto do Serviço */}
-                      {srvPhoto ? (
-                        <div className="relative w-14 h-14 rounded-xl overflow-hidden shrink-0 bg-neutral-100 border border-neutral-200/80 shadow-2xs">
-                          {/* eslint-disable-next-line @next/next/no-img-element */}
-                          <img
-                            src={srvPhoto}
-                            alt={srv.name}
-                            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-                            loading="lazy"
-                          />
-                        </div>
-                      ) : (
-                        <div
-                          className="w-14 h-14 rounded-xl flex items-center justify-center shrink-0 border"
-                          style={{
-                            backgroundColor: hexToRgba(primaryColor, 0.08),
-                            borderColor: hexToRgba(primaryColor, 0.15),
-                            color: primaryColor,
-                          }}
-                        >
-                          <Scissors className="w-5 h-5 opacity-80" />
-                        </div>
-                      )}
+                      <div className="flex items-start gap-3.5 w-full">
+                        {/* Foto Maior em Destaque Visual (Estilo Vitrine Comercial) */}
+                        {srvPhoto ? (
+                          <div
+                            className={`relative w-24 h-24 sm:w-26 sm:h-26 rounded-2xl overflow-hidden shrink-0 shadow-xs ${
+                              isDark
+                                ? 'bg-[#1a1a22] border border-white/[0.08]'
+                                : 'bg-neutral-100 border border-neutral-200/80'
+                            }`}
+                          >
+                            {/* eslint-disable-next-line @next/next/no-img-element */}
+                            <img
+                              src={srvPhoto}
+                              alt={srv.name}
+                              className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                              loading="lazy"
+                            />
+                            {srv.durationMinutes && (
+                              <div className="absolute bottom-1.5 left-1.5 px-1.5 py-0.5 rounded-md bg-black/70 backdrop-blur-xs text-[10px] font-bold text-white flex items-center gap-1 shadow-2xs">
+                                <Clock className="w-2.5 h-2.5" />
+                                <span>{srv.durationMinutes}m</span>
+                              </div>
+                            )}
+                          </div>
+                        ) : (
+                          <div
+                            className="w-24 h-24 sm:w-26 sm:h-26 rounded-2xl flex flex-col items-center justify-center shrink-0 border"
+                            style={{
+                              backgroundColor: hexToRgba(primaryColor, isDark ? 0.15 : 0.08),
+                              borderColor: hexToRgba(primaryColor, isDark ? 0.3 : 0.2),
+                              color: primaryColor,
+                            }}
+                          >
+                            <Scissors className="w-7 h-7 opacity-85 mb-1" />
+                            {srv.durationMinutes && (
+                              <span className="text-[10px] font-bold opacity-80">
+                                {srv.durationMinutes} min
+                              </span>
+                            )}
+                          </div>
+                        )}
 
-                      <div className="min-w-0 flex-1">
-                        <div className="flex items-center justify-between gap-1">
-                          <h4 className="font-bold text-neutral-900 text-xs truncate group-hover:text-violet-700 transition-colors">
-                            {srv.name}
-                          </h4>
-                          {srv.category && (
-                            <span className="text-[9px] font-semibold text-neutral-400 bg-neutral-100 px-1.5 py-0.5 rounded shrink-0">
-                              {srv.category}
-                            </span>
-                          )}
-                        </div>
-                        <div className="flex items-center gap-2 mt-0.5">
-                          {isConsult ? (
-                            <span className="text-[11px] font-bold text-violet-700">Consulte</span>
-                          ) : (
-                            <span className="text-xs font-bold font-mono text-neutral-900">
-                              R$ {srv.price?.toFixed(2).replace('.', ',')}
-                            </span>
-                          )}
-                          {srv.durationMinutes && (
-                            <span className="text-[10px] text-neutral-400 flex items-center gap-0.5">
-                              <Clock className="w-2.5 h-2.5" />
-                              {srv.durationMinutes} min
-                            </span>
-                          )}
+                        {/* Informações Completas do Serviço */}
+                        <div className="min-w-0 flex-1 flex flex-col justify-between self-stretch">
+                          <div>
+                            {srv.category && (
+                              <span
+                                className="text-[10px] font-bold uppercase tracking-wider block mb-0.5"
+                                style={{ color: primaryColor }}
+                              >
+                                {srv.category}
+                              </span>
+                            )}
+                            <h4
+                              className={`font-black text-sm sm:text-base leading-snug transition-colors ${
+                                isDark
+                                  ? 'text-white group-hover:text-neutral-100'
+                                  : 'text-neutral-900 group-hover:text-neutral-950'
+                              }`}
+                            >
+                              {srv.name}
+                            </h4>
+                            {srv.description && (
+                              <p
+                                className={`text-[11px] line-clamp-2 mt-1 leading-relaxed ${
+                                  isDark ? 'text-neutral-400' : 'text-neutral-500'
+                                }`}
+                              >
+                                {srv.description}
+                              </p>
+                            )}
+                          </div>
+
+                          {/* Preço e Botão de Agendamento */}
+                          <div
+                            className={`flex items-center justify-between gap-2 mt-2 pt-2 ${
+                              isDark ? 'border-t border-white/[0.06]' : 'border-t border-neutral-100'
+                            }`}
+                          >
+                            <div>
+                              <span
+                                className={`text-[10px] block font-medium ${
+                                  isDark ? 'text-neutral-500' : 'text-neutral-400'
+                                }`}
+                              >
+                                A partir de
+                              </span>
+                              {isConsult ? (
+                                <span
+                                  className="text-xs font-bold"
+                                  style={{ color: primaryColor }}
+                                >
+                                  Sob Consulta
+                                </span>
+                              ) : (
+                                <span
+                                  className={`text-sm sm:text-base font-black font-mono ${
+                                    isDark ? 'text-white' : 'text-neutral-900'
+                                  }`}
+                                >
+                                  R$ {srv.price?.toFixed(2).replace('.', ',')}
+                                </span>
+                              )}
+                            </div>
+
+                            {/* Botão de Agendar */}
+                            {activeModules.appointments ? (
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation()
+                                  setBookingService(srv)
+                                  setIsBookingOpen(true)
+                                }}
+                                className="px-3.5 py-1.5 rounded-xl text-xs font-extrabold text-white shadow-xs hover:opacity-90 active:scale-95 transition-all flex items-center gap-1.5 cursor-pointer"
+                                style={{
+                                  backgroundColor: primaryColor,
+                                  boxShadow: `0 4px 12px -2px ${hexToRgba(primaryColor, 0.45)}`,
+                                }}
+                              >
+                                <Calendar className="w-3 h-3" />
+                                <span>Agendar</span>
+                              </button>
+                            ) : (
+                              <div
+                                className="text-[11px] font-bold flex items-center gap-0.5"
+                                style={{ color: primaryColor }}
+                              >
+                                <span>Ver Mais</span>
+                                <ChevronRight className="w-3 h-3" />
+                              </div>
+                            )}
+                          </div>
                         </div>
                       </div>
                     </div>
                   )
                 })}
               </div>
-            </div>
-          )}
 
-          {/* 6. ATALHOS: LOCALIZAÇÃO, INSTAGRAM E OUTROS MÓDULOS ATIVOS */}
-          {(activeModules.location || activeModules.instagram) && (
-            <div className="mt-6 space-y-2.5">
-              {/* Atalho de Localização */}
-              {activeModules.location && (
-                <div
-                  onClick={handleOpenLocation}
-                  className="w-full bg-white border border-neutral-200/80 hover:border-neutral-300 rounded-2xl p-3 sm:p-3.5 flex items-center justify-between gap-3 shadow-2xs hover:shadow-xs active:scale-[0.99] transition-all cursor-pointer group"
-                  style={{ WebkitTapHighlightColor: 'transparent' }}
-                >
-                  <div className="flex items-center gap-3 min-w-0">
-                    <div className="w-9 h-9 rounded-xl bg-rose-50 text-rose-600 flex items-center justify-center shrink-0">
-                      <MapPin className="w-5 h-5" />
-                    </div>
-                    <div className="min-w-0">
-                      <p className="text-xs font-bold text-neutral-900 group-hover:text-rose-700 transition-colors truncate">
-                        Localização & Como Chegar
-                      </p>
-                      <p className="text-[11px] text-neutral-500 truncate mt-0.5">
-                        {company.addressText || 'Abrir rota no Google Maps'}
-                      </p>
-                    </div>
-                  </div>
-                  <div className="shrink-0 px-2.5 py-1 rounded-lg bg-rose-50 text-rose-700 text-[11px] font-bold group-hover:bg-rose-100 transition-colors">
-                    Rotas
-                  </div>
-                </div>
-              )}
-
-              {/* Atalho de Instagram */}
-              {activeModules.instagram && company.instagram && (
-                <div
-                  onClick={(e) => {
-                    e.preventDefault()
-                    const clean = company.instagram.replace(/^@/, '').trim()
-                    window.open(`https://www.instagram.com/${clean}/`, '_blank', 'noopener,noreferrer')
+              {/* Botão de Ver Catálogo Completo */}
+              {activeServicesList.length > 4 && (
+                <button
+                  type="button"
+                  onClick={() => setIsServicesOpen(true)}
+                  className={`w-full py-2.5 rounded-2xl border text-xs font-bold flex items-center justify-center gap-1.5 transition-colors cursor-pointer ${
+                    isDark
+                      ? 'hover:bg-white/[0.05]'
+                      : 'hover:bg-neutral-100'
+                  }`}
+                  style={{
+                    backgroundColor: hexToRgba(primaryColor, isDark ? 0.1 : 0.04),
+                    borderColor: hexToRgba(primaryColor, isDark ? 0.3 : 0.2),
+                    color: isDark ? '#ffffff' : primaryColor,
                   }}
-                  className="w-full bg-white border border-neutral-200/80 hover:border-neutral-300 rounded-2xl p-3 sm:p-3.5 flex items-center justify-between gap-3 shadow-2xs hover:shadow-xs active:scale-[0.99] transition-all cursor-pointer group"
-                  style={{ WebkitTapHighlightColor: 'transparent' }}
                 >
-                  <div className="flex items-center gap-3 min-w-0">
-                    <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-[#f09433] via-[#e6683c] to-[#bc1888] text-white flex items-center justify-center shrink-0 shadow-2xs">
-                      <Instagram className="w-5 h-5" />
-                    </div>
-                    <div className="min-w-0">
-                      <p className="text-xs font-bold text-neutral-900 group-hover:text-[#bc1888] transition-colors truncate">
-                        Instagram Oficial
-                      </p>
-                      <p className="text-[11px] text-neutral-500 truncate mt-0.5 font-mono">
-                        @{company.instagram.replace(/^@/, '')}
-                      </p>
-                    </div>
-                  </div>
-                  <div className="shrink-0 px-2.5 py-1 rounded-lg bg-pink-50 text-pink-700 text-[11px] font-bold group-hover:bg-pink-100 transition-colors flex items-center gap-1">
-                    <span>Seguir</span>
-                    <ExternalLink className="w-3 h-3" />
-                  </div>
-                </div>
+                  <span>Ver todos os {activeServicesList.length} serviços</span>
+                  <ChevronRight className="w-3.5 h-3.5" />
+                </button>
               )}
             </div>
           )}
+
+          {/* ======================================================= */}
+          {/* 5. SEÇÃO VISUAL: FIDELIDADE DIGITAL                     */}
+          {/* ======================================================= */}
+          {activeModules.loyalty && (
+            <div
+              className={`rounded-3xl p-5 border relative overflow-hidden space-y-4 ${
+                isDark
+                  ? 'border-white/[0.08] shadow-lg'
+                  : 'shadow-sm'
+              }`}
+              style={{
+                background: isDark
+                  ? `linear-gradient(135deg, ${hexToRgba(primaryColor, 0.18)} 0%, #131318 45%, ${hexToRgba(secondaryColor, 0.12)} 100%)`
+                  : `linear-gradient(135deg, ${hexToRgba(primaryColor, 0.05)} 0%, #ffffff 50%, ${hexToRgba(secondaryColor, 0.08)} 100%)`,
+                borderColor: hexToRgba(primaryColor, isDark ? 0.28 : 0.22),
+              }}
+            >
+              {/* Efeito decorativo sutil */}
+              <div
+                className="absolute top-0 right-0 w-36 h-36 rounded-full blur-2xl pointer-events-none opacity-25"
+                style={{ backgroundColor: primaryColor }}
+              />
+
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <div
+                    className="w-9 h-9 rounded-xl flex items-center justify-center shadow-xs"
+                    style={{
+                      background: gradientBg,
+                      color: contrastText,
+                    }}
+                  >
+                    <Gift className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <span
+                      className="text-[10px] font-bold uppercase tracking-wider block"
+                      style={{ color: primaryColor }}
+                    >
+                      Programa de Vantagens
+                    </span>
+                    <h3
+                      className={`text-sm font-black tracking-tight ${
+                        isDark ? 'text-white' : 'text-neutral-900'
+                      }`}
+                    >
+                      {loyaltyProgram.campaignName || 'Cartão Fidelidade'}
+                    </h3>
+                  </div>
+                </div>
+
+                {hasAvailableReward && (
+                  <span className="px-2.5 py-1 rounded-full bg-emerald-500/20 text-emerald-300 text-[10px] font-extrabold uppercase tracking-wide border border-emerald-500/40 flex items-center gap-1">
+                    <Award className="w-3 h-3" />
+                    <span>Prêmio Pronto!</span>
+                  </span>
+                )}
+              </div>
+
+              {/* Status dos Pontos & Progresso Visual */}
+              <div className="space-y-2">
+                <div className="flex items-end justify-between">
+                  <div>
+                    <span
+                      className={`text-[11px] ${
+                        isDark ? 'text-neutral-400' : 'text-neutral-500'
+                      }`}
+                    >
+                      Seu saldo atual
+                    </span>
+                    <p
+                      className={`text-base sm:text-lg font-black ${
+                        isDark ? 'text-white' : 'text-neutral-900'
+                      }`}
+                    >
+                      {customerPoints !== null ? `${customerPoints} ` : '0 '}
+                      <span
+                        className={`text-xs font-normal ${
+                          isDark ? 'text-neutral-400' : 'text-neutral-500'
+                        }`}
+                      >
+                        de {loyaltyProgram.goalPoints} pontos
+                      </span>
+                    </p>
+                  </div>
+                  <span
+                    className="text-xs font-bold font-mono"
+                    style={{ color: primaryColor }}
+                  >
+                    {loyaltyProgressPercent}%
+                  </span>
+                </div>
+
+                {/* Barra de Progresso Visual */}
+                <div
+                  className={`w-full h-2.5 rounded-full overflow-hidden p-0.5 ${
+                    isDark ? 'bg-neutral-800/90' : 'bg-neutral-200/80'
+                  }`}
+                >
+                  <div
+                    className="h-full rounded-full transition-all duration-500"
+                    style={{
+                      width: `${Math.max(5, loyaltyProgressPercent)}%`,
+                      background: gradientBg,
+                    }}
+                  />
+                </div>
+
+                {/* Carimbos Digitais de Progresso (Punch Card) */}
+                <div className="flex flex-wrap items-center justify-center gap-1.5 pt-1.5">
+                  {Array.from({
+                    length: Math.min(10, loyaltyProgram.goalPoints || 10),
+                  }).map((_, idx) => {
+                    const isEarned = (customerPoints || 0) > idx
+                    const isGoal = idx === Math.min(10, loyaltyProgram.goalPoints || 10) - 1
+
+                    return (
+                      <div
+                        key={idx}
+                        className={`w-7 h-7 sm:w-7.5 sm:h-7.5 rounded-full flex items-center justify-center text-[10px] font-black transition-all ${
+                          isEarned
+                            ? 'shadow-xs scale-105'
+                            : isGoal
+                            ? isDark
+                              ? 'border border-amber-500/50 text-amber-300 bg-amber-950/40'
+                              : 'border border-amber-300 text-amber-700 bg-amber-50'
+                            : isDark
+                            ? 'bg-neutral-800/80 border border-neutral-700/60 text-neutral-400'
+                            : 'bg-neutral-100 border border-neutral-200 text-neutral-400'
+                        }`}
+                        style={{
+                          background: isEarned ? gradientBg : undefined,
+                          color: isEarned ? contrastText : undefined,
+                        }}
+                      >
+                        {isEarned ? (
+                          <Check className="w-3.5 h-3.5 stroke-[3]" />
+                        ) : isGoal ? (
+                          <Gift className="w-3.5 h-3.5 text-amber-400" />
+                        ) : (
+                          <span>{idx + 1}</span>
+                        )}
+                      </div>
+                    )
+                  })}
+                </div>
+              </div>
+
+              {/* Recompensa */}
+              <div
+                className="p-3 rounded-2xl flex items-start gap-2.5 text-left border"
+                style={{
+                  backgroundColor: hexToRgba(primaryColor, isDark ? 0.12 : 0.05),
+                  borderColor: hexToRgba(primaryColor, isDark ? 0.28 : 0.15),
+                }}
+              >
+                <Sparkles
+                  className="w-4 h-4 shrink-0 mt-0.5"
+                  style={{ color: primaryColor }}
+                />
+                <div className="text-xs">
+                  <span
+                    className={`font-bold block ${
+                      isDark ? 'text-white' : 'text-neutral-900'
+                    }`}
+                  >
+                    Próxima Recompensa:
+                  </span>
+                  <span
+                    className={`leading-snug ${
+                      isDark ? 'text-neutral-300' : 'text-neutral-600'
+                    }`}
+                  >
+                    {loyaltyProgram.rewardDescription}
+                  </span>
+                </div>
+              </div>
+
+              {/* Botão de Ação: Ver Meu Cartão */}
+              <button
+                type="button"
+                onClick={() => setIsLoyaltyOpen(true)}
+                className="w-full py-2.5 px-4 rounded-xl text-xs font-bold shadow-xs hover:opacity-95 active:scale-[0.99] transition-all flex items-center justify-center gap-2 cursor-pointer"
+                style={{
+                  background: gradientBg,
+                  color: contrastText,
+                }}
+              >
+                <Gift className="w-3.5 h-3.5" />
+                <span>
+                  {hasAvailableReward ? 'Resgatar Prêmio Disponível' : 'Ver Meu Cartão Fidelidade'}
+                </span>
+              </button>
+            </div>
+          )}
+
+          {/* ======================================================= */}
+          {/* 6. SEÇÃO VISUAL: AVALIAÇÃO NO GOOGLE                    */}
+          {/* ======================================================= */}
+          {activeModules.googleReview && company.googleReviewUrl && (
+            <div
+              className={`rounded-3xl p-4.5 sm:p-5 space-y-3.5 ${
+                isDark
+                  ? 'bg-[#141419] border border-white/[0.07] shadow-sm'
+                  : 'bg-white border border-neutral-200/80 shadow-2xs'
+              }`}
+            >
+              <div className="flex items-center justify-between">
+                {/* Badge Oficial Google */}
+                <div className="flex items-center gap-2">
+                  <div
+                    className={`w-7 h-7 rounded-lg flex items-center justify-center font-bold text-xs shadow-2xs ${
+                      isDark
+                        ? 'bg-neutral-800/90 border border-white/10'
+                        : 'bg-neutral-100 border border-neutral-200/60'
+                    }`}
+                  >
+                    <span className="text-[#4285F4] font-black">G</span>
+                  </div>
+                  <div>
+                    <span
+                      className={`text-xs font-bold tracking-tight block ${
+                        isDark ? 'text-neutral-200' : 'text-neutral-800'
+                      }`}
+                    >
+                      Google Reviews
+                    </span>
+                    <div className="flex items-center gap-0.5 mt-0.5">
+                      {[...Array(5)].map((_, i) => (
+                        <Star
+                          key={i}
+                          className="w-3 h-3 fill-amber-400 text-amber-400"
+                        />
+                      ))}
+                    </div>
+                  </div>
+                </div>
+
+                <div className="text-right">
+                  <span
+                    className={`text-sm font-black block leading-none ${
+                      isDark ? 'text-white' : 'text-neutral-900'
+                    }`}
+                  >
+                    {company.rating ? company.rating.toFixed(1) : '4.9'}
+                  </span>
+                  <span
+                    className={`text-[10px] font-normal ${
+                      isDark ? 'text-neutral-400' : 'text-neutral-400'
+                    }`}
+                  >
+                    {company.reviewCount || '120+'} opiniões
+                  </span>
+                </div>
+              </div>
+
+              <div>
+                <h4
+                  className={`text-sm font-black tracking-tight ${
+                    isDark ? 'text-white' : 'text-neutral-900'
+                  }`}
+                >
+                  Sua opinião faz a diferença!
+                </h4>
+                <p
+                  className={`text-xs mt-0.5 leading-relaxed ${
+                    isDark ? 'text-neutral-400' : 'text-neutral-500'
+                  }`}
+                >
+                  Avalie sua experiência na {company.name} no Google. Leva menos de 1 minuto e nos ajuda muito a continuar evoluindo.
+                </p>
+              </div>
+
+              {/* Botão de Avaliar no Google */}
+              <button
+                type="button"
+                onClick={handleGoogleReview}
+                className="w-full py-2.5 px-4 rounded-xl bg-amber-500 hover:bg-amber-600 active:scale-[0.99] text-white font-bold text-xs flex items-center justify-center gap-2 shadow-xs transition-all cursor-pointer"
+              >
+                <Star className="w-3.5 h-3.5 fill-white text-white" />
+                <span>Avaliar no Google</span>
+                <ExternalLink className="w-3.5 h-3.5 opacity-80" />
+              </button>
+            </div>
+          )}
+
+          {/* ======================================================= */}
+          {/* 7. LOCALIZAÇÃO E CONTATO (COMPACTO & ELEGANTE NO FINAL) */}
+          {/* ======================================================= */}
+          {(activeModules.location ||
+            activeModules.whatsapp ||
+            activeModules.instagram ||
+            activeModules.wifi) && (
+            <div className="space-y-3 pt-1">
+              <div className="flex items-center justify-between px-0.5">
+                <div className="flex items-center gap-1.5">
+                  <span
+                    className="w-1.5 h-3 rounded-full"
+                    style={{ backgroundColor: primaryColor }}
+                  />
+                  <h3
+                    className={`text-xs font-extrabold uppercase tracking-wider ${
+                      isDark ? 'text-neutral-400' : 'text-neutral-600'
+                    }`}
+                  >
+                    Onde Estamos & Contato
+                  </h3>
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                {/* Localização & Como Chegar */}
+                {activeModules.location && (
+                  <div
+                    onClick={handleOpenLocation}
+                    className={`w-full rounded-2xl p-3 flex items-center justify-between gap-3 active:scale-[0.99] transition-all cursor-pointer group ${
+                      isDark
+                        ? 'bg-[#141419] hover:bg-[#1a1a22] border border-white/[0.07] hover:border-white/15'
+                        : 'bg-white border border-neutral-200/80 hover:border-neutral-300 shadow-2xs hover:shadow-xs'
+                    }`}
+                    style={{ WebkitTapHighlightColor: 'transparent' }}
+                  >
+                    <div className="flex items-center gap-3 min-w-0">
+                      <div
+                        className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 border ${
+                          isDark
+                            ? 'bg-rose-950/40 text-rose-400 border-rose-500/20'
+                            : 'bg-rose-50 text-rose-600 border-rose-100'
+                        }`}
+                      >
+                        <MapPin className="w-4.5 h-4.5" />
+                      </div>
+                      <div className="min-w-0">
+                        <p
+                          className={`text-xs font-bold transition-colors truncate ${
+                            isDark
+                              ? 'text-white group-hover:text-rose-400'
+                              : 'text-neutral-900 group-hover:text-rose-600'
+                          }`}
+                        >
+                          Localização
+                        </p>
+                        <p
+                          className={`text-[11px] truncate mt-0.5 ${
+                            isDark ? 'text-neutral-400' : 'text-neutral-500'
+                          }`}
+                        >
+                          {company.addressText || 'Ver rota no Google Maps'}
+                        </p>
+                      </div>
+                    </div>
+                    <div
+                      className={`shrink-0 px-2.5 py-1 rounded-lg text-[11px] font-bold transition-colors flex items-center gap-1 ${
+                        isDark
+                          ? 'bg-rose-950/40 text-rose-300 border border-rose-500/30 group-hover:bg-rose-900/50'
+                          : 'bg-rose-50 text-rose-700 group-hover:bg-rose-100'
+                      }`}
+                    >
+                      <Navigation className="w-3 h-3" />
+                      <span>Rotas</span>
+                    </div>
+                  </div>
+                )}
+
+                {/* WhatsApp */}
+                {activeModules.whatsapp && (
+                  <div
+                    onClick={handleOpenWhatsApp}
+                    className={`w-full rounded-2xl p-3 flex items-center justify-between gap-3 active:scale-[0.99] transition-all cursor-pointer group ${
+                      isDark
+                        ? 'bg-[#141419] hover:bg-[#1a1a22] border border-white/[0.07] hover:border-white/15'
+                        : 'bg-white border border-neutral-200/80 hover:border-neutral-300 shadow-2xs hover:shadow-xs'
+                    }`}
+                    style={{ WebkitTapHighlightColor: 'transparent' }}
+                  >
+                    <div className="flex items-center gap-3 min-w-0">
+                      <div
+                        className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 border ${
+                          isDark
+                            ? 'bg-emerald-950/40 text-emerald-400 border-emerald-500/20'
+                            : 'bg-emerald-50 text-emerald-600 border-emerald-100'
+                        }`}
+                      >
+                        <MessageCircle className="w-4.5 h-4.5" />
+                      </div>
+                      <div className="min-w-0">
+                        <p
+                          className={`text-xs font-bold transition-colors truncate ${
+                            isDark
+                              ? 'text-white group-hover:text-emerald-400'
+                              : 'text-neutral-900 group-hover:text-emerald-600'
+                          }`}
+                        >
+                          WhatsApp Oficial
+                        </p>
+                        <p
+                          className={`text-[11px] truncate mt-0.5 font-mono ${
+                            isDark ? 'text-neutral-400' : 'text-neutral-500'
+                          }`}
+                        >
+                          {company.whatsapp || 'Atendimento rápido'}
+                        </p>
+                      </div>
+                    </div>
+                    <div
+                      className={`shrink-0 px-2.5 py-1 rounded-lg text-[11px] font-bold transition-colors flex items-center gap-1 ${
+                        isDark
+                          ? 'bg-emerald-950/40 text-emerald-300 border border-emerald-500/30 group-hover:bg-emerald-900/50'
+                          : 'bg-emerald-50 text-emerald-700 group-hover:bg-emerald-100'
+                      }`}
+                    >
+                      <span>Conversar</span>
+                      <ArrowRight className="w-3 h-3" />
+                    </div>
+                  </div>
+                )}
+
+                {/* Instagram */}
+                {activeModules.instagram && company.instagram && (
+                  <div
+                    onClick={(e) => {
+                      e.preventDefault()
+                      const clean = company.instagram.replace(/^@/, '').trim()
+                      window.open(`https://www.instagram.com/${clean}/`, '_blank', 'noopener,noreferrer')
+                    }}
+                    className={`w-full rounded-2xl p-3 flex items-center justify-between gap-3 active:scale-[0.99] transition-all cursor-pointer group ${
+                      isDark
+                        ? 'bg-[#141419] hover:bg-[#1a1a22] border border-white/[0.07] hover:border-white/15'
+                        : 'bg-white border border-neutral-200/80 hover:border-neutral-300 shadow-2xs hover:shadow-xs'
+                    }`}
+                    style={{ WebkitTapHighlightColor: 'transparent' }}
+                  >
+                    <div className="flex items-center gap-3 min-w-0">
+                      <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-[#f09433] via-[#e6683c] to-[#bc1888] text-white flex items-center justify-center shrink-0 shadow-2xs">
+                        <Instagram className="w-4.5 h-4.5" />
+                      </div>
+                      <div className="min-w-0">
+                        <p
+                          className={`text-xs font-bold transition-colors truncate ${
+                            isDark
+                              ? 'text-white group-hover:text-[#e6683c]'
+                              : 'text-neutral-900 group-hover:text-[#bc1888]'
+                          }`}
+                        >
+                          Instagram
+                        </p>
+                        <p
+                          className={`text-[11px] truncate mt-0.5 font-mono ${
+                            isDark ? 'text-neutral-400' : 'text-neutral-500'
+                          }`}
+                        >
+                          @{company.instagram.replace(/^@/, '')}
+                        </p>
+                      </div>
+                    </div>
+                    <div
+                      className={`shrink-0 px-2.5 py-1 rounded-lg text-[11px] font-bold transition-colors flex items-center gap-1 ${
+                        isDark
+                          ? 'bg-pink-950/40 text-pink-300 border border-pink-500/30 group-hover:bg-pink-900/50'
+                          : 'bg-pink-50 text-pink-700 group-hover:bg-pink-100'
+                      }`}
+                    >
+                      <span>Seguir</span>
+                      <ExternalLink className="w-3.5 h-3.5" />
+                    </div>
+                  </div>
+                )}
+
+                {/* Wi-Fi Rápido */}
+                {activeModules.wifi && company.wifi?.ssid && (
+                  <div
+                    onClick={handleOpenWifi}
+                    className={`w-full rounded-2xl p-3 flex items-center justify-between gap-3 active:scale-[0.99] transition-all cursor-pointer group ${
+                      isDark
+                        ? 'bg-[#141419] hover:bg-[#1a1a22] border border-white/[0.07] hover:border-white/15'
+                        : 'bg-white border border-neutral-200/80 hover:border-neutral-300 shadow-2xs hover:shadow-xs'
+                    }`}
+                    style={{ WebkitTapHighlightColor: 'transparent' }}
+                  >
+                    <div className="flex items-center gap-3 min-w-0">
+                      <div
+                        className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 border ${
+                          isDark
+                            ? 'bg-sky-950/40 text-sky-400 border-sky-500/20'
+                            : 'bg-sky-50 text-sky-600 border-sky-100'
+                        }`}
+                      >
+                        <Wifi className="w-4.5 h-4.5" />
+                      </div>
+                      <div className="min-w-0">
+                        <p
+                          className={`text-xs font-bold transition-colors truncate ${
+                            isDark
+                              ? 'text-white group-hover:text-sky-400'
+                              : 'text-neutral-900 group-hover:text-sky-600'
+                          }`}
+                        >
+                          Wi-Fi do Local
+                        </p>
+                        <p
+                          className={`text-[11px] truncate mt-0.5 ${
+                            isDark ? 'text-neutral-400' : 'text-neutral-500'
+                          }`}
+                        >
+                          Rede: {company.wifi.ssid}
+                        </p>
+                      </div>
+                    </div>
+                    <div
+                      className={`shrink-0 px-2.5 py-1 rounded-lg text-[11px] font-bold transition-colors ${
+                        isDark
+                          ? 'bg-sky-950/40 text-sky-300 border border-sky-500/30 group-hover:bg-sky-900/50'
+                          : 'bg-sky-50 text-sky-700 group-hover:bg-sky-100'
+                      }`}
+                    >
+                      Conectar
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
         </div>
 
-        {/* DiretoLink Signature Footer */}
-        <footer className="mt-8 pt-5 pb-6 border-t border-neutral-100 text-center text-[11px] text-neutral-400 px-6 space-y-1">
-          <p className="font-medium text-neutral-600">© {company.name}</p>
-          <div className="flex items-center justify-center gap-1.5 text-[10px] text-neutral-400">
+        {/* ========================================================= */}
+        {/* RODAPÉ ELEGANTE DIRETO LINK                              */}
+        {/* ========================================================= */}
+        <footer
+          className={`mt-10 pt-5 pb-6 border-t text-center text-[11px] px-6 space-y-1.5 ${
+            isDark
+              ? 'border-white/[0.06] text-neutral-500'
+              : 'border-neutral-100 text-neutral-400'
+          }`}
+        >
+          <p
+            className={`font-semibold ${
+              isDark ? 'text-neutral-300' : 'text-neutral-600'
+            }`}
+          >
+            © {company.name}
+          </p>
+          <div
+            className={`flex items-center justify-center gap-1.5 text-[10px] ${
+              isDark ? 'text-neutral-500' : 'text-neutral-400'
+            }`}
+          >
             <span
               className="w-1.5 h-1.5 rounded-full"
               style={{ backgroundColor: primaryColor }}
             />
-            <span className="font-semibold text-neutral-600">DiretoLink • Uma conexão. Tudo mais perto.</span>
+            <span className={isDark ? 'font-medium text-neutral-400' : 'font-medium text-neutral-500'}>
+              DiretoLink • Uma conexão. Tudo mais perto.
+            </span>
           </div>
         </footer>
 
-        {/* MODALS / SHEETS (Preserving all existing business flows) */}
+        {/* ========================================================= */}
+        {/* BARRA INFERIOR FIXA (MOBILE APP ACTION DOCK)              */}
+        {/* ========================================================= */}
+        <div
+          className={`fixed bottom-0 inset-x-0 max-w-md mx-auto z-40 px-3.5 py-2.5 backdrop-blur-xl border-t flex items-center justify-between gap-2.5 transition-colors duration-200 ${
+            isDark
+              ? 'bg-[#0f0f14]/95 border-white/[0.08] shadow-[0_-8px_25px_rgba(0,0,0,0.6)]'
+              : 'bg-white/95 border-neutral-200/80 shadow-[0_-8px_25px_rgba(0,0,0,0.08)]'
+          }`}
+        >
+          {/* Ações Rápidas Secundárias */}
+          <div className="flex items-center gap-1 sm:gap-2">
+            <button
+              type="button"
+              onClick={() => {
+                if (typeof window !== 'undefined') {
+                  window.scrollTo({ top: 0, behavior: 'smooth' })
+                }
+              }}
+              className={`p-2 sm:p-2.5 rounded-xl transition-colors flex flex-col items-center gap-0.5 cursor-pointer ${
+                isDark
+                  ? 'text-neutral-400 hover:text-white hover:bg-white/[0.05]'
+                  : 'text-neutral-600 hover:text-neutral-900 hover:bg-neutral-100'
+              }`}
+              title="Início"
+            >
+              <Store className="w-4 h-4" />
+              <span className="text-[9px] font-medium hidden sm:inline">Início</span>
+            </button>
+
+            {activeModules.services && (
+              <button
+                type="button"
+                onClick={() => setIsServicesOpen(true)}
+                className={`p-2 sm:p-2.5 rounded-xl transition-colors flex flex-col items-center gap-0.5 cursor-pointer ${
+                  isDark
+                    ? 'text-neutral-400 hover:text-white hover:bg-white/[0.05]'
+                    : 'text-neutral-600 hover:text-neutral-900 hover:bg-neutral-100'
+                }`}
+                title="Serviços"
+              >
+                <Scissors className="w-4 h-4" />
+                <span className="text-[9px] font-medium hidden sm:inline">Serviços</span>
+              </button>
+            )}
+
+            {activeModules.loyalty && (
+              <button
+                type="button"
+                onClick={() => setIsLoyaltyOpen(true)}
+                className={`p-2 sm:p-2.5 rounded-xl transition-colors flex flex-col items-center gap-0.5 relative cursor-pointer ${
+                  isDark
+                    ? 'text-neutral-400 hover:text-amber-400 hover:bg-white/[0.05]'
+                    : 'text-neutral-600 hover:text-amber-700 hover:bg-amber-50'
+                }`}
+                title="Fidelidade"
+              >
+                <Gift className="w-4 h-4 text-amber-500" />
+                {hasAvailableReward && (
+                  <span className="absolute top-1 right-1 w-2 h-2 rounded-full bg-emerald-500 animate-ping" />
+                )}
+                <span className="text-[9px] font-medium hidden sm:inline">Fidelidade</span>
+              </button>
+            )}
+
+            {activeModules.whatsapp && (
+              <button
+                type="button"
+                onClick={handleOpenWhatsApp}
+                className={`p-2 sm:p-2.5 rounded-xl transition-colors flex flex-col items-center gap-0.5 cursor-pointer ${
+                  isDark
+                    ? 'text-emerald-400 hover:text-emerald-300 hover:bg-white/[0.05]'
+                    : 'text-emerald-600 hover:bg-emerald-50'
+                }`}
+                title="WhatsApp"
+              >
+                <MessageCircle className="w-4 h-4" />
+                <span className="text-[9px] font-medium hidden sm:inline">Contato</span>
+              </button>
+            )}
+          </div>
+
+          {/* Botão Principal de Conversão */}
+          {activeModules.appointments ? (
+            <button
+              type="button"
+              onClick={() => {
+                setBookingService(null)
+                setIsBookingOpen(true)
+              }}
+              className="flex-1 py-2.5 px-4 rounded-xl font-extrabold text-xs shadow-md hover:opacity-95 active:scale-95 transition-all flex items-center justify-center gap-1.5 cursor-pointer truncate"
+              style={{
+                background: gradientBg,
+                color: contrastText,
+              }}
+            >
+              <Calendar className="w-3.5 h-3.5 shrink-0" />
+              <span className="truncate">Agendar Horário</span>
+            </button>
+          ) : activeModules.whatsapp ? (
+            <button
+              type="button"
+              onClick={handleOpenWhatsApp}
+              className="flex-1 py-2.5 px-4 rounded-xl font-extrabold text-xs text-white bg-emerald-600 hover:bg-emerald-700 active:scale-95 shadow-md transition-all flex items-center justify-center gap-1.5 cursor-pointer truncate"
+            >
+              <MessageCircle className="w-3.5 h-3.5 shrink-0" />
+              <span className="truncate">Falar no WhatsApp</span>
+            </button>
+          ) : activeModules.services ? (
+            <button
+              type="button"
+              onClick={() => setIsServicesOpen(true)}
+              className="flex-1 py-2.5 px-4 rounded-xl font-extrabold text-xs shadow-md active:scale-95 transition-all flex items-center justify-center gap-1.5 cursor-pointer truncate"
+              style={{
+                background: gradientBg,
+                color: contrastText,
+              }}
+            >
+              <Scissors className="w-3.5 h-3.5 shrink-0" />
+              <span className="truncate">Ver Serviços</span>
+            </button>
+          ) : activeModules.loyalty ? (
+            <button
+              type="button"
+              onClick={() => setIsLoyaltyOpen(true)}
+              className="flex-1 py-2.5 px-4 rounded-xl font-extrabold text-xs shadow-md active:scale-95 transition-all flex items-center justify-center gap-1.5 cursor-pointer truncate"
+              style={{
+                background: gradientBg,
+                color: contrastText,
+              }}
+            >
+              <Gift className="w-3.5 h-3.5 shrink-0" />
+              <span className="truncate">Meu Cartão</span>
+            </button>
+          ) : null}
+        </div>
+
+        {/* ========================================================= */}
+        {/* MODAIS E SHEETS (TODAS AS FUNCIONALIDADES PRESERVADAS)    */}
+        {/* ========================================================= */}
         <LoyaltySheet
           isOpen={isLoyaltyOpen}
           onClose={() => setIsLoyaltyOpen(false)}
