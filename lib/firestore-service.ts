@@ -20,6 +20,7 @@ import {
   PrivateFeedback,
   CompanyService,
   CompanyProduct,
+  MenuItem,
   Appointment,
   AppointmentStatus,
   CompanyProfessional,
@@ -37,6 +38,7 @@ import {
   INITIAL_FEEDBACKS,
   INITIAL_SERVICES,
   INITIAL_PROFESSIONALS,
+  INITIAL_MENU_ITEMS,
 } from '@/lib/initial-data'
 
 // Collection references
@@ -48,6 +50,7 @@ const LOGS_COLLECTION = 'activityLogs'
 const SETTINGS_COLLECTION = 'settings'
 const SERVICES_COLLECTION = 'services'
 const PRODUCTS_COLLECTION = 'products'
+const MENU_ITEMS_COLLECTION = 'menuItems'
 const APPOINTMENTS_COLLECTION = 'appointments'
 const PROFESSIONALS_COLLECTION = 'professionals'
 const DELETED_COMPANIES_COLLECTION = 'deleted_companies'
@@ -175,7 +178,16 @@ export async function ensureFirestoreInitialized(): Promise<void> {
         }
       }
 
-      // 10. Mark migration as completed in Firestore
+      // 10. Migrate Menu Items
+      for (const item of INITIAL_MENU_ITEMS) {
+        const itemRef = doc(db, MENU_ITEMS_COLLECTION, item.id)
+        const itemDoc = await getDoc(itemRef)
+        if (!itemDoc.exists()) {
+          await setDoc(itemRef, item)
+        }
+      }
+
+      // 11. Mark migration as completed in Firestore
       await setDoc(settingsRef, {
         migrationCompleted: true,
         migratedAt: new Date().toISOString(),
@@ -1557,5 +1569,186 @@ export async function toggleFirestoreProductStatus(
     return { success: true }
   } catch (err) {
     handleFirestoreError(err, OperationType.WRITE, `${PRODUCTS_COLLECTION}/${productId}`)
+  }
+}
+
+// ==========================================
+// 9. MENU ITEMS (CARDÁPIO DIGITAL DIRETO LINK)
+// ==========================================
+
+export async function getFirestoreMenuItems(companyId?: string): Promise<MenuItem[]> {
+  try {
+    await ensureFirestoreInitialized()
+    const colRef = collection(db, MENU_ITEMS_COLLECTION)
+    let q
+    if (companyId) {
+      q = query(colRef, where('companyId', '==', companyId))
+    } else {
+      q = colRef
+    }
+    const snap = await getDocs(q)
+    const list: MenuItem[] = []
+    snap.forEach((d) => {
+      list.push(d.data() as MenuItem)
+    })
+
+    // If Firestore has no menu items for this company yet, fallback to INITIAL_MENU_ITEMS if applicable
+    if (list.length === 0 && companyId) {
+      const initMatch = INITIAL_MENU_ITEMS.filter((i) => i.companyId === companyId)
+      if (initMatch.length > 0) {
+        return initMatch
+      }
+    }
+
+    return list.sort((a, b) => {
+      const orderA = typeof a.order === 'number' ? a.order : 0
+      const orderB = typeof b.order === 'number' ? b.order : 0
+      if (orderA !== orderB) return orderA - orderB
+      return (b.createdAt || '').localeCompare(a.createdAt || '')
+    })
+  } catch (err) {
+    console.warn('Could not read menu items from Firestore (returning initial fallback):', err)
+    if (companyId) {
+      return INITIAL_MENU_ITEMS.filter((i) => i.companyId === companyId)
+    }
+    return INITIAL_MENU_ITEMS
+  }
+}
+
+export async function getFirestoreMenuItemById(
+  companyId: string,
+  itemId: string
+): Promise<MenuItem | null> {
+  await ensureFirestoreInitialized()
+  try {
+    const docRef = doc(db, MENU_ITEMS_COLLECTION, itemId)
+    const snap = await getDoc(docRef)
+    if (!snap.exists()) {
+      // Fallback check initial
+      const initItem = INITIAL_MENU_ITEMS.find((i) => i.id === itemId && i.companyId === companyId)
+      return initItem || null
+    }
+    const data = snap.data() as MenuItem
+    if (data.companyId !== companyId) return null
+    return data
+  } catch (err) {
+    handleFirestoreError(err, OperationType.GET, `${MENU_ITEMS_COLLECTION}/${itemId}`)
+  }
+}
+
+export async function saveFirestoreMenuItem(
+  item: MenuItem
+): Promise<{ success: boolean; menuItem?: MenuItem; error?: string }> {
+  if (!item.name || !item.name.trim()) {
+    return { success: false, error: 'Nome do item do cardápio é obrigatório.' }
+  }
+  if (!item.companyId) {
+    return { success: false, error: 'companyId é obrigatório.' }
+  }
+
+  // Handle photoUrl with base64 defense and conversion
+  let finalPhoto = item.photoUrl?.trim() || undefined
+  if (finalPhoto && isBase64Image(finalPhoto)) {
+    try {
+      const { uploadCompanyFileServer } = await import('@/lib/storage-service')
+      const matches = finalPhoto.match(/^data:([A-Za-z-+\/]+);base64,(.+)$/)
+      if (matches && matches[2]) {
+        const mime = matches[1]
+        const buf = Buffer.from(matches[2], 'base64')
+        const up = await uploadCompanyFileServer(item.companyId, 'menu', buf, 'menu_item.jpg', mime)
+        finalPhoto = up.url || undefined
+      }
+    } catch {
+      finalPhoto = undefined
+    }
+  }
+
+  await ensureFirestoreInitialized()
+  const now = new Date().toISOString()
+  const itemId = item.id || `mnu_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`
+
+  const itemToSave: Record<string, unknown> = {
+    id: itemId,
+    companyId: item.companyId,
+    name: item.name.trim(),
+    category: item.category?.trim() || 'Geral',
+    description: item.description?.trim() || '',
+    price: typeof item.price === 'number' && !isNaN(item.price) ? item.price : null,
+    priceType: item.priceType || (item.price != null ? 'fixed' : 'consult'),
+    promotionalPrice:
+      typeof item.promotionalPrice === 'number' && !isNaN(item.promotionalPrice)
+        ? item.promotionalPrice
+        : null,
+    isAvailable: item.isAvailable !== false,
+    isFeatured: Boolean(item.isFeatured),
+    order: typeof item.order === 'number' && !isNaN(item.order) ? item.order : 0,
+    sizes: Array.isArray(item.sizes) ? item.sizes : [],
+    flavorsMax: typeof item.flavorsMax === 'number' ? item.flavorsMax : 1,
+    flavors: Array.isArray(item.flavors) ? item.flavors : [],
+    extras: Array.isArray(item.extras) ? item.extras : [],
+    removableIngredients: Array.isArray(item.removableIngredients) ? item.removableIngredients : [],
+    allowNotes: item.allowNotes !== false,
+    isCustomBuilder: Boolean(item.isCustomBuilder),
+    customSteps: Array.isArray(item.customSteps) ? item.customSteps : [],
+    isActive: item.isActive !== false,
+    updatedAt: now,
+    createdAt: item.createdAt || now,
+    photoUrl: finalPhoto || '',
+  }
+
+  try {
+    const docRef = doc(db, MENU_ITEMS_COLLECTION, itemId)
+    await setDoc(docRef, itemToSave, { merge: true })
+    return { success: true, menuItem: itemToSave as unknown as MenuItem }
+  } catch (err) {
+    handleFirestoreError(err, OperationType.WRITE, `${MENU_ITEMS_COLLECTION}/${itemId}`)
+  }
+}
+
+export async function deleteFirestoreMenuItem(
+  itemId: string,
+  companyId: string
+): Promise<{ success: boolean; error?: string }> {
+  await ensureFirestoreInitialized()
+  try {
+    const docRef = doc(db, MENU_ITEMS_COLLECTION, itemId)
+    const snap = await getDoc(docRef)
+    if (!snap.exists()) {
+      return { success: true }
+    }
+    const data = snap.data() as MenuItem
+    if (data.companyId !== companyId) {
+      return { success: false, error: 'Operação não autorizada para este item do cardápio.' }
+    }
+    await deleteDoc(docRef)
+    return { success: true }
+  } catch (err) {
+    handleFirestoreError(err, OperationType.DELETE, `${MENU_ITEMS_COLLECTION}/${itemId}`)
+  }
+}
+
+export async function toggleFirestoreMenuItemStatus(
+  itemId: string,
+  companyId: string
+): Promise<{ success: boolean; isAvailable?: boolean; error?: string }> {
+  await ensureFirestoreInitialized()
+  try {
+    const docRef = doc(db, MENU_ITEMS_COLLECTION, itemId)
+    const snap = await getDoc(docRef)
+    if (!snap.exists()) {
+      return { success: false, error: 'Item do cardápio não encontrado.' }
+    }
+    const data = snap.data() as MenuItem
+    if (data.companyId !== companyId) {
+      return { success: false, error: 'Operação não autorizada.' }
+    }
+    const newAvailable = !data.isAvailable
+    await updateDoc(docRef, {
+      isAvailable: newAvailable,
+      updatedAt: new Date().toISOString(),
+    })
+    return { success: true, isAvailable: newAvailable }
+  } catch (err) {
+    handleFirestoreError(err, OperationType.WRITE, `${MENU_ITEMS_COLLECTION}/${itemId}`)
   }
 }

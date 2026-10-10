@@ -3,7 +3,7 @@
 import React, { useState, useEffect } from 'react'
 import Link from 'next/link'
 import { Store, ArrowLeft, AlertTriangle, Loader2 } from 'lucide-react'
-import { Company, CompanyProduct, CompanyService } from '@/types/platform'
+import { Company, CompanyProduct, CompanyService, MenuItem } from '@/types/platform'
 import { getCompanyBySlug, DATA_CHANGE_EVENT, saveCompanyLocally } from '@/lib/storage'
 import { PublicCompanyView } from '@/components/public/public-company-view'
 
@@ -12,6 +12,7 @@ interface EmpresaClientPageProps {
   initialCompany?: Company | null
   initialProducts?: CompanyProduct[]
   initialServices?: CompanyService[]
+  initialMenuItems?: MenuItem[]
 }
 
 export const EmpresaClientPage: React.FC<EmpresaClientPageProps> = ({
@@ -19,6 +20,7 @@ export const EmpresaClientPage: React.FC<EmpresaClientPageProps> = ({
   initialCompany,
   initialProducts,
   initialServices,
+  initialMenuItems,
 }) => {
   const [company, setCompany] = useState<Company | null>(initialCompany || null)
   const [isLoading, setIsLoading] = useState(!initialCompany)
@@ -141,6 +143,7 @@ export const EmpresaClientPage: React.FC<EmpresaClientPageProps> = ({
       company={company}
       initialProducts={initialProducts}
       initialServices={initialServices}
+      initialMenuItems={initialMenuItems}
     />
   )
 }

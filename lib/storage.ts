@@ -7,6 +7,7 @@ import {
   GlobalStats,
   CompanyService,
   CompanyProduct,
+  MenuItem,
   Appointment,
   AppointmentStatus,
   CompanyProfessional,
@@ -19,6 +20,7 @@ import {
   INITIAL_FEEDBACKS,
   INITIAL_SERVICES,
   INITIAL_PROFESSIONALS,
+  INITIAL_MENU_ITEMS,
 } from './initial-data'
 import { normalizePhone } from './utils'
 
@@ -30,6 +32,7 @@ const STORAGE_KEYS = {
   FEEDBACKS: 'nfc_tenant_feedbacks_v1',
   SERVICES: 'nfc_tenant_services_v1',
   PRODUCTS: 'nfc_tenant_products_v1',
+  MENU_ITEMS: 'nfc_tenant_menu_items_v1',
   APPOINTMENTS: 'nfc_tenant_appointments_v1',
   PROFESSIONALS: 'nfc_tenant_professionals_v1',
   DELETED_COMPANIES: 'nfc_tenant_deleted_companies_v1',
@@ -57,6 +60,7 @@ let memoryLogs: ActivityLog[] = [...INITIAL_LOGS]
 let memoryFeedbacks: PrivateFeedback[] = [...INITIAL_FEEDBACKS]
 let memoryServices: CompanyService[] = [...INITIAL_SERVICES]
 let memoryProducts: CompanyProduct[] = []
+let memoryMenuItems: MenuItem[] = [...INITIAL_MENU_ITEMS]
 let memoryAppointments: Appointment[] = []
 let memoryProfessionals: CompanyProfessional[] = [...INITIAL_PROFESSIONALS]
 
@@ -1258,10 +1262,12 @@ export function resetDemoData(): void {
   setItem(STORAGE_KEYS.FEEDBACKS, INITIAL_FEEDBACKS)
   setItem(STORAGE_KEYS.SERVICES, [])
   setItem(STORAGE_KEYS.PRODUCTS, [])
+  setItem(STORAGE_KEYS.MENU_ITEMS, INITIAL_MENU_ITEMS)
   setItem(STORAGE_KEYS.APPOINTMENTS, [])
   setItem(STORAGE_KEYS.PROFESSIONALS, [])
   memoryServices = []
   memoryProducts = []
+  memoryMenuItems = [...INITIAL_MENU_ITEMS]
   memoryAppointments = []
   memoryProfessionals = []
   notifyDataChange()
@@ -1517,6 +1523,146 @@ export async function toggleCompanyProductOnServerApi(
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ id: productId, companyId, toggleStatus: true }),
+    })
+    return res.ok
+  } catch {
+    return true
+  }
+}
+
+// ==========================================
+// 8.1 MENU ITEMS (CARDÁPIO DIGITAL DIRETO LINK)
+// ==========================================
+
+export function getCompanyMenuItems(companyId: string): MenuItem[] {
+  if (!isBrowser()) {
+    const list = memoryMenuItems.filter((i) => i.companyId === companyId)
+    if (list.length === 0) {
+      return INITIAL_MENU_ITEMS.filter((i) => i.companyId === companyId)
+    }
+    return list
+  }
+  const all = getItem<MenuItem[]>(STORAGE_KEYS.MENU_ITEMS, memoryMenuItems) || []
+  let compItems = all.filter((i) => i.companyId === companyId)
+  if (compItems.length === 0) {
+    compItems = INITIAL_MENU_ITEMS.filter((i) => i.companyId === companyId)
+  }
+  return compItems.sort((a, b) => {
+    const orderA = typeof a.order === 'number' ? a.order : 0
+    const orderB = typeof b.order === 'number' ? b.order : 0
+    if (orderA !== orderB) return orderA - orderB
+    return (b.createdAt || '').localeCompare(a.createdAt || '')
+  })
+}
+
+export function saveCompanyMenuItemLocally(item: MenuItem): void {
+  if (!isBrowser()) return
+  const all = getItem<MenuItem[]>(STORAGE_KEYS.MENU_ITEMS, memoryMenuItems) || []
+  const idx = all.findIndex((i) => i.id === item.id && i.companyId === item.companyId)
+  let updated: MenuItem[]
+  if (idx >= 0) {
+    updated = [...all]
+    updated[idx] = item
+  } else {
+    updated = [item, ...all]
+  }
+  memoryMenuItems = updated
+  setItem(STORAGE_KEYS.MENU_ITEMS, updated)
+  notifyDataChange()
+}
+
+export function deleteCompanyMenuItemLocally(itemId: string, companyId: string): void {
+  if (!isBrowser()) return
+  const all = getItem<MenuItem[]>(STORAGE_KEYS.MENU_ITEMS, memoryMenuItems) || []
+  const updated = all.filter((i) => !(i.id === itemId && i.companyId === companyId))
+  memoryMenuItems = updated
+  setItem(STORAGE_KEYS.MENU_ITEMS, updated)
+  notifyDataChange()
+}
+
+export async function fetchCompanyMenuItemsFromServer(companyId: string): Promise<MenuItem[]> {
+  if (!companyId) return []
+  try {
+    const res = await fetch(`/api/menu?companyId=${encodeURIComponent(companyId)}`)
+    if (res.ok) {
+      const data = await res.json()
+      if (Array.isArray(data.menuItems)) {
+        if (isBrowser()) {
+          const currentAll = getItem<MenuItem[]>(STORAGE_KEYS.MENU_ITEMS, memoryMenuItems) || []
+          const otherItems = currentAll.filter((i) => i.companyId !== companyId)
+          const merged = [...data.menuItems, ...otherItems]
+          memoryMenuItems = merged
+          setItem(STORAGE_KEYS.MENU_ITEMS, merged)
+          notifyDataChange()
+        }
+        return data.menuItems
+      }
+    }
+  } catch (err) {
+    console.error('Error fetching menu items from server:', err)
+  }
+  return getCompanyMenuItems(companyId)
+}
+
+export async function saveCompanyMenuItemOnServerApi(
+  item: MenuItem,
+  isEdit = false
+): Promise<{ success: boolean; menuItem?: MenuItem; error?: string }> {
+  if (!item.photoUrl || !item.photoUrl.startsWith('data:')) {
+    saveCompanyMenuItemLocally(item)
+  }
+  try {
+    const res = await fetch('/api/menu', {
+      method: isEdit ? 'PUT' : 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(item),
+    })
+    const data = await res.json()
+    if (res.ok && data.success) {
+      if (data.menuItem) {
+        saveCompanyMenuItemLocally(data.menuItem)
+      }
+      return { success: true, menuItem: data.menuItem }
+    } else {
+      return { success: false, error: data.error || 'Erro ao salvar item do cardápio.' }
+    }
+  } catch (err) {
+    console.error('Error saving menu item to server API:', err)
+    saveCompanyMenuItemLocally(item)
+    return { success: true, menuItem: item }
+  }
+}
+
+export async function deleteCompanyMenuItemOnServerApi(
+  itemId: string,
+  companyId: string
+): Promise<boolean> {
+  deleteCompanyMenuItemLocally(itemId, companyId)
+  try {
+    const res = await fetch(
+      `/api/menu?id=${encodeURIComponent(itemId)}&companyId=${encodeURIComponent(companyId)}`,
+      { method: 'DELETE' }
+    )
+    return res.ok
+  } catch {
+    return true
+  }
+}
+
+export async function toggleCompanyMenuItemStatusOnServerApi(
+  itemId: string,
+  companyId: string
+): Promise<boolean> {
+  const all = getCompanyMenuItems(companyId)
+  const current = all.find((i) => i.id === itemId)
+  if (current) {
+    saveCompanyMenuItemLocally({ ...current, isAvailable: !current.isAvailable })
+  }
+  try {
+    const res = await fetch('/api/menu', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id: itemId, companyId }),
     })
     return res.ok
   } catch {

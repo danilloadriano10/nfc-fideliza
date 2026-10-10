@@ -4,6 +4,7 @@ import {
   getServerCompanyBySlug,
   getServerProducts,
   getServerServices,
+  getServerMenuItems,
 } from '@/lib/server-storage'
 import { EmpresaClientPage } from './empresa-client-page'
 
@@ -41,6 +42,7 @@ export default async function EmpresaPage({ params }: PageProps) {
   const company = await getServerCompanyBySlug(slug)
   const initialProducts = company ? await getServerProducts(company.id) : []
   const initialServices = company ? await getServerServices(company.id) : []
+  const initialMenuItems = company ? await getServerMenuItems(company.id) : []
 
   return (
     <EmpresaClientPage
@@ -48,6 +50,7 @@ export default async function EmpresaPage({ params }: PageProps) {
       initialCompany={company}
       initialProducts={initialProducts}
       initialServices={initialServices}
+      initialMenuItems={initialMenuItems}
     />
   )
 }

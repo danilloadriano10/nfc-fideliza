@@ -13,7 +13,7 @@ export async function POST(req: NextRequest) {
       const file = formData.get('file') as File | null
       const companyId = String(formData.get('companyId') || '').trim()
       const rawType = String(formData.get('type') || 'logo').trim().toLowerCase()
-      const type = (rawType === 'product' ? 'product' : rawType === 'service' ? 'service' : rawType === 'cover' ? 'cover' : 'logo') as 'logo' | 'cover' | 'service' | 'product'
+      const type = (rawType === 'product' ? 'product' : rawType === 'menu' ? 'menu' : rawType === 'service' ? 'service' : rawType === 'cover' ? 'cover' : 'logo') as 'logo' | 'cover' | 'service' | 'product' | 'menu'
 
       if (!file) {
         return NextResponse.json(

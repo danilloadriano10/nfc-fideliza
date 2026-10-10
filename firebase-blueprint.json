@@ -171,6 +171,30 @@
         "updatedAt": { "type": "string", "format": "date-time" }
       },
       "required": ["id", "companyId", "name", "isActive"]
+    },
+    "MenuItem": {
+      "title": "MenuItem",
+      "description": "Establishment digital menu item with customizable options and multi-step builder.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128 },
+        "companyId": { "type": "string", "maxLength": 128 },
+        "name": { "type": "string", "maxLength": 150 },
+        "photoUrl": { "type": "string", "maxLength": 2048 },
+        "category": { "type": "string", "maxLength": 100 },
+        "description": { "type": "string", "maxLength": 1000 },
+        "price": { "type": "number" },
+        "priceType": { "type": "string", "enum": ["fixed", "consult"] },
+        "promotionalPrice": { "type": "number" },
+        "isAvailable": { "type": "boolean" },
+        "isFeatured": { "type": "boolean" },
+        "order": { "type": "number" },
+        "isCustomBuilder": { "type": "boolean" },
+        "isActive": { "type": "boolean" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "companyId", "name", "isAvailable", "isActive"]
     }
   },
   "firestore": {
@@ -201,6 +225,10 @@
     "/products/{productId}": {
       "schema": "Product",
       "description": "Catalog of company products."
+    },
+    "/menuItems/{menuItemId}": {
+      "schema": "MenuItem",
+      "description": "Catalog of digital menu items with options and stages."
     },
     "/appointments/{appointmentId}": {
       "schema": "Appointment",

@@ -26,8 +26,12 @@ import {
   Check,
   Package,
   ShoppingBag,
+  UtensilsCrossed,
+  Minus,
+  Plus,
+  Layers,
 } from 'lucide-react'
-import { Company, CompanyService, CompanyProduct } from '@/types/platform'
+import { Company, CompanyService, CompanyProduct, MenuItem } from '@/types/platform'
 import { LoyaltySheet } from './loyalty-sheet'
 import { WifiSheet } from './wifi-sheet'
 import { FeedbackSheet } from './feedback-sheet'
@@ -35,6 +39,8 @@ import { ServicesSheet } from './services-sheet'
 import { BookingSheet } from './booking-sheet'
 import { ProductsSheet } from './products-sheet'
 import { ProductDetailModal } from './product-detail-modal'
+import { MenuItemModal, CartItem } from './menu-item-modal'
+import { MenuCartDrawer } from './menu-cart-drawer'
 import {
   getLocalCustomerSession,
   getCustomerByPhone,
@@ -42,6 +48,8 @@ import {
   fetchCompanyServicesFromServer,
   getCompanyProducts,
   fetchCompanyProductsFromServer,
+  getCompanyMenuItems,
+  fetchCompanyMenuItemsFromServer,
   DATA_CHANGE_EVENT,
 } from '@/lib/storage'
 import {
@@ -54,6 +62,7 @@ interface PublicCompanyViewProps {
   company: Company
   initialProducts?: CompanyProduct[]
   initialServices?: CompanyService[]
+  initialMenuItems?: MenuItem[]
 }
 
 interface FeatureItem {
@@ -77,6 +86,7 @@ export const PublicCompanyView: React.FC<PublicCompanyViewProps> = ({
   company,
   initialProducts = [],
   initialServices = [],
+  initialMenuItems = [],
 }) => {
   const isDark = (company.theme || 'dark') === 'dark'
   const primaryColor = useMemo(
@@ -105,9 +115,16 @@ export const PublicCompanyView: React.FC<PublicCompanyViewProps> = ({
   const [bookingService, setBookingService] = useState<CompanyService | null>(null)
   const [services, setServices] = useState<CompanyService[]>(initialServices)
   const [products, setProducts] = useState<CompanyProduct[]>(initialProducts)
+  const [menuItems, setMenuItems] = useState<MenuItem[]>(() =>
+    initialMenuItems.length > 0 ? initialMenuItems : getCompanyMenuItems(company.id)
+  )
   const [selectedVitrineCategory, setSelectedVitrineCategory] = useState<string>('Todos')
+  const [selectedMenuCategory, setSelectedMenuCategory] = useState<string>('Todos')
   const [isProductsSheetOpen, setIsProductsSheetOpen] = useState(false)
   const [selectedProductDetail, setSelectedProductDetail] = useState<CompanyProduct | null>(null)
+  const [selectedMenuItemDetail, setSelectedMenuItemDetail] = useState<MenuItem | null>(null)
+  const [cart, setCart] = useState<CartItem[]>([])
+  const [isCartOpen, setIsCartOpen] = useState(false)
   const [coverError, setCoverError] = useState(false)
   const [logoError, setLogoError] = useState(false)
   const [copiedLink, setCopiedLink] = useState(false)
@@ -197,6 +214,29 @@ export const PublicCompanyView: React.FC<PublicCompanyViewProps> = ({
     }
   }, [company.id])
 
+  // Menu items data sync
+  useEffect(() => {
+    setMenuItems(getCompanyMenuItems(company.id))
+    fetchCompanyMenuItemsFromServer(company.id).then((items) => {
+      if (Array.isArray(items) && items.length > 0) setMenuItems(items)
+    })
+    const updateMenu = () => {
+      setMenuItems(getCompanyMenuItems(company.id))
+    }
+    window.addEventListener(DATA_CHANGE_EVENT, updateMenu)
+    window.addEventListener('storage', updateMenu)
+    return () => {
+      window.removeEventListener(DATA_CHANGE_EVENT, updateMenu)
+      window.removeEventListener('storage', updateMenu)
+    }
+  }, [company.id])
+
+  const isExternalMenu = useMemo(() => {
+    if (company.menuMode === 'external') return true
+    if (company.menuMode === 'internal') return false
+    return Boolean(company.menuUrl) && menuItems.length === 0
+  }, [company.menuMode, company.menuUrl, menuItems.length])
+
   const customerPhone = customerSession.phone
   const customerName = customerSession.name
   const customerPoints = customerSession.points
@@ -209,12 +249,17 @@ export const PublicCompanyView: React.FC<PublicCompanyViewProps> = ({
     }
   }, [company.googleReviewUrl])
 
-  // Open Menu
+  // Open Menu (External link or Scroll to internal cardápio)
   const handleOpenMenu = useCallback(() => {
-    if (company.menuUrl) {
+    if (isExternalMenu && company.menuUrl) {
       window.open(company.menuUrl, '_blank', 'noopener,noreferrer')
+    } else {
+      const el = document.getElementById('secao-cardapio')
+      if (el) {
+        el.scrollIntoView({ behavior: 'smooth' })
+      }
     }
-  }, [company.menuUrl])
+  }, [isExternalMenu, company.menuUrl])
 
   // Open WhatsApp
   const handleOpenWhatsApp = useCallback(() => {
@@ -331,7 +376,11 @@ export const PublicCompanyView: React.FC<PublicCompanyViewProps> = ({
       googleReview:
         Boolean(company.modules?.googleReview ?? true) &&
         Boolean(company.googleReviewUrl),
-      menu: Boolean(company.modules?.menu ?? true) && Boolean(company.menuUrl),
+      menu:
+        Boolean(company.modules?.menu ?? true) &&
+        (company.menuMode === 'internal' ||
+          Boolean(company.menuUrl) ||
+          menuItems.length > 0),
       wifi: Boolean(company.modules?.wifi ?? true) && Boolean(company.wifi?.ssid),
       location:
         Boolean(company.modules?.location ?? true) &&
@@ -340,7 +389,119 @@ export const PublicCompanyView: React.FC<PublicCompanyViewProps> = ({
       instagram:
         Boolean(company.modules?.instagram ?? true) && Boolean(company.instagram),
     }
-  }, [company, products.length, services.length])
+  }, [company, products.length, services.length, menuItems.length])
+
+  // Active menu items
+  const activeMenuItemsList = useMemo(() => {
+    return menuItems.filter((i) => i.isActive !== false)
+  }, [menuItems])
+
+  const menuCategories = useMemo(() => {
+    const cats = Array.from(
+      new Set(activeMenuItemsList.map((i) => i.category || 'Geral'))
+    ).filter(Boolean)
+    return ['Todos', ...cats]
+  }, [activeMenuItemsList])
+
+  const displayedMenuItems = useMemo(() => {
+    if (selectedMenuCategory === 'Todos') {
+      return activeMenuItemsList
+    }
+    return activeMenuItemsList.filter((i) => i.category === selectedMenuCategory)
+  }, [activeMenuItemsList, selectedMenuCategory])
+
+  // Cart operations
+  const handleAddToCart = useCallback((item: CartItem) => {
+    setCart((prev) => [...prev, item])
+    setSelectedMenuItemDetail(null)
+    setIsCartOpen(true)
+  }, [])
+
+  const handleDirectOrderWhatsApp = useCallback(
+    (item: CartItem) => {
+      setCart((prev) => [...prev, item])
+      setSelectedMenuItemDetail(null)
+
+      const phoneRaw = company.whatsapp || ''
+      const phoneClean = phoneRaw.replace(/\D/g, '')
+      const phoneWithDdi = phoneClean.startsWith('55') ? phoneClean : `55${phoneClean}`
+
+      const formatItemMoney = (val: number) => {
+        return new Intl.NumberFormat('pt-BR', {
+          style: 'currency',
+          currency: 'BRL',
+        }).format(val)
+      }
+
+      let message = `👋 Olá! Gostaria de pedir pelo cardápio da *${company.name}*:\n\n`
+      message += `1x *${item.menuItem.name}* — ${formatItemMoney(item.totalPrice)}\n`
+      if (item.options.size) {
+        message += `   • Tamanho: ${item.options.size.name}${
+          item.options.size.price > 0 ? ` (+${formatItemMoney(item.options.size.price)})` : ''
+        }\n`
+      }
+      if (item.options.flavors && item.options.flavors.length > 0) {
+        message += `   • Sabores: ${item.options.flavors.join(', ')}\n`
+      }
+      if (item.options.customSteps && item.options.customSteps.length > 0) {
+        item.options.customSteps.forEach((st) => {
+          if (st.selected && st.selected.length > 0) {
+            const opts = st.selected
+              .map((o) => `${o.name}${o.price > 0 ? ` (+${formatItemMoney(o.price)})` : ''}`)
+              .join(', ')
+            message += `   • ${st.stepTitle}: ${opts}\n`
+          }
+        })
+      }
+      if (item.options.extras && item.options.extras.length > 0) {
+        const ext = item.options.extras
+          .map((e) => `${e.name} (+${formatItemMoney(e.price)})`)
+          .join(', ')
+        message += `   • Adicionais: ${ext}\n`
+      }
+      if (item.options.removals && item.options.removals.length > 0) {
+        message += `   • Retirar: ${item.options.removals.join(', ')}\n`
+      }
+      if (item.options.notes) {
+        message += `   • Obs: "${item.options.notes}"\n`
+      }
+      message += `\n--------------------------------\n`
+      message += `💰 *Total do Pedido: ${formatItemMoney(item.totalPrice)}*\n`
+      message += `--------------------------------\n\n`
+      message += `Por favor, confirme o recebimento do pedido!`
+
+      const url = `https://wa.me/${phoneWithDdi}?text=${encodeURIComponent(message)}`
+      window.open(url, '_blank', 'noopener,noreferrer')
+    },
+    [company]
+  )
+
+  const handleUpdateCartQty = useCallback((cartItemId: string, newQty: number) => {
+    if (newQty <= 0) {
+      setCart((prev) => prev.filter((i) => i.id !== cartItemId))
+    } else {
+      setCart((prev) =>
+        prev.map((i) => {
+          if (i.id === cartItemId) {
+            return {
+              ...i,
+              quantity: newQty,
+              totalPrice: i.unitPrice * newQty,
+            }
+          }
+          return i
+        })
+      )
+    }
+  }, [])
+
+  const handleRemoveCartItem = useCallback((cartItemId: string) => {
+    setCart((prev) => prev.filter((i) => i.id !== cartItemId))
+  }, [])
+
+  const handleClearCart = useCallback(() => {
+    setCart([])
+  }, [])
 
   const loyaltyProgram = useMemo(() => {
     return (
@@ -733,11 +894,11 @@ export const PublicCompanyView: React.FC<PublicCompanyViewProps> = ({
     }
 
     // 7. Cardápio (Teal) se ativo
-    if (activeModules.menu && company.menuUrl) {
+    if (activeModules.menu) {
       list.push({
         id: 'menu',
         title: 'Cardápio',
-        subtitle: 'Ver cardápio',
+        subtitle: isExternalMenu ? 'Ver cardápio' : 'Ver opções & pedir',
         icon: <BookOpen className="w-5 h-5" />,
         iconContainerClass: isDark
           ? 'bg-teal-500/15 text-teal-400 border border-teal-500/25'
@@ -827,6 +988,7 @@ export const PublicCompanyView: React.FC<PublicCompanyViewProps> = ({
     handleOpenWifi,
     handleOpenMenu,
     handleOpenCatalogExternal,
+    isExternalMenu,
   ])
 
   // Calculate loyalty percentage
@@ -1745,6 +1907,311 @@ export const PublicCompanyView: React.FC<PublicCompanyViewProps> = ({
           )}
 
           {/* ======================================================= */}
+          {/* 4.7. SEÇÃO VISUAL: CARDÁPIO DIGITAL DIRETO LINK        */}
+          {/* ======================================================= */}
+          {activeModules.menu && !isExternalMenu && activeMenuItemsList.length > 0 && (
+            <div
+              id="secao-cardapio"
+              className={`rounded-3xl p-4.5 sm:p-5 space-y-4 border ${
+                isDark
+                  ? 'bg-[#121217] border-white/[0.08] shadow-sm'
+                  : 'bg-white border-neutral-200/80 shadow-2xs'
+              }`}
+            >
+              {/* Cabeçalho do Cardápio */}
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2.5">
+                  <div
+                    className="w-9 h-9 rounded-xl flex items-center justify-center shadow-xs text-white"
+                    style={{ backgroundColor: primaryColor }}
+                  >
+                    <UtensilsCrossed className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <span
+                      className="text-[10px] font-bold uppercase tracking-wider block"
+                      style={{ color: primaryColor }}
+                    >
+                      Cardápio Digital
+                    </span>
+                    <div className="flex items-center gap-2">
+                      <h3
+                        className={`text-sm sm:text-base font-black tracking-tight ${
+                          isDark ? 'text-white' : 'text-neutral-900'
+                        }`}
+                      >
+                        Nossas Opções
+                      </h3>
+                      <span
+                        className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
+                          isDark
+                            ? 'bg-white/10 text-neutral-300'
+                            : 'bg-neutral-100 text-neutral-700'
+                        }`}
+                      >
+                        {activeMenuItemsList.length} {activeMenuItemsList.length === 1 ? 'item' : 'itens'}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+
+                {cart.length > 0 && (
+                  <button
+                    type="button"
+                    onClick={() => setIsCartOpen(true)}
+                    className="px-3 py-1.5 rounded-xl bg-teal-600 hover:bg-teal-500 text-white font-bold text-xs flex items-center gap-1.5 shadow-md shadow-teal-600/20 transition-all cursor-pointer"
+                  >
+                    <ShoppingBag className="w-3.5 h-3.5" />
+                    <span>Ver Pedido ({cart.reduce((a, b) => a + b.quantity, 0)})</span>
+                  </button>
+                )}
+              </div>
+
+              {/* Filtro de Categorias */}
+              {menuCategories.length > 1 && (
+                <div className="flex items-center gap-1.5 overflow-x-auto pb-1.5 scrollbar-none">
+                  {menuCategories.map((cat) => {
+                    const isSelected = selectedMenuCategory === cat
+                    return (
+                      <button
+                        key={cat}
+                        type="button"
+                        onClick={() => setSelectedMenuCategory(cat)}
+                        className={`px-3 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap transition-all cursor-pointer ${
+                          isSelected
+                            ? 'text-white shadow-xs'
+                            : isDark
+                              ? 'bg-white/[0.05] hover:bg-white/10 text-neutral-300'
+                              : 'bg-neutral-100 hover:bg-neutral-200/80 text-neutral-700'
+                        }`}
+                        style={
+                          isSelected
+                            ? { backgroundColor: primaryColor }
+                            : undefined
+                        }
+                      >
+                        {cat}
+                      </button>
+                    )
+                  })}
+                </div>
+              )}
+
+              {/* Grade de Itens do Cardápio */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
+                {displayedMenuItems.map((item) => {
+                  const hasPromo =
+                    item.promotionalPrice != null &&
+                    typeof item.price === 'number' &&
+                    item.promotionalPrice < item.price
+                  const isSoldOut = item.isAvailable === false
+
+                  const formatMoney = (val?: number | null) => {
+                    if (val == null) return ''
+                    return new Intl.NumberFormat('pt-BR', {
+                      style: 'currency',
+                      currency: 'BRL',
+                    }).format(val)
+                  }
+
+                  return (
+                    <div
+                      key={item.id}
+                      onClick={() => {
+                        if (!isSoldOut) setSelectedMenuItemDetail(item)
+                      }}
+                      className={`rounded-2xl p-3 border transition-all flex flex-col justify-between gap-3 ${
+                        isSoldOut
+                          ? 'opacity-65 cursor-not-allowed'
+                          : 'cursor-pointer hover:border-teal-500/50 hover:shadow-md'
+                      } ${
+                        isDark
+                          ? 'bg-white/[0.03] border-white/[0.06]'
+                          : 'bg-neutral-50/70 border-neutral-200/80'
+                      }`}
+                    >
+                      <div className="flex gap-3">
+                        {/* Foto com Thumbnail */}
+                        <div className="relative w-20 h-20 sm:w-24 sm:h-24 rounded-xl overflow-hidden shrink-0 bg-neutral-800">
+                          {item.photoUrl ? (
+                            <img
+                              src={item.photoUrl}
+                              alt={item.name}
+                              className="w-full h-full object-cover"
+                              onError={(e) => {
+                                ;(e.target as HTMLElement).style.display = 'none'
+                              }}
+                            />
+                          ) : (
+                            <div className="w-full h-full flex items-center justify-center text-neutral-500">
+                              <UtensilsCrossed className="w-6 h-6 opacity-40" />
+                            </div>
+                          )}
+                          {hasPromo && (
+                            <span className="absolute top-1 left-1 px-1.5 py-0.5 rounded-full text-[8px] font-black uppercase bg-rose-600 text-white shadow-xs">
+                              Promo
+                            </span>
+                          )}
+                          {isSoldOut && (
+                            <span className="absolute inset-0 bg-black/70 flex items-center justify-center text-[10px] font-extrabold uppercase text-rose-300">
+                              Esgotado
+                            </span>
+                          )}
+                        </div>
+
+                        {/* Informações */}
+                        <div className="flex-1 min-w-0 space-y-1">
+                          <div className="flex items-center gap-1.5 flex-wrap">
+                            {item.category && (
+                              <span className="text-[9px] font-bold uppercase tracking-wider text-neutral-400 block truncate">
+                                {item.category}
+                              </span>
+                            )}
+                            {item.isFeatured && (
+                              <span className="text-[9px] font-bold text-amber-500 flex items-center gap-0.5">
+                                <Sparkles className="w-2.5 h-2.5" />
+                                <span>Destaque</span>
+                              </span>
+                            )}
+                            {item.isCustomBuilder && (
+                              <span className="text-[9px] font-bold text-violet-400 flex items-center gap-0.5">
+                                <Layers className="w-2.5 h-2.5" />
+                                <span>Monte seu pedido</span>
+                              </span>
+                            )}
+                          </div>
+
+                          <h4
+                            className={`font-bold text-xs sm:text-sm leading-snug line-clamp-1 ${
+                              isDark ? 'text-white' : 'text-neutral-900'
+                            }`}
+                          >
+                            {item.name}
+                          </h4>
+
+                          {item.description && (
+                            <p
+                              className={`text-[11px] line-clamp-2 leading-relaxed ${
+                                isDark ? 'text-neutral-400' : 'text-neutral-500'
+                              }`}
+                            >
+                              {item.description}
+                            </p>
+                          )}
+
+                          {/* Preço */}
+                          <div className="flex items-baseline gap-1.5 pt-1">
+                            {hasPromo ? (
+                              <>
+                                <span className="text-xs sm:text-sm font-extrabold text-emerald-500">
+                                  {formatMoney(item.promotionalPrice)}
+                                </span>
+                                <span className="text-[10px] text-neutral-400 line-through">
+                                  {formatMoney(item.price)}
+                                </span>
+                              </>
+                            ) : item.price != null ? (
+                              <span
+                                className={`text-xs sm:text-sm font-extrabold ${
+                                  isDark ? 'text-white' : 'text-neutral-900'
+                                }`}
+                              >
+                                {formatMoney(item.price)}
+                              </span>
+                            ) : (
+                              <span className="text-xs font-semibold text-neutral-400">
+                                Sob consulta
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Botão de Ação */}
+                      <div className="pt-2 border-t border-neutral-200/40 dark:border-white/[0.06] flex items-center justify-between">
+                        <div className="flex items-center gap-1 text-[10px] text-neutral-400">
+                          {item.sizes && item.sizes.length > 0 && (
+                            <span>{item.sizes.length} tamanhos</span>
+                          )}
+                          {item.extras && item.extras.length > 0 && (
+                            <span>• +adicionais</span>
+                          )}
+                          {item.isCustomBuilder && (
+                            <span>• {item.customSteps?.length || 0} etapas</span>
+                          )}
+                        </div>
+
+                        <button
+                          type="button"
+                          disabled={isSoldOut}
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            if (!isSoldOut) setSelectedMenuItemDetail(item)
+                          }}
+                          className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1 ${
+                            isSoldOut
+                              ? 'opacity-40 cursor-not-allowed bg-neutral-500 text-white'
+                              : 'bg-teal-600 hover:bg-teal-500 text-white shadow-xs cursor-pointer active:scale-95'
+                          }`}
+                        >
+                          <Plus className="w-3.5 h-3.5" />
+                          <span>{item.isCustomBuilder ? 'Montar' : 'Pedir'}</span>
+                        </button>
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
+            </div>
+          )}
+
+          {/* Banner do Cardápio Externo se modo externo configurado */}
+          {activeModules.menu && isExternalMenu && company.menuUrl && (
+            <div
+              className={`rounded-3xl p-4.5 sm:p-5 border flex items-center justify-between gap-3 ${
+                isDark
+                  ? 'bg-[#121217] border-white/[0.08] shadow-sm'
+                  : 'bg-white border-neutral-200/80 shadow-2xs'
+              }`}
+            >
+              <div className="flex items-center gap-3 min-w-0">
+                <div
+                  className="w-10 h-10 rounded-2xl flex items-center justify-center text-white shadow-xs shrink-0"
+                  style={{ backgroundColor: primaryColor }}
+                >
+                  <BookOpen className="w-5 h-5" />
+                </div>
+                <div className="min-w-0">
+                  <h4
+                    className={`font-black text-xs sm:text-sm truncate ${
+                      isDark ? 'text-white' : 'text-neutral-900'
+                    }`}
+                  >
+                    Cardápio Digital
+                  </h4>
+                  <p
+                    className={`text-[11px] truncate mt-0.5 ${
+                      isDark ? 'text-neutral-400' : 'text-neutral-500'
+                    }`}
+                  >
+                    Acesse nosso cardápio completo e confira todas as opções
+                  </p>
+                </div>
+              </div>
+
+              <button
+                type="button"
+                onClick={handleOpenMenu}
+                className="px-4 py-2.5 rounded-xl font-bold text-xs text-white shadow-sm flex items-center gap-1.5 shrink-0 transition-opacity hover:opacity-90 active:scale-95 cursor-pointer"
+                style={{ backgroundColor: primaryColor }}
+              >
+                <span>Abrir Cardápio</span>
+                <ExternalLink className="w-3.5 h-3.5 opacity-80" />
+              </button>
+            </div>
+          )}
+
+          {/* ======================================================= */}
           {/* 5. SEÇÃO VISUAL: FIDELIDADE DIGITAL                     */}
           {/* ======================================================= */}
           {activeModules.loyalty && (
@@ -2182,6 +2649,23 @@ export const PublicCompanyView: React.FC<PublicCompanyViewProps> = ({
               </button>
             )}
 
+            {/* Botão de Cardápio no Dock se ativo */}
+            {activeModules.menu && (
+              <button
+                type="button"
+                onClick={handleOpenMenu}
+                className={`p-2 sm:p-2.5 rounded-xl transition-colors flex flex-col items-center gap-0.5 cursor-pointer ${
+                  isDark
+                    ? 'text-neutral-400 hover:text-teal-400 hover:bg-white/[0.05]'
+                    : 'text-neutral-600 hover:text-teal-700 hover:bg-teal-50'
+                }`}
+                title="Cardápio"
+              >
+                <UtensilsCrossed className="w-4 h-4 text-teal-500" />
+                <span className="text-[9px] font-medium hidden sm:inline">Cardápio</span>
+              </button>
+            )}
+
             {activeModules.loyalty && (
               <button
                 type="button"
@@ -2337,6 +2821,57 @@ export const PublicCompanyView: React.FC<PublicCompanyViewProps> = ({
           onClose={() => setSelectedProductDetail(null)}
           company={company}
         />
+
+        {/* Modal de Personalização do Item do Cardápio */}
+        {selectedMenuItemDetail && (
+          <MenuItemModal
+            item={selectedMenuItemDetail}
+            company={company}
+            isDark={isDark}
+            onClose={() => setSelectedMenuItemDetail(null)}
+            onAddToCart={handleAddToCart}
+            onDirectOrderWhatsApp={handleDirectOrderWhatsApp}
+          />
+        )}
+
+        {/* Drawer do Carrinho / Resumo do Pedido */}
+        <MenuCartDrawer
+          isOpen={isCartOpen}
+          cart={cart}
+          company={company}
+          isDark={isDark}
+          onClose={() => setIsCartOpen(false)}
+          onUpdateQuantity={handleUpdateCartQty}
+          onRemoveItem={handleRemoveCartItem}
+          onClearCart={handleClearCart}
+        />
+
+        {/* Botão Flutuante do Carrinho quando houver itens */}
+        {cart.length > 0 && !isCartOpen && (
+          <div className="fixed bottom-20 sm:bottom-6 right-4 sm:right-6 z-40 animate-in fade-in slide-in-from-bottom-4 duration-200">
+            <button
+              type="button"
+              onClick={() => setIsCartOpen(true)}
+              className="px-4 py-3 rounded-2xl bg-teal-600 hover:bg-teal-500 text-white font-bold text-xs shadow-xl shadow-teal-950/40 flex items-center gap-2.5 transition-all transform active:scale-95 cursor-pointer border border-teal-400/30"
+            >
+              <ShoppingBag className="w-4 h-4" />
+              <span>
+                {cart.reduce((a, b) => a + b.quantity, 0)}{' '}
+                {cart.reduce((a, b) => a + b.quantity, 0) === 1 ? 'item' : 'itens'}
+              </span>
+              <span className="w-1 h-1 rounded-full bg-white/50" />
+              <span>
+                {new Intl.NumberFormat('pt-BR', {
+                  style: 'currency',
+                  currency: 'BRL',
+                }).format(cart.reduce((a, b) => a + b.totalPrice, 0))}
+              </span>
+              <span className="ml-1 px-1.5 py-0.5 rounded-md bg-white/20 text-[10px] uppercase font-black tracking-wider">
+                Ver Pedido
+              </span>
+            </button>
+          </div>
+        )}
       </main>
     </div>
   )

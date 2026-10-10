@@ -45,6 +45,7 @@ import {
   Moon,
   Sun,
   Package,
+  UtensilsCrossed,
 } from 'lucide-react'
 import confetti from 'canvas-confetti'
 import { BRAND_COLOR_PRESETS, sanitizeHex, getGradientContrastTextColor } from '@/lib/colors'
@@ -60,6 +61,7 @@ import {
   getCompanyCustomers,
   getCompanyServices,
   getCompanyProducts,
+  getCompanyMenuItems,
   getCompanyAppointments,
   getCompanyActivityLogs,
   getCompanyFeedbacks,
@@ -84,6 +86,7 @@ import { CompanyOnboardingModal } from './company-onboarding-modal'
 import { ServicesTab } from './services-tab'
 import { AppointmentsTab } from './appointments-tab'
 import { ProductsTab } from './products-tab'
+import { MenuTab } from './menu-tab'
 
 const PRESET_BANNERS = [
   { label: '☕ Cafeteria / Café', url: '/images/cafe_central_banner_1791003956057.jpg' },
@@ -100,6 +103,7 @@ type TabType =
   | 'services'
   | 'appointments'
   | 'products'
+  | 'menu'
   | 'customers'
   | 'loyalty'
   | 'rewards'
@@ -432,6 +436,7 @@ export const CompanyPanelView: React.FC<CompanyPanelViewProps> = ({
   const totalCustomers = customers.length
   const servicesCount = getCompanyServices(company.id).length
   const productsCount = getCompanyProducts(company.id).length
+  const menuItemsCount = getCompanyMenuItems(company.id).length
   const allAppointments = getCompanyAppointments(company.id)
   const pendingAppointmentsCount = allAppointments.filter((a) => a.status === 'pending').length
   const totalPoints = logs.reduce((acc, l) => acc + (l.pointsChange || 0), 0)
@@ -577,6 +582,12 @@ export const CompanyPanelView: React.FC<CompanyPanelViewProps> = ({
               label: 'Produtos',
               count: productsCount > 0 ? productsCount : undefined,
               icon: Package,
+            },
+            {
+              id: 'menu',
+              label: 'Cardápio',
+              count: menuItemsCount > 0 ? menuItemsCount : undefined,
+              icon: UtensilsCrossed,
             },
             { id: 'customers', label: 'Clientes', count: totalCustomers, icon: Users },
             { id: 'loyalty', label: 'Fidelidade', icon: Gift },
@@ -886,6 +897,19 @@ export const CompanyPanelView: React.FC<CompanyPanelViewProps> = ({
             company={company}
             onEnableModule={() => setActiveTab('settings')}
             onOpenSettings={() => setActiveTab('settings')}
+          />
+        )}
+
+        {/* ============================================== */}
+        {/* TAB 1.8: CARDÁPIO */}
+        {/* ============================================== */}
+        {activeTab === 'menu' && (
+          <MenuTab
+            company={company}
+            onCompanyUpdate={(updated) => {
+              setCompany(updated)
+              setFormData(updated)
+            }}
           />
         )}
 
@@ -2176,16 +2200,73 @@ export const CompanyPanelView: React.FC<CompanyPanelViewProps> = ({
                 </div>
 
                 <div>
-                  <label className="block text-xs font-semibold text-neutral-700 mb-1">
-                    Link do Cardápio
-                  </label>
-                  <input
-                    type="url"
-                    value={formData.menuUrl || ''}
-                    onChange={(e) => setFormData({ ...formData, menuUrl: e.target.value })}
-                    placeholder="https://cardapio.meusite.com.br"
-                    className="w-full px-3 py-2 rounded-xl border border-neutral-300 text-xs font-mono"
-                  />
+                  <div className="flex items-center justify-between mb-1">
+                    <label className="block text-xs font-semibold text-neutral-700">
+                      Cardápio (Externo ou DiretoLink)
+                    </label>
+                    <button
+                      type="button"
+                      onClick={() => setActiveTab('menu')}
+                      className="text-[11px] font-bold text-teal-700 hover:underline flex items-center gap-1"
+                    >
+                      <UtensilsCrossed className="w-3 h-3" />
+                      <span>Gerenciar Cardápio</span>
+                    </button>
+                  </div>
+                  <div className="flex items-center gap-2 mb-2">
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setFormData({
+                          ...formData,
+                          menuMode: 'external',
+                        })
+                      }
+                      className={`px-2.5 py-1 text-[11px] rounded-lg font-semibold transition-all ${
+                        formData.menuMode !== 'internal'
+                          ? 'bg-teal-600 text-white'
+                          : 'bg-neutral-100 text-neutral-600 hover:bg-neutral-200'
+                      }`}
+                    >
+                      1. Link Externo
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setFormData({
+                          ...formData,
+                          menuMode: 'internal',
+                        })
+                      }
+                      className={`px-2.5 py-1 text-[11px] rounded-lg font-semibold transition-all ${
+                        formData.menuMode === 'internal'
+                          ? 'bg-teal-600 text-white'
+                          : 'bg-neutral-100 text-neutral-600 hover:bg-neutral-200'
+                      }`}
+                    >
+                      2. Cardápio DiretoLink
+                    </button>
+                  </div>
+                  {formData.menuMode !== 'internal' ? (
+                    <input
+                      type="url"
+                      value={formData.menuUrl || ''}
+                      onChange={(e) => setFormData({ ...formData, menuUrl: e.target.value })}
+                      placeholder="https://cardapio.meusite.com.br"
+                      className="w-full px-3 py-2 rounded-xl border border-neutral-300 text-xs font-mono"
+                    />
+                  ) : (
+                    <div className="p-2.5 rounded-xl bg-teal-50 border border-teal-200 text-xs text-teal-900 flex items-center justify-between">
+                      <span>Cardápio digital DiretoLink configurado</span>
+                      <button
+                        type="button"
+                        onClick={() => setActiveTab('menu')}
+                        className="px-2.5 py-1 bg-teal-600 text-white rounded-lg text-[11px] font-bold hover:bg-teal-700 transition-all"
+                      >
+                        Ver Itens
+                      </button>
+                    </div>
+                  )}
                 </div>
 
                 <div>

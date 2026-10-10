@@ -36,6 +36,11 @@ import {
   saveFirestoreProduct,
   deleteFirestoreProduct,
   toggleFirestoreProductStatus,
+  getFirestoreMenuItems,
+  getFirestoreMenuItemById,
+  saveFirestoreMenuItem,
+  deleteFirestoreMenuItem,
+  toggleFirestoreMenuItemStatus,
   getFirestoreAppointments,
   createFirestoreAppointment,
   updateFirestoreAppointmentStatus,
@@ -53,6 +58,7 @@ import {
   PrivateFeedback,
   CompanyService,
   CompanyProduct,
+  MenuItem,
   Appointment,
   AppointmentStatus,
   CompanyProfessional,
@@ -285,6 +291,41 @@ export async function toggleServerProductStatus(
   companyId: string
 ): Promise<{ success: boolean; error?: string }> {
   return await toggleFirestoreProductStatus(productId, companyId)
+}
+
+// ==========================================
+// 6.2 MENU ITEMS (CARDÁPIO DIGITAL DIRETO LINK)
+// ==========================================
+
+export async function getServerMenuItems(companyId?: string): Promise<MenuItem[]> {
+  return await getFirestoreMenuItems(companyId)
+}
+
+export async function getServerMenuItemById(
+  companyId: string,
+  itemId: string
+): Promise<MenuItem | null> {
+  return await getFirestoreMenuItemById(companyId, itemId)
+}
+
+export async function saveServerMenuItem(
+  item: MenuItem
+): Promise<{ success: boolean; menuItem?: MenuItem; error?: string }> {
+  return await saveFirestoreMenuItem(item)
+}
+
+export async function deleteServerMenuItem(
+  itemId: string,
+  companyId: string
+): Promise<{ success: boolean; error?: string }> {
+  return await deleteFirestoreMenuItem(itemId, companyId)
+}
+
+export async function toggleServerMenuItemStatus(
+  itemId: string,
+  companyId: string
+): Promise<{ success: boolean; isAvailable?: boolean; error?: string }> {
+  return await toggleFirestoreMenuItemStatus(itemId, companyId)
 }
 
 // ==========================================

@@ -90,6 +90,80 @@ export interface ProductCatalogConfig {
   externalUrl?: string
 }
 
+export type MenuMode = 'external' | 'internal'
+
+export interface MenuSizeOption {
+  id: string
+  name: string // Ex: "Pequeno", "Médio", "Grande"
+  price?: number | null // Preço fixo deste tamanho ou acréscimo
+}
+
+export interface MenuFlavorOption {
+  id: string
+  name: string // Ex: "Calabresa", "Quatro Queijos"
+  description?: string
+}
+
+export interface MenuExtraOption {
+  id: string
+  name: string // Ex: "Bacon Crocante", "Queijo Extra"
+  price: number // Ex: 4.50
+}
+
+export interface MenuCustomStepOption {
+  id: string
+  name: string // Ex: "Filé de Frango", "Carne Desfiada", "Tofu"
+  description?: string
+  price?: number // Acréscimo opcional Ex: 0 ou 4.00
+}
+
+export interface MenuCustomStep {
+  id: string
+  title: string // Ex: "1. Escolha a proteína", "2. Escolha acompanhamentos", "3. Escolha adicionais"
+  description?: string
+  minSelection: number // Ex: 1
+  maxSelection: number // Ex: 1 ou 2
+  required: boolean
+  options: MenuCustomStepOption[]
+}
+
+export interface MenuItem {
+  id: string
+  companyId: string
+  name: string
+  photoUrl?: string
+  category: string // Ex: "Lanches", "Pizzas", "Bebidas", "Sobremesas", "Combos"
+  description?: string
+  price?: number | null // Preço base
+  priceType?: 'fixed' | 'consult'
+  promotionalPrice?: number | null
+  isAvailable: boolean // Disponível / Esgotado
+  isFeatured?: boolean // Destaque
+  order?: number // Ordem de exibição
+
+  // Opções e adicionais
+  sizes?: MenuSizeOption[] // Tamanhos
+  flavorsMax?: number // Ex: até 2 sabores
+  flavors?: MenuFlavorOption[] // Sabores
+  extras?: MenuExtraOption[] // Adicionais com valor extra
+  removableIngredients?: string[] // Remover ingredientes Ex: ["Sem cebola", "Sem maionese"]
+  allowNotes?: boolean // Permitir observações do cliente (default true)
+
+  // Monte seu pedido
+  isCustomBuilder?: boolean // Flag se é item multi-etapas ("Monte seu pedido")
+  customSteps?: MenuCustomStep[] // Etapas configuradas
+
+  isActive: boolean
+  createdAt: string
+  updatedAt?: string
+}
+
+export interface MenuConfig {
+  mode: MenuMode // 'external' | 'internal'
+  externalUrl?: string
+  categories?: string[]
+}
+
 export interface CompanyProduct {
   id: string
   companyId: string
@@ -137,6 +211,8 @@ export interface Company {
   instagram: string
   googleReviewUrl: string
   menuUrl: string
+  menuMode?: MenuMode
+  menuConfig?: MenuConfig
   wifi: CompanyWifi
   locationUrl: string
   addressText: string

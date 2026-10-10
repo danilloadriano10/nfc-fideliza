@@ -32,6 +32,11 @@ service cloud.firestore {
       allow read, write: if true;
     }
 
+    // Menu Items: Company digital menu items (Cardápio DiretoLink)
+    match /menuItems/{menuItemId} {
+      allow read, write: if true;
+    }
+
     // Appointments: Multi-tenant booking reservations
     match /appointments/{appointmentId} {
       allow read, write: if true;

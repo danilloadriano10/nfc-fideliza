@@ -25,6 +25,24 @@ export default function RootLayout({children}: {children: React.ReactNode}) {
           dangerouslySetInnerHTML={{
             __html: `
               (function() {
+                function isIgnorable(err) {
+                  if (!err) return true;
+                  if (typeof Event !== 'undefined' && err instanceof Event) return true;
+                  if (typeof err === 'object' && err !== null) {
+                    if (err.isTrusted === true && !err.message && !err.stack) return true;
+                    var msg = String(err.message || (err.reason && err.reason.message) || err || '');
+                    if (
+                      msg.indexOf('webpack-hmr') !== -1 ||
+                      msg.indexOf('WebSocket') !== -1 ||
+                      msg.indexOf('Disconnecting idle stream') !== -1 ||
+                      msg.indexOf('Timed out waiting for new targets') !== -1
+                    ) {
+                      return true;
+                    }
+                  }
+                  return false;
+                }
+
                 function handleChunkError(err) {
                   try {
                     var msg = (err && (err.message || (err.reason && err.reason.message))) || '';
@@ -40,8 +58,26 @@ export default function RootLayout({children}: {children: React.ReactNode}) {
                     }
                   } catch (e) {}
                 }
-                window.addEventListener('error', handleChunkError);
-                window.addEventListener('unhandledrejection', handleChunkError);
+
+                window.addEventListener('error', function(e) {
+                  var err = e.error || e;
+                  if (isIgnorable(err)) {
+                    e.preventDefault();
+                    if (e.stopImmediatePropagation) e.stopImmediatePropagation();
+                    return;
+                  }
+                  handleChunkError(e);
+                }, true);
+
+                window.addEventListener('unhandledrejection', function(e) {
+                  var reason = e.reason;
+                  if (isIgnorable(reason)) {
+                    e.preventDefault();
+                    if (e.stopImmediatePropagation) e.stopImmediatePropagation();
+                    return;
+                  }
+                  handleChunkError(e);
+                }, true);
               })();
             `,
           }}
