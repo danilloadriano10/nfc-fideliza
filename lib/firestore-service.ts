@@ -19,6 +19,7 @@ import {
   ActivityLog,
   PrivateFeedback,
   CompanyService,
+  CompanyProduct,
   Appointment,
   AppointmentStatus,
   CompanyProfessional,
@@ -46,6 +47,7 @@ const FEEDBACKS_COLLECTION = 'feedbacks'
 const LOGS_COLLECTION = 'activityLogs'
 const SETTINGS_COLLECTION = 'settings'
 const SERVICES_COLLECTION = 'services'
+const PRODUCTS_COLLECTION = 'products'
 const APPOINTMENTS_COLLECTION = 'appointments'
 const PROFESSIONALS_COLLECTION = 'professionals'
 const DELETED_COMPANIES_COLLECTION = 'deleted_companies'
@@ -1401,5 +1403,159 @@ export async function deleteFirestoreProfessional(
     return { success: true }
   } catch (err) {
     handleFirestoreError(err, OperationType.DELETE, `${PROFESSIONALS_COLLECTION}/${profId}`)
+  }
+}
+
+// ==========================================
+// 8. PRODUCTS (CATÁLOGO DE PRODUTOS)
+// ==========================================
+
+export async function getFirestoreProducts(companyId?: string): Promise<CompanyProduct[]> {
+  try {
+    await ensureFirestoreInitialized()
+    const colRef = collection(db, PRODUCTS_COLLECTION)
+    let q
+    if (companyId) {
+      q = query(colRef, where('companyId', '==', companyId))
+    } else {
+      q = colRef
+    }
+    const snap = await getDocs(q)
+    const list: CompanyProduct[] = []
+    snap.forEach((d) => {
+      list.push(d.data() as CompanyProduct)
+    })
+    return list.sort((a, b) => {
+      const orderA = typeof a.order === 'number' ? a.order : 0
+      const orderB = typeof b.order === 'number' ? b.order : 0
+      if (orderA !== orderB) return orderA - orderB
+      return (b.createdAt || '').localeCompare(a.createdAt || '')
+    })
+  } catch (err) {
+    console.warn('Could not read products from Firestore (returning empty list):', err)
+    return []
+  }
+}
+
+export async function getFirestoreProductById(
+  companyId: string,
+  productId: string
+): Promise<CompanyProduct | null> {
+  await ensureFirestoreInitialized()
+  try {
+    const docRef = doc(db, PRODUCTS_COLLECTION, productId)
+    const snap = await getDoc(docRef)
+    if (!snap.exists()) return null
+    const data = snap.data() as CompanyProduct
+    if (data.companyId !== companyId) return null
+    return data
+  } catch (err) {
+    handleFirestoreError(err, OperationType.GET, `${PRODUCTS_COLLECTION}/${productId}`)
+  }
+}
+
+export async function saveFirestoreProduct(
+  product: CompanyProduct
+): Promise<{ success: boolean; product?: CompanyProduct; error?: string }> {
+  if (!product.name || !product.name.trim()) {
+    return { success: false, error: 'Nome do produto é obrigatório.' }
+  }
+  if (!product.companyId) {
+    return { success: false, error: 'companyId é obrigatório.' }
+  }
+
+  // Handle photoUrl with base64 defense and conversion
+  let finalPhoto = product.photoUrl?.trim() || undefined
+  if (finalPhoto && isBase64Image(finalPhoto)) {
+    try {
+      const { uploadCompanyFileServer } = await import('@/lib/storage-service')
+      const matches = finalPhoto.match(/^data:([A-Za-z-+\/]+);base64,(.+)$/)
+      if (matches && matches[2]) {
+        const mime = matches[1]
+        const buf = Buffer.from(matches[2], 'base64')
+        const up = await uploadCompanyFileServer(product.companyId, 'product', buf, 'product.jpg', mime)
+        finalPhoto = up.url || undefined
+      }
+    } catch {
+      finalPhoto = undefined
+    }
+  }
+
+  await ensureFirestoreInitialized()
+  const now = new Date().toISOString()
+  const productId = product.id || `prd_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`
+  
+  const productToSave: Record<string, unknown> = {
+    id: productId,
+    companyId: product.companyId,
+    name: product.name.trim(),
+    category: product.category?.trim() || 'Geral',
+    description: product.description?.trim() || '',
+    price: typeof product.price === 'number' && !isNaN(product.price) ? product.price : null,
+    priceType: product.priceType || (product.price != null ? 'fixed' : 'consult'),
+    promotionalPrice: typeof product.promotionalPrice === 'number' && !isNaN(product.promotionalPrice) ? product.promotionalPrice : null,
+    isAvailable: product.isAvailable !== false,
+    purchaseUrl: product.purchaseUrl?.trim() || '',
+    order: typeof product.order === 'number' && !isNaN(product.order) ? product.order : 0,
+    isActive: product.isActive !== false,
+    updatedAt: now,
+    createdAt: product.createdAt || now,
+    photoUrl: finalPhoto || '',
+  }
+
+  try {
+    const docRef = doc(db, PRODUCTS_COLLECTION, productId)
+    await setDoc(docRef, productToSave, { merge: true })
+    return { success: true, product: productToSave as unknown as CompanyProduct }
+  } catch (err) {
+    handleFirestoreError(err, OperationType.WRITE, `${PRODUCTS_COLLECTION}/${productId}`)
+  }
+}
+
+export async function deleteFirestoreProduct(
+  productId: string,
+  companyId: string
+): Promise<{ success: boolean; error?: string }> {
+  await ensureFirestoreInitialized()
+  try {
+    const docRef = doc(db, PRODUCTS_COLLECTION, productId)
+    const snap = await getDoc(docRef)
+    if (!snap.exists()) {
+      return { success: true }
+    }
+    const data = snap.data() as CompanyProduct
+    // Security check: isolate per companyId
+    if (data.companyId !== companyId) {
+      return { success: false, error: 'Operação não autorizada para este produto.' }
+    }
+    await deleteDoc(docRef)
+    return { success: true }
+  } catch (err) {
+    handleFirestoreError(err, OperationType.DELETE, `${PRODUCTS_COLLECTION}/${productId}`)
+  }
+}
+
+export async function toggleFirestoreProductStatus(
+  productId: string,
+  companyId: string
+): Promise<{ success: boolean; error?: string }> {
+  await ensureFirestoreInitialized()
+  try {
+    const docRef = doc(db, PRODUCTS_COLLECTION, productId)
+    const snap = await getDoc(docRef)
+    if (!snap.exists()) {
+      return { success: false, error: 'Produto não encontrado.' }
+    }
+    const data = snap.data() as CompanyProduct
+    if (data.companyId !== companyId) {
+      return { success: false, error: 'Operação não autorizada.' }
+    }
+    await updateDoc(docRef, {
+      isActive: !data.isActive,
+      updatedAt: new Date().toISOString(),
+    })
+    return { success: true }
+  } catch (err) {
+    handleFirestoreError(err, OperationType.WRITE, `${PRODUCTS_COLLECTION}/${productId}`)
   }
 }

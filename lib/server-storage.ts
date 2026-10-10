@@ -31,6 +31,11 @@ import {
   saveFirestoreService,
   deleteFirestoreService,
   toggleFirestoreServiceStatus,
+  getFirestoreProducts,
+  getFirestoreProductById,
+  saveFirestoreProduct,
+  deleteFirestoreProduct,
+  toggleFirestoreProductStatus,
   getFirestoreAppointments,
   createFirestoreAppointment,
   updateFirestoreAppointmentStatus,
@@ -47,6 +52,7 @@ import {
   ActivityLog,
   PrivateFeedback,
   CompanyService,
+  CompanyProduct,
   Appointment,
   AppointmentStatus,
   CompanyProfessional,
@@ -244,6 +250,41 @@ export async function toggleServerServiceStatus(
   companyId: string
 ): Promise<{ success: boolean; error?: string }> {
   return await toggleFirestoreServiceStatus(serviceId, companyId)
+}
+
+// ==========================================
+// 6.1 PRODUCTS (CATÁLOGO DE PRODUTOS)
+// ==========================================
+
+export async function getServerProducts(companyId?: string): Promise<CompanyProduct[]> {
+  return await getFirestoreProducts(companyId)
+}
+
+export async function getServerProductById(
+  companyId: string,
+  productId: string
+): Promise<CompanyProduct | null> {
+  return await getFirestoreProductById(companyId, productId)
+}
+
+export async function saveServerProduct(
+  product: CompanyProduct
+): Promise<{ success: boolean; product?: CompanyProduct; error?: string }> {
+  return await saveFirestoreProduct(product)
+}
+
+export async function deleteServerProduct(
+  productId: string,
+  companyId: string
+): Promise<{ success: boolean; error?: string }> {
+  return await deleteFirestoreProduct(productId, companyId)
+}
+
+export async function toggleServerProductStatus(
+  productId: string,
+  companyId: string
+): Promise<{ success: boolean; error?: string }> {
+  return await toggleFirestoreProductStatus(productId, companyId)
 }
 
 // ==========================================

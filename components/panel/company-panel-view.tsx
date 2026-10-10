@@ -44,6 +44,7 @@ import {
   Palette,
   Moon,
   Sun,
+  Package,
 } from 'lucide-react'
 import confetti from 'canvas-confetti'
 import { BRAND_COLOR_PRESETS, sanitizeHex, getGradientContrastTextColor } from '@/lib/colors'
@@ -58,6 +59,7 @@ import {
 import {
   getCompanyCustomers,
   getCompanyServices,
+  getCompanyProducts,
   getCompanyAppointments,
   getCompanyActivityLogs,
   getCompanyFeedbacks,
@@ -81,6 +83,7 @@ import { CompanyLoginView } from './company-login-view'
 import { CompanyOnboardingModal } from './company-onboarding-modal'
 import { ServicesTab } from './services-tab'
 import { AppointmentsTab } from './appointments-tab'
+import { ProductsTab } from './products-tab'
 
 const PRESET_BANNERS = [
   { label: '☕ Cafeteria / Café', url: '/images/cafe_central_banner_1791003956057.jpg' },
@@ -96,6 +99,7 @@ type TabType =
   | 'dashboard'
   | 'services'
   | 'appointments'
+  | 'products'
   | 'customers'
   | 'loyalty'
   | 'rewards'
@@ -130,6 +134,12 @@ export const CompanyPanelView: React.FC<CompanyPanelViewProps> = ({
       ...initialCompany.modules,
       services: initialCompany.modules?.services ?? false,
       appointments: initialCompany.modules?.appointments ?? false,
+      products: initialCompany.modules?.products ?? false,
+    },
+    productCatalog: initialCompany.productCatalog || {
+      mode: 'internal',
+      externalButtonText: 'Ver Catálogo',
+      externalUrl: '',
     },
     loyaltyProgram: initialCompany.loyaltyProgram || {
       isActive: true,
@@ -421,6 +431,7 @@ export const CompanyPanelView: React.FC<CompanyPanelViewProps> = ({
   // Metrics
   const totalCustomers = customers.length
   const servicesCount = getCompanyServices(company.id).length
+  const productsCount = getCompanyProducts(company.id).length
   const allAppointments = getCompanyAppointments(company.id)
   const pendingAppointmentsCount = allAppointments.filter((a) => a.status === 'pending').length
   const totalPoints = logs.reduce((acc, l) => acc + (l.pointsChange || 0), 0)
@@ -560,6 +571,12 @@ export const CompanyPanelView: React.FC<CompanyPanelViewProps> = ({
               label: 'Agendamentos',
               count: pendingAppointmentsCount > 0 ? pendingAppointmentsCount : (allAppointments.length > 0 ? allAppointments.length : undefined),
               icon: Calendar,
+            },
+            {
+              id: 'products',
+              label: 'Produtos',
+              count: productsCount > 0 ? productsCount : undefined,
+              icon: Package,
             },
             { id: 'customers', label: 'Clientes', count: totalCustomers, icon: Users },
             { id: 'loyalty', label: 'Fidelidade', icon: Gift },
@@ -858,6 +875,17 @@ export const CompanyPanelView: React.FC<CompanyPanelViewProps> = ({
           <AppointmentsTab
             company={company}
             onUpdateCompany={(updated) => setCompany(updated)}
+          />
+        )}
+
+        {/* ============================================== */}
+        {/* TAB 1.7: PRODUTOS */}
+        {/* ============================================== */}
+        {activeTab === 'products' && (
+          <ProductsTab
+            company={company}
+            onEnableModule={() => setActiveTab('settings')}
+            onOpenSettings={() => setActiveTab('settings')}
           />
         )}
 
@@ -2333,6 +2361,7 @@ export const CompanyPanelView: React.FC<CompanyPanelViewProps> = ({
 
               <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
                 {[
+                  { key: 'products', label: 'Catálogo de Produtos' },
                   { key: 'services', label: 'Serviços' },
                   { key: 'appointments', label: 'Agendamento' },
                   { key: 'loyalty', label: 'Cartão Fidelidade' },
@@ -2346,7 +2375,11 @@ export const CompanyPanelView: React.FC<CompanyPanelViewProps> = ({
                 ].map((mod) => (
                   <label
                     key={mod.key}
-                    className="flex items-center justify-between p-3 rounded-xl bg-neutral-50 border border-neutral-200 cursor-pointer hover:bg-neutral-100 transition-colors"
+                    className={`flex items-center justify-between p-3 rounded-xl border cursor-pointer transition-all ${
+                      Boolean(formData.modules?.[mod.key as keyof typeof formData.modules])
+                        ? 'bg-violet-50/80 border-violet-300 shadow-2xs'
+                        : 'bg-neutral-50 border-neutral-200 hover:bg-neutral-100'
+                    }`}
                   >
                     <span className="text-xs font-medium text-neutral-800">{mod.label}</span>
                     <input
@@ -2361,11 +2394,182 @@ export const CompanyPanelView: React.FC<CompanyPanelViewProps> = ({
                           },
                         })
                       }
-                      className="w-4 h-4 accent-neutral-900 rounded"
+                      className="w-4 h-4 accent-violet-600 rounded"
                     />
                   </label>
                 ))}
               </div>
+
+              {/* Configuração Dedicada: Opções do Catálogo de Produtos ao ativar */}
+              {Boolean(formData.modules?.products) && (
+                <div className="p-4 sm:p-5 rounded-2xl bg-violet-50/70 border border-violet-200/80 space-y-4">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <div className="w-8 h-8 rounded-xl bg-violet-600 text-white flex items-center justify-center shadow-xs">
+                        <Package className="w-4 h-4" />
+                      </div>
+                      <div>
+                        <h4 className="text-xs font-bold text-neutral-900 uppercase tracking-wide">
+                          Configuração do Catálogo de Produtos
+                        </h4>
+                        <p className="text-[11px] text-neutral-600">
+                          Escolha se prefere cadastrar sua vitrine própria na DiretoLink ou conectar uma loja/catálogo externo.
+                        </p>
+                      </div>
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={() => setActiveTab('products')}
+                      className="text-[11px] font-bold text-violet-700 hover:text-violet-900 underline flex items-center gap-1"
+                    >
+                      <span>Gerenciar Produtos</span>
+                      <ArrowRight className="w-3 h-3" />
+                    </button>
+                  </div>
+
+                  {/* Seleção do Modo: Interno ou Externo */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
+                    <label
+                      className={`p-3.5 rounded-xl border flex flex-col gap-1.5 cursor-pointer transition-all ${
+                        (formData.productCatalog?.mode || 'internal') === 'internal'
+                          ? 'bg-white border-violet-600 ring-2 ring-violet-500/20 shadow-xs'
+                          : 'bg-white/80 border-neutral-200 hover:bg-white'
+                      }`}
+                    >
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          <input
+                            type="radio"
+                            name="productCatalogMode"
+                            checked={(formData.productCatalog?.mode || 'internal') === 'internal'}
+                            onChange={() =>
+                              setFormData({
+                                ...formData,
+                                productCatalog: {
+                                  ...(formData.productCatalog || {
+                                    externalButtonText: 'Ver Catálogo',
+                                    externalUrl: '',
+                                  }),
+                                  mode: 'internal',
+                                },
+                              })
+                            }
+                            className="w-4 h-4 accent-violet-600"
+                          />
+                          <span className="text-xs font-bold text-neutral-900">
+                            1. Criar Catálogo na DiretoLink
+                          </span>
+                        </div>
+                        <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-violet-100 text-violet-800">
+                          Vitrine Própria
+                        </span>
+                      </div>
+                      <p className="text-[11px] text-neutral-500 leading-relaxed pl-6">
+                        Cadastre produtos com foto, nome, categoria, preço fixo ou sob consulta, link de compra e botão de WhatsApp direto.
+                      </p>
+                    </label>
+
+                    <label
+                      className={`p-3.5 rounded-xl border flex flex-col gap-1.5 cursor-pointer transition-all ${
+                        formData.productCatalog?.mode === 'external'
+                          ? 'bg-white border-violet-600 ring-2 ring-violet-500/20 shadow-xs'
+                          : 'bg-white/80 border-neutral-200 hover:bg-white'
+                      }`}
+                    >
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          <input
+                            type="radio"
+                            name="productCatalogMode"
+                            checked={formData.productCatalog?.mode === 'external'}
+                            onChange={() =>
+                              setFormData({
+                                ...formData,
+                                productCatalog: {
+                                  ...(formData.productCatalog || {
+                                    externalButtonText: 'Ver Catálogo',
+                                    externalUrl: '',
+                                  }),
+                                  mode: 'external',
+                                },
+                              })
+                            }
+                            className="w-4 h-4 accent-violet-600"
+                          />
+                          <span className="text-xs font-bold text-neutral-900">
+                            2. Usar Catálogo Externo
+                          </span>
+                        </div>
+                        <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-neutral-200 text-neutral-700">
+                          Link Externo
+                        </span>
+                      </div>
+                      <p className="text-[11px] text-neutral-500 leading-relaxed pl-6">
+                        Conecte seu site próprio, loja virtual (Shopify, Nuvemshop), marketplace ou catálogo externo em PDF/link.
+                      </p>
+                    </label>
+                  </div>
+
+                  {/* Campos do Modo Externo */}
+                  {formData.productCatalog?.mode === 'external' && (
+                    <div className="bg-white p-4 rounded-xl border border-violet-200/90 shadow-2xs space-y-3 pt-3 mt-1">
+                      <div className="flex items-center gap-2 text-xs font-bold text-violet-950">
+                        <ExternalLink className="w-4 h-4 text-violet-600" />
+                        <span>Dados do Catálogo Externo</span>
+                      </div>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        <div>
+                          <label className="block text-[11px] font-semibold text-neutral-700 mb-1">
+                            Nome do Botão
+                          </label>
+                          <input
+                            type="text"
+                            value={formData.productCatalog?.externalButtonText || ''}
+                            onChange={(e) =>
+                              setFormData({
+                                ...formData,
+                                productCatalog: {
+                                  ...(formData.productCatalog || { mode: 'external' }),
+                                  mode: 'external',
+                                  externalButtonText: e.target.value,
+                                },
+                              })
+                            }
+                            placeholder="Ex: Ver Catálogo, Ver Loja Virtual, Comprar Online"
+                            className="w-full px-3 py-2 rounded-xl border border-neutral-300 text-xs focus:outline-none focus:ring-2 focus:ring-violet-500"
+                          />
+                        </div>
+
+                        <div>
+                          <label className="block text-[11px] font-semibold text-neutral-700 mb-1">
+                            URL do Catálogo / Loja (com https://)
+                          </label>
+                          <input
+                            type="url"
+                            value={formData.productCatalog?.externalUrl || ''}
+                            onChange={(e) =>
+                              setFormData({
+                                ...formData,
+                                productCatalog: {
+                                  ...(formData.productCatalog || { mode: 'external' }),
+                                  mode: 'external',
+                                  externalUrl: e.target.value,
+                                },
+                              })
+                            }
+                            placeholder="https://sualoja.com.br ou marketplace"
+                            className="w-full px-3 py-2 rounded-xl border border-neutral-300 text-xs font-mono focus:outline-none focus:ring-2 focus:ring-violet-500"
+                          />
+                        </div>
+                      </div>
+                      <p className="text-[10px] text-neutral-400">
+                        Na página pública, os visitantes verão o botão com o nome cadastrado e serão redirecionados diretamente ao link.
+                      </p>
+                    </div>
+                  )}
+                </div>
+              )}
 
               {/* Destaque Principal da Página Pública */}
               <div className="pt-5 border-t border-neutral-100 space-y-3">
@@ -2397,6 +2601,9 @@ export const CompanyPanelView: React.FC<CompanyPanelViewProps> = ({
                     <option value="auto">
                       ⚡ Automático (prioriza o principal serviço ativo)
                     </option>
+                    {Boolean(formData.modules?.products) && (
+                      <option value="products">📦 Catálogo de Produtos</option>
+                    )}
                     {Boolean(formData.modules?.appointments) && (
                       <option value="appointments">📅 Agendamento Online</option>
                     )}
@@ -2444,10 +2651,10 @@ export const CompanyPanelView: React.FC<CompanyPanelViewProps> = ({
                 </div>
                 <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5">
                   {[
-                    { label: 'Catálogo de Produtos', icon: Layers, tag: 'Em breve' },
-                    { label: 'Promoções', icon: Sparkles, tag: 'Em breve' },
+                    { label: 'Promoções & Ofertas', icon: Sparkles, tag: 'Em breve' },
                     { label: 'Portfólio / Galeria', icon: ImageIcon, tag: 'Em breve' },
                     { label: 'Cupons de Desconto', icon: Gift, tag: 'Em breve' },
+                    { label: 'Checkout & Pagamento', icon: Layers, tag: 'Em breve' },
                     { label: 'Outros Recursos', icon: Plus, tag: 'Em breve' },
                   ].map((feat) => {
                     const FeatIcon = feat.icon

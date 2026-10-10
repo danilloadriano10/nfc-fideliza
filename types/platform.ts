@@ -17,6 +17,7 @@ export interface CompanyModules {
   instagram: boolean
   services?: boolean
   appointments?: boolean
+  products?: boolean
 }
 
 export interface DaySchedule {
@@ -81,6 +82,32 @@ export interface CompanyService {
   updatedAt?: string
 }
 
+export type ProductCatalogMode = 'internal' | 'external'
+
+export interface ProductCatalogConfig {
+  mode: ProductCatalogMode // 'internal' | 'external'
+  externalButtonText?: string // Default: "Ver Catálogo"
+  externalUrl?: string
+}
+
+export interface CompanyProduct {
+  id: string
+  companyId: string
+  name: string
+  photoUrl?: string
+  category?: string
+  price?: number | null // null or undefined indicates "Sob consulta"
+  priceType?: 'fixed' | 'consult'
+  promotionalPrice?: number | null
+  description?: string
+  isAvailable?: boolean // default true
+  purchaseUrl?: string
+  order?: number // default 0
+  isActive: boolean // default true
+  createdAt: string
+  updatedAt?: string
+}
+
 export interface LoyaltyProgramConfig {
   isActive: boolean
   campaignName: string
@@ -116,6 +143,7 @@ export interface Company {
   isActive: boolean
   modules: CompanyModules
   loyaltyProgram: LoyaltyProgramConfig
+  productCatalog?: ProductCatalogConfig
   highlightModule?: string // 'auto' | 'appointments' | 'services' | 'whatsapp' | 'loyalty' | 'googleReview' | 'menu' | etc.
   theme?: 'dark' | 'light' // Public page appearance theme (Escuro / Claro)
   rating?: number

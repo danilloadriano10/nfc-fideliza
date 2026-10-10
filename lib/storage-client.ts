@@ -100,12 +100,12 @@ export async function compressImageClient(
 
 export async function uploadCompanyImageFromClient(
   companyId: string,
-  type: 'logo' | 'cover' | 'service',
+  type: 'logo' | 'cover' | 'service' | 'product',
   file: File
 ): Promise<{ success: boolean; url?: string; error?: string }> {
-  const typeLabel = type === 'logo' ? 'da logo' : type === 'cover' ? 'da capa' : 'do serviço'
+  const typeLabel = type === 'logo' ? 'da logo' : type === 'cover' ? 'da capa' : type === 'product' ? 'do produto' : 'do serviço'
   try {
-    // 1. Client-side smart compression (Logo: max 512x512, Cover: max 1280x720, Service: max 800x800)
+    // 1. Client-side smart compression (Logo: max 512x512, Cover: max 1280x720, Service/Product: max 800x800)
     const maxW = type === 'logo' ? 512 : type === 'cover' ? 1280 : 800
     const maxH = type === 'logo' ? 512 : type === 'cover' ? 720 : 800
     const fileToUpload = await compressImageClient(file, maxW, maxH, 0.85)

@@ -3,18 +3,22 @@
 import React, { useState, useEffect } from 'react'
 import Link from 'next/link'
 import { Store, ArrowLeft, AlertTriangle, Loader2 } from 'lucide-react'
-import { Company } from '@/types/platform'
+import { Company, CompanyProduct, CompanyService } from '@/types/platform'
 import { getCompanyBySlug, DATA_CHANGE_EVENT, saveCompanyLocally } from '@/lib/storage'
 import { PublicCompanyView } from '@/components/public/public-company-view'
 
 interface EmpresaClientPageProps {
   slug: string
   initialCompany?: Company | null
+  initialProducts?: CompanyProduct[]
+  initialServices?: CompanyService[]
 }
 
 export const EmpresaClientPage: React.FC<EmpresaClientPageProps> = ({
   slug,
   initialCompany,
+  initialProducts,
+  initialServices,
 }) => {
   const [company, setCompany] = useState<Company | null>(initialCompany || null)
   const [isLoading, setIsLoading] = useState(!initialCompany)
@@ -132,5 +136,12 @@ export const EmpresaClientPage: React.FC<EmpresaClientPageProps> = ({
     )
   }
 
-  return <PublicCompanyView company={company} />
+  return (
+    <PublicCompanyView
+      company={company}
+      initialProducts={initialProducts}
+      initialServices={initialServices}
+    />
+  )
 }
+

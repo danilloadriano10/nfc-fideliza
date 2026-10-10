@@ -24,18 +24,24 @@ import {
   CheckCircle2,
   Share2,
   Check,
+  Package,
+  ShoppingBag,
 } from 'lucide-react'
-import { Company, CompanyService } from '@/types/platform'
+import { Company, CompanyService, CompanyProduct } from '@/types/platform'
 import { LoyaltySheet } from './loyalty-sheet'
 import { WifiSheet } from './wifi-sheet'
 import { FeedbackSheet } from './feedback-sheet'
 import { ServicesSheet } from './services-sheet'
 import { BookingSheet } from './booking-sheet'
+import { ProductsSheet } from './products-sheet'
+import { ProductDetailModal } from './product-detail-modal'
 import {
   getLocalCustomerSession,
   getCustomerByPhone,
   getCompanyServices,
   fetchCompanyServicesFromServer,
+  getCompanyProducts,
+  fetchCompanyProductsFromServer,
   DATA_CHANGE_EVENT,
 } from '@/lib/storage'
 import {
@@ -46,6 +52,8 @@ import {
 
 interface PublicCompanyViewProps {
   company: Company
+  initialProducts?: CompanyProduct[]
+  initialServices?: CompanyService[]
 }
 
 interface FeatureItem {
@@ -65,7 +73,11 @@ interface FeatureItem {
   onClick: () => void
 }
 
-export const PublicCompanyView: React.FC<PublicCompanyViewProps> = ({ company }) => {
+export const PublicCompanyView: React.FC<PublicCompanyViewProps> = ({
+  company,
+  initialProducts = [],
+  initialServices = [],
+}) => {
   const isDark = (company.theme || 'dark') === 'dark'
   const primaryColor = useMemo(
     () => sanitizeHex(company.primaryColor, '#6D28D9'),
@@ -91,7 +103,11 @@ export const PublicCompanyView: React.FC<PublicCompanyViewProps> = ({ company })
   const [isServicesOpen, setIsServicesOpen] = useState(false)
   const [isBookingOpen, setIsBookingOpen] = useState(false)
   const [bookingService, setBookingService] = useState<CompanyService | null>(null)
-  const [services, setServices] = useState<CompanyService[]>([])
+  const [services, setServices] = useState<CompanyService[]>(initialServices)
+  const [products, setProducts] = useState<CompanyProduct[]>(initialProducts)
+  const [selectedVitrineCategory, setSelectedVitrineCategory] = useState<string>('Todos')
+  const [isProductsSheetOpen, setIsProductsSheetOpen] = useState(false)
+  const [selectedProductDetail, setSelectedProductDetail] = useState<CompanyProduct | null>(null)
   const [coverError, setCoverError] = useState(false)
   const [logoError, setLogoError] = useState(false)
   const [copiedLink, setCopiedLink] = useState(false)
@@ -164,6 +180,23 @@ export const PublicCompanyView: React.FC<PublicCompanyViewProps> = ({ company })
     }
   }, [company.id])
 
+  // Products data sync
+  useEffect(() => {
+    setProducts(getCompanyProducts(company.id))
+    fetchCompanyProductsFromServer(company.id).then((prds) => {
+      if (Array.isArray(prds) && prds.length > 0) setProducts(prds)
+    })
+    const updateProducts = () => {
+      setProducts(getCompanyProducts(company.id))
+    }
+    window.addEventListener(DATA_CHANGE_EVENT, updateProducts)
+    window.addEventListener('storage', updateProducts)
+    return () => {
+      window.removeEventListener(DATA_CHANGE_EVENT, updateProducts)
+      window.removeEventListener('storage', updateProducts)
+    }
+  }, [company.id])
+
   const customerPhone = customerSession.phone
   const customerName = customerSession.name
   const customerPoints = customerSession.points
@@ -216,6 +249,17 @@ export const PublicCompanyView: React.FC<PublicCompanyViewProps> = ({ company })
     window.open(targetUrl, '_blank', 'noopener,noreferrer')
   }, [company.instagram])
 
+  // Open External Product Catalog
+  const handleOpenCatalogExternal = useCallback(() => {
+    if (company.productCatalog?.externalUrl) {
+      let raw = company.productCatalog.externalUrl.trim()
+      if (!raw.startsWith('http://') && !raw.startsWith('https://')) {
+        raw = `https://${raw}`
+      }
+      window.open(raw, '_blank', 'noopener,noreferrer')
+    }
+  }, [company.productCatalog])
+
   // Share Page Link
   const handleShare = useCallback(() => {
     if (typeof window !== 'undefined') {
@@ -257,19 +301,46 @@ export const PublicCompanyView: React.FC<PublicCompanyViewProps> = ({ company })
 
   // Active Modules strictly respected
   const activeModules = useMemo(() => {
+    const isCatalogExternal = company.productCatalog?.mode === 'external'
+    const hasExternalUrl = Boolean(company.productCatalog?.externalUrl)
+
+    // A company has products active if:
+    // 1) company.modules?.products is explicitly true
+    // 2) OR company.modules?.products !== false AND (products.length > 0 || (isCatalogExternal && hasExternalUrl))
+    const hasProductsExplicit = company.modules?.products === true
+    const hasProductsImplicit =
+      company.modules?.products !== false &&
+      (products.length > 0 || (isCatalogExternal && hasExternalUrl))
+
+    const isProductsEnabled =
+      (hasProductsExplicit || hasProductsImplicit) &&
+      (!isCatalogExternal || hasExternalUrl)
+
     return {
+      products: Boolean(isProductsEnabled),
       appointments: Boolean(company.modules?.appointments),
-      services: Boolean(company.modules?.services),
-      loyalty: Boolean(company.modules?.loyalty ?? true) && Boolean(company.loyaltyProgram?.isActive ?? true),
-      whatsapp: Boolean(company.modules?.whatsapp ?? true) && Boolean(company.whatsapp),
-      googleReview: Boolean(company.modules?.googleReview ?? true) && Boolean(company.googleReviewUrl),
+      services: Boolean(
+        company.modules?.services !== false &&
+          (company.modules?.services || services.length > 0)
+      ),
+      loyalty:
+        Boolean(company.modules?.loyalty ?? true) &&
+        Boolean(company.loyaltyProgram?.isActive ?? true),
+      whatsapp:
+        Boolean(company.modules?.whatsapp ?? true) && Boolean(company.whatsapp),
+      googleReview:
+        Boolean(company.modules?.googleReview ?? true) &&
+        Boolean(company.googleReviewUrl),
       menu: Boolean(company.modules?.menu ?? true) && Boolean(company.menuUrl),
       wifi: Boolean(company.modules?.wifi ?? true) && Boolean(company.wifi?.ssid),
-      location: Boolean(company.modules?.location ?? true) && Boolean(company.locationUrl || company.addressText),
+      location:
+        Boolean(company.modules?.location ?? true) &&
+        Boolean(company.locationUrl || company.addressText),
       feedback: Boolean(company.modules?.feedback ?? true),
-      instagram: Boolean(company.modules?.instagram ?? true) && Boolean(company.instagram),
+      instagram:
+        Boolean(company.modules?.instagram ?? true) && Boolean(company.instagram),
     }
-  }, [company])
+  }, [company, products.length, services.length])
 
   const loyaltyProgram = useMemo(() => {
     return (
@@ -287,13 +358,82 @@ export const PublicCompanyView: React.FC<PublicCompanyViewProps> = ({ company })
     return services.filter((s) => s.isActive !== false)
   }, [services])
 
+  // Active products list
+  const activeProductsList = useMemo(() => {
+    return products
+      .filter((p) => p.isActive !== false)
+      .sort((a, b) => (a.order || 0) - (b.order || 0))
+  }, [products])
+
+  // Category filters for the on-page vitrine
+  const vitrineCategories = useMemo(() => {
+    const cats = Array.from(
+      new Set(
+        activeProductsList
+          .map((p) => p.category?.trim() || 'Geral')
+          .filter(Boolean)
+      )
+    )
+    return cats.length > 1 ? ['Todos', ...cats] : []
+  }, [activeProductsList])
+
+  const displayedVitrineProducts = useMemo(() => {
+    if (selectedVitrineCategory === 'Todos') {
+      return activeProductsList
+    }
+    return activeProductsList.filter(
+      (p) => (p.category?.trim() || 'Geral') === selectedVitrineCategory
+    )
+  }, [activeProductsList, selectedVitrineCategory])
+
   // Flags to detect if full dedicated sections are present on page
+  const isExternalCatalog = company.productCatalog?.mode === 'external'
   const hasFullServicesSection = Boolean(activeModules.services && activeServicesList.length > 0)
   const hasFullLoyaltySection = Boolean(activeModules.loyalty && company.loyaltyProgram?.isActive)
+  const hasFullProductsSection = Boolean(activeModules.products && !isExternalCatalog && activeProductsList.length > 0)
 
   // Build items catalog for active modules
   const allFeatureItems = useMemo<FeatureItem[]>(() => {
     const items: FeatureItem[] = []
+
+    // 0. Catálogo de Produtos (Vitrine ou Externo)
+    if (activeModules.products) {
+      if (isExternalCatalog) {
+        items.push({
+          id: 'products',
+          title: company.productCatalog?.externalButtonText || 'Ver Catálogo',
+          subtitle: 'Loja / Catálogo',
+          icon: <ShoppingBag className="w-5 h-5" />,
+          iconContainerClass: isDark
+            ? 'bg-violet-500/15 text-violet-400 border border-violet-500/25'
+            : 'bg-violet-50 text-violet-600 border border-violet-200/80',
+          iconContainerStyle: { color: '#8B5CF6' },
+          featuredTitle: company.productCatalog?.externalButtonText || 'Ver Catálogo',
+          featuredDescription: 'Conheça nossos produtos e faça seus pedidos em nossa vitrine oficial.',
+          featuredCta: company.productCatalog?.externalButtonText || 'Ver Catálogo',
+          featuredIcon: <ExternalLink className="w-5 h-5 stroke-[2.2]" />,
+          themeBg: 'bg-violet-50 text-violet-700 border-violet-100',
+          onClick: handleOpenCatalogExternal,
+        })
+      } else if (activeProductsList.length > 0) {
+        items.push({
+          id: 'products',
+          title: 'Produtos',
+          subtitle: `${activeProductsList.length} itens`,
+          icon: <Package className="w-5 h-5" />,
+          iconContainerClass: isDark
+            ? 'bg-violet-500/15 text-violet-400 border border-violet-500/25'
+            : 'bg-violet-50 text-violet-600 border border-violet-200/80',
+          iconContainerStyle: { color: '#8B5CF6' },
+          featuredTitle: 'Catálogo de Produtos',
+          featuredDescription: 'Explore nossos produtos exclusivos e fale direto no WhatsApp.',
+          featuredCta: 'Ver Catálogo',
+          featuredIcon: <Package className="w-5 h-5 stroke-[2.2]" />,
+          themeBg: 'bg-violet-50 text-violet-700 border-violet-100',
+          onClick: () => setIsProductsSheetOpen(true),
+        })
+      }
+    }
 
     if (activeModules.appointments) {
       items.push({
@@ -461,6 +601,8 @@ export const PublicCompanyView: React.FC<PublicCompanyViewProps> = ({ company })
   }, [
     activeModules,
     activeServicesList,
+    activeProductsList,
+    isExternalCatalog,
     customerPoints,
     hasAvailableReward,
     loyaltyProgram,
@@ -470,6 +612,7 @@ export const PublicCompanyView: React.FC<PublicCompanyViewProps> = ({ company })
     handleOpenMenu,
     handleOpenWhatsApp,
     handleOpenWifi,
+    handleOpenCatalogExternal,
   ])
 
   // Resolve configurable featured module
@@ -484,7 +627,7 @@ export const PublicCompanyView: React.FC<PublicCompanyViewProps> = ({ company })
     }
 
     // Automatic priority order
-    const priority = ['appointments', 'services', 'loyalty', 'whatsapp', 'googleReview', 'menu', 'wifi', 'feedback']
+    const priority = ['products', 'appointments', 'services', 'loyalty', 'whatsapp', 'googleReview', 'menu', 'wifi', 'feedback']
     for (const key of priority) {
       const found = allFeatureItems.find((item) => item.id === key)
       if (found) return found
@@ -652,12 +795,28 @@ export const PublicCompanyView: React.FC<PublicCompanyViewProps> = ({ company })
       })
     }
 
+    // 11. Catálogo Externo (Roxo / Violeta) - Se for catálogo externo e não for destaque
+    if (activeModules.products && isExternalCatalog && featuredItem?.id !== 'products') {
+      list.push({
+        id: 'products',
+        title: company.productCatalog?.externalButtonText || 'Catálogo',
+        subtitle: 'Loja',
+        icon: <ShoppingBag className="w-5 h-5 text-violet-400" />,
+        iconContainerClass: isDark
+          ? 'bg-violet-500/15 text-violet-400 border border-violet-500/25'
+          : 'bg-violet-50 text-violet-600 border border-violet-200/80',
+        iconContainerStyle: { color: '#8B5CF6' },
+        onClick: handleOpenCatalogExternal,
+      })
+    }
+
     // Não repetir o item de Destaque Principal em Acessos Rápidos
     return list.filter((item) => !featuredItem || item.id !== featuredItem.id)
   }, [
     activeModules,
     hasFullServicesSection,
     hasFullLoyaltySection,
+    isExternalCatalog,
     featuredItem,
     company,
     isDark,
@@ -667,6 +826,7 @@ export const PublicCompanyView: React.FC<PublicCompanyViewProps> = ({ company })
     handleOpenLocation,
     handleOpenWifi,
     handleOpenMenu,
+    handleOpenCatalogExternal,
   ])
 
   // Calculate loyalty percentage
@@ -1268,6 +1428,323 @@ export const PublicCompanyView: React.FC<PublicCompanyViewProps> = ({ company })
           )}
 
           {/* ======================================================= */}
+          {/* 4.5. SEÇÃO VISUAL: PRODUTOS (VITRINE OU EXTERNO)        */}
+          {/* ======================================================= */}
+          {activeProductsList.length > 0 && !isExternalCatalog && company.modules?.products !== false && (
+            <div
+              className={`rounded-3xl p-4.5 sm:p-5 space-y-4 border ${
+                isDark
+                  ? 'bg-[#121217] border-white/[0.08] shadow-sm'
+                  : 'bg-white border-neutral-200/80 shadow-2xs'
+              }`}
+            >
+              {/* Cabeçalho da Vitrine */}
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2.5">
+                  <div
+                    className="w-9 h-9 rounded-xl flex items-center justify-center shadow-xs text-white"
+                    style={{ backgroundColor: primaryColor }}
+                  >
+                    <Package className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <span
+                      className="text-[10px] font-bold uppercase tracking-wider block"
+                      style={{ color: primaryColor }}
+                    >
+                      Vitrine de Produtos
+                    </span>
+                    <div className="flex items-center gap-2">
+                      <h3
+                        className={`text-sm sm:text-base font-black tracking-tight ${
+                          isDark ? 'text-white' : 'text-neutral-900'
+                        }`}
+                      >
+                        Nossos Produtos
+                      </h3>
+                      <span
+                        className="text-[10px] font-black px-2 py-0.5 rounded-full"
+                        style={{
+                          backgroundColor: hexToRgba(primaryColor, isDark ? 0.2 : 0.1),
+                          color: isDark ? '#ffffff' : primaryColor,
+                        }}
+                      >
+                        {activeProductsList.length}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+
+                {activeProductsList.length > 4 && (
+                  <button
+                    type="button"
+                    onClick={() => setIsProductsSheetOpen(true)}
+                    className="text-xs font-bold transition-opacity hover:opacity-85 flex items-center gap-0.5 cursor-pointer"
+                    style={{ color: primaryColor }}
+                  >
+                    <span>Ver todos</span>
+                    <ChevronRight className="w-3.5 h-3.5" />
+                  </button>
+                )}
+              </div>
+
+              {/* Filtros de Categoria (se houver mais de uma categoria) */}
+              {vitrineCategories.length > 1 && (
+                <div className="flex items-center gap-1.5 overflow-x-auto pb-1 scrollbar-none -mx-1 px-1">
+                  {vitrineCategories.map((cat) => {
+                    const isSelected = selectedVitrineCategory === cat
+                    return (
+                      <button
+                        key={cat}
+                        type="button"
+                        onClick={() => setSelectedVitrineCategory(cat)}
+                        className={`px-3 py-1 rounded-full text-xs font-bold whitespace-nowrap transition-all cursor-pointer ${
+                          isSelected
+                            ? 'text-white shadow-xs'
+                            : isDark
+                            ? 'bg-white/[0.06] text-neutral-400 hover:text-white hover:bg-white/10'
+                            : 'bg-neutral-100 text-neutral-600 hover:text-neutral-900 hover:bg-neutral-200'
+                        }`}
+                        style={isSelected ? { backgroundColor: primaryColor } : undefined}
+                      >
+                        {cat}
+                      </button>
+                    )
+                  })}
+                </div>
+              )}
+
+              {/* Vitrine Visual de Produtos: Cards em Grid de 2 colunas */}
+              <div className="grid grid-cols-2 gap-3">
+                {displayedVitrineProducts.slice(0, 6).map((prod) => {
+                  const isConsult = prod.priceType === 'consult' || prod.price == null
+                  const hasPromo = !isConsult && prod.promotionalPrice != null && prod.promotionalPrice > 0
+                  const discountPercent =
+                    hasPromo && prod.price && prod.price > 0 && prod.promotionalPrice
+                      ? Math.round((1 - prod.promotionalPrice / prod.price) * 100)
+                      : null
+                  const prodPhoto =
+                    prod.photoUrl ||
+                    (prod as unknown as { imageUrl?: string; image?: string; photo?: string }).imageUrl ||
+                    (prod as unknown as { image?: string }).image ||
+                    (prod as unknown as { photo?: string }).photo ||
+                    ''
+
+                  return (
+                    <div
+                      key={prod.id}
+                      onClick={() => setSelectedProductDetail(prod)}
+                      className={`group rounded-2xl border p-2.5 flex flex-col justify-between transition-all cursor-pointer ${
+                        isDark
+                          ? 'bg-[#181820] border-white/[0.06] hover:border-white/20'
+                          : 'bg-neutral-50/80 border-neutral-200/90 hover:border-neutral-300 hover:bg-white shadow-2xs'
+                      }`}
+                    >
+                      {/* Foto do Produto */}
+                      <div
+                        className={`relative w-full aspect-square rounded-xl overflow-hidden mb-2.5 border flex items-center justify-center ${
+                          isDark ? 'bg-neutral-900 border-white/5' : 'bg-white border-neutral-200'
+                        }`}
+                      >
+                        {prodPhoto ? (
+                          /* eslint-disable-next-line @next/next/no-img-element */
+                          <img
+                            src={prodPhoto}
+                            alt={prod.name}
+                            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                            loading="lazy"
+                            referrerPolicy="no-referrer"
+                          />
+                        ) : (
+                          <Package className="w-8 h-8 text-neutral-400 opacity-60" />
+                        )}
+
+                        {hasPromo && (
+                          <span className="absolute top-1.5 left-1.5 px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider bg-rose-600 text-white shadow-xs">
+                            {discountPercent ? `-${discountPercent}%` : 'Promo'}
+                          </span>
+                        )}
+
+                        {prod.isAvailable === false && (
+                          <span className="absolute bottom-1.5 left-1.5 px-2 py-0.5 rounded-full text-[9px] font-extrabold uppercase tracking-wider bg-black/75 text-rose-300 border border-rose-500/30">
+                            Esgotado
+                          </span>
+                        )}
+                      </div>
+
+                      {/* Nome, Categoria & Preço */}
+                      <div className="space-y-1 flex-1 flex flex-col justify-between">
+                        <div>
+                          {prod.category && (
+                            <span className="text-[9px] font-bold uppercase tracking-wider text-neutral-400 block truncate">
+                              {prod.category}
+                            </span>
+                          )}
+                          <h4
+                            className={`font-bold text-xs leading-snug line-clamp-2 ${
+                              isDark ? 'text-white' : 'text-neutral-900'
+                            }`}
+                          >
+                            {prod.name}
+                          </h4>
+                          {prod.description && (
+                            <p
+                              className={`text-[10px] line-clamp-1 mt-0.5 ${
+                                isDark ? 'text-neutral-400' : 'text-neutral-500'
+                              }`}
+                            >
+                              {prod.description}
+                            </p>
+                          )}
+                        </div>
+
+                        <div className="pt-1.5">
+                          {isConsult ? (
+                            <span className="text-xs font-bold text-amber-400 block truncate">
+                              Sob consulta
+                            </span>
+                          ) : hasPromo ? (
+                            <div className="flex items-baseline gap-1.5 flex-wrap">
+                              <span className="text-xs font-black text-emerald-400 font-mono">
+                                R$ {prod.promotionalPrice?.toFixed(2).replace('.', ',')}
+                              </span>
+                              <span
+                                className={`text-[10px] line-through font-mono ${
+                                  isDark ? 'text-neutral-500' : 'text-neutral-400'
+                                }`}
+                              >
+                                R$ {prod.price?.toFixed(2).replace('.', ',')}
+                              </span>
+                            </div>
+                          ) : (
+                            <span
+                              className={`text-xs font-black font-mono block ${
+                                isDark ? 'text-white' : 'text-neutral-900'
+                              }`}
+                            >
+                              R$ {prod.price?.toFixed(2).replace('.', ',')}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* Botões de Ação do Card */}
+                      <div className="flex items-center gap-1.5 mt-2.5">
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            setSelectedProductDetail(prod)
+                          }}
+                          className={`flex-1 py-1.5 px-2 rounded-xl text-[11px] font-bold flex items-center justify-center gap-1 transition-all cursor-pointer ${
+                            isDark
+                              ? 'bg-white/10 hover:bg-white/15 text-white'
+                              : 'bg-neutral-100 hover:bg-neutral-200 text-neutral-900 border border-neutral-200/80'
+                          }`}
+                        >
+                          <span>Detalhes</span>
+                          <ChevronRight className="w-3 h-3" />
+                        </button>
+
+                        {company.whatsapp && (
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              const raw = company.whatsapp || ''
+                              const clean = raw.replace(/\D/g, '')
+                              const phoneWithDdi = clean.startsWith('55') ? clean : `55${clean}`
+                              const msg = encodeURIComponent(
+                                `Olá! Gostei do produto "${prod.name}" no DiretoLink e gostaria de saber mais.`
+                              )
+                              window.open(
+                                `https://wa.me/${phoneWithDdi}?text=${msg}`,
+                                '_blank',
+                                'noopener,noreferrer'
+                              )
+                            }}
+                            className="p-1.5 rounded-xl bg-[#25D366] hover:bg-[#20ba59] text-white flex items-center justify-center transition-transform active:scale-95 shadow-xs cursor-pointer"
+                            title="Pedir no WhatsApp"
+                            aria-label="Pedir no WhatsApp"
+                          >
+                            <MessageCircle className="w-3.5 h-3.5 fill-white" />
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
+
+              {/* Botão de Ver Catálogo Completo */}
+              {activeProductsList.length > 2 && (
+                <button
+                  type="button"
+                  onClick={() => setIsProductsSheetOpen(true)}
+                  className={`w-full py-2.5 rounded-2xl border text-xs font-bold flex items-center justify-center gap-1.5 transition-colors cursor-pointer ${
+                    isDark ? 'hover:bg-white/[0.05]' : 'hover:bg-neutral-100'
+                  }`}
+                  style={{
+                    backgroundColor: hexToRgba(primaryColor, isDark ? 0.1 : 0.04),
+                    borderColor: hexToRgba(primaryColor, isDark ? 0.3 : 0.2),
+                    color: isDark ? '#ffffff' : primaryColor,
+                  }}
+                >
+                  <Package className="w-3.5 h-3.5" />
+                  <span>Ver catálogo completo ({activeProductsList.length} itens)</span>
+                  <ChevronRight className="w-3.5 h-3.5" />
+                </button>
+              )}
+            </div>
+          )}
+
+          {/* Banner do Catálogo Externo se configurado */}
+          {activeModules.products && isExternalCatalog && company.productCatalog?.externalUrl && (
+            <div
+              className={`rounded-3xl p-4.5 sm:p-5 border flex items-center justify-between gap-3 ${
+                isDark
+                  ? 'bg-[#121217] border-white/[0.08] shadow-sm'
+                  : 'bg-white border-neutral-200/80 shadow-2xs'
+              }`}
+            >
+              <div className="flex items-center gap-3 min-w-0">
+                <div
+                  className="w-10 h-10 rounded-2xl flex items-center justify-center text-white shadow-xs shrink-0"
+                  style={{ backgroundColor: primaryColor }}
+                >
+                  <ShoppingBag className="w-5 h-5" />
+                </div>
+                <div className="min-w-0">
+                  <h4
+                    className={`font-black text-xs sm:text-sm truncate ${
+                      isDark ? 'text-white' : 'text-neutral-900'
+                    }`}
+                  >
+                    {company.productCatalog?.externalButtonText || 'Ver Catálogo'}
+                  </h4>
+                  <p
+                    className={`text-[11px] truncate mt-0.5 ${
+                      isDark ? 'text-neutral-400' : 'text-neutral-500'
+                    }`}
+                  >
+                    Acesse nossa loja oficial e veja todos os produtos disponíveis
+                  </p>
+                </div>
+              </div>
+
+              <button
+                type="button"
+                onClick={handleOpenCatalogExternal}
+                className="px-4 py-2.5 rounded-xl font-bold text-xs text-white shadow-sm flex items-center gap-1.5 shrink-0 transition-opacity hover:opacity-90 active:scale-95 cursor-pointer"
+                style={{ backgroundColor: primaryColor }}
+              >
+                <span>{company.productCatalog?.externalButtonText || 'Ver Catálogo'}</span>
+                <ExternalLink className="w-3.5 h-3.5 opacity-80" />
+              </button>
+            </div>
+          )}
+
+          {/* ======================================================= */}
           {/* 5. SEÇÃO VISUAL: FIDELIDADE DIGITAL                     */}
           {/* ======================================================= */}
           {activeModules.loyalty && (
@@ -1688,6 +2165,23 @@ export const PublicCompanyView: React.FC<PublicCompanyViewProps> = ({ company })
               </button>
             )}
 
+            {/* Botão de Produtos no Dock se ativo */}
+            {activeModules.products && !isExternalCatalog && (
+              <button
+                type="button"
+                onClick={() => setIsProductsSheetOpen(true)}
+                className={`p-2 sm:p-2.5 rounded-xl transition-colors flex flex-col items-center gap-0.5 cursor-pointer ${
+                  isDark
+                    ? 'text-neutral-400 hover:text-white hover:bg-white/[0.05]'
+                    : 'text-neutral-600 hover:text-neutral-900 hover:bg-neutral-100'
+                }`}
+                title="Produtos"
+              >
+                <Package className="w-4 h-4" />
+                <span className="text-[9px] font-medium hidden sm:inline">Produtos</span>
+              </button>
+            )}
+
             {activeModules.loyalty && (
               <button
                 type="button"
@@ -1827,6 +2321,21 @@ export const PublicCompanyView: React.FC<PublicCompanyViewProps> = ({ company })
           }}
           company={company}
           initialService={bookingService}
+        />
+
+        {/* Modais do Catálogo de Produtos */}
+        <ProductsSheet
+          isOpen={isProductsSheetOpen}
+          onClose={() => setIsProductsSheetOpen(false)}
+          products={products}
+          company={company}
+        />
+
+        <ProductDetailModal
+          product={selectedProductDetail}
+          isOpen={Boolean(selectedProductDetail)}
+          onClose={() => setSelectedProductDetail(null)}
+          company={company}
         />
       </main>
     </div>

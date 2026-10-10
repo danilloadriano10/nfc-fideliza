@@ -13,7 +13,7 @@ export async function POST(req: NextRequest) {
       const file = formData.get('file') as File | null
       const companyId = String(formData.get('companyId') || '').trim()
       const rawType = String(formData.get('type') || 'logo').trim().toLowerCase()
-      const type = (rawType === 'service' ? 'service' : rawType === 'cover' ? 'cover' : 'logo') as 'logo' | 'cover' | 'service'
+      const type = (rawType === 'product' ? 'product' : rawType === 'service' ? 'service' : rawType === 'cover' ? 'cover' : 'logo') as 'logo' | 'cover' | 'service' | 'product'
 
       if (!file) {
         return NextResponse.json(
@@ -31,7 +31,7 @@ export async function POST(req: NextRequest) {
 
       // Size limit (5MB)
       if (file.size > 5 * 1024 * 1024) {
-        const typeLabel = type === 'logo' ? 'logo' : type === 'cover' ? 'capa' : 'serviço'
+        const typeLabel = type === 'logo' ? 'logo' : type === 'cover' ? 'capa' : type === 'product' ? 'produto' : 'serviço'
         return NextResponse.json(
           { success: false, error: `A imagem do ${typeLabel} excede o limite máximo de 5MB.` },
           { status: 400 }
@@ -50,7 +50,7 @@ export async function POST(req: NextRequest) {
       )
 
       if (!result.success) {
-        const typeLabel = type === 'logo' ? 'logo' : type === 'cover' ? 'capa' : 'serviço'
+        const typeLabel = type === 'logo' ? 'logo' : type === 'cover' ? 'capa' : type === 'product' ? 'produto' : 'serviço'
         return NextResponse.json(
           {
             success: false,
@@ -90,7 +90,7 @@ export async function POST(req: NextRequest) {
 
       const mimeType = matches[1]
       const buffer = Buffer.from(matches[2], 'base64')
-      const targetType = type === 'cover' ? 'cover' : type === 'service' ? 'service' : 'logo'
+      const targetType = type === 'product' ? 'product' : type === 'cover' ? 'cover' : type === 'service' ? 'service' : 'logo'
 
       const result = await uploadCompanyFileServer(
         companyId,
@@ -101,7 +101,7 @@ export async function POST(req: NextRequest) {
       )
 
       if (!result.success) {
-        const typeLabel = targetType === 'logo' ? 'logo' : targetType === 'cover' ? 'capa' : 'serviço'
+        const typeLabel = targetType === 'logo' ? 'logo' : targetType === 'cover' ? 'capa' : targetType === 'product' ? 'produto' : 'serviço'
         return NextResponse.json(
           {
             success: false,

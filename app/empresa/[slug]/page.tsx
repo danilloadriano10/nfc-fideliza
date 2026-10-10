@@ -1,6 +1,10 @@
 import React from 'react'
 import { Metadata } from 'next'
-import { getServerCompanyBySlug } from '@/lib/server-storage'
+import {
+  getServerCompanyBySlug,
+  getServerProducts,
+  getServerServices,
+} from '@/lib/server-storage'
 import { EmpresaClientPage } from './empresa-client-page'
 
 export const dynamic = 'force-dynamic'
@@ -16,17 +20,17 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
 
   if (!company) {
     return {
-      title: 'Página NFC Oficial · TapHub',
+      title: 'Página NFC Oficial · DiretoLink',
     }
   }
 
   return {
-    title: `${company.name} · Página NFC Oficial`,
+    title: `${company.name} · Vitrine e Página NFC Oficial`,
     description:
       company.tagline ||
-      `Página oficial de ${company.name}. Conecte-se ao Wi-Fi, pontue na fidelidade e acesse nosso cardápio.`,
+      `Página oficial de ${company.name}. Conheça nossos produtos e serviços, conecte-se ao Wi-Fi e pontue na fidelidade.`,
     openGraph: {
-      title: `${company.name} · NFC Oficial`,
+      title: `${company.name} · Vitrine e NFC Oficial`,
       description: company.tagline || `Página oficial de ${company.name}`,
     },
   }
@@ -35,5 +39,16 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
 export default async function EmpresaPage({ params }: PageProps) {
   const { slug } = await params
   const company = await getServerCompanyBySlug(slug)
-  return <EmpresaClientPage slug={slug} initialCompany={company} />
+  const initialProducts = company ? await getServerProducts(company.id) : []
+  const initialServices = company ? await getServerServices(company.id) : []
+
+  return (
+    <EmpresaClientPage
+      slug={slug}
+      initialCompany={company}
+      initialProducts={initialProducts}
+      initialServices={initialServices}
+    />
+  )
 }
+

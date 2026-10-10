@@ -27,6 +27,11 @@ service cloud.firestore {
       allow read, write: if true;
     }
 
+    // Products: Company products for catalog showcase
+    match /products/{productId} {
+      allow read, write: if true;
+    }
+
     // Appointments: Multi-tenant booking reservations
     match /appointments/{appointmentId} {
       allow read, write: if true;

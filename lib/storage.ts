@@ -6,6 +6,7 @@ import {
   PrivateFeedback,
   GlobalStats,
   CompanyService,
+  CompanyProduct,
   Appointment,
   AppointmentStatus,
   CompanyProfessional,
@@ -28,6 +29,7 @@ const STORAGE_KEYS = {
   LOGS: 'nfc_tenant_logs_v1',
   FEEDBACKS: 'nfc_tenant_feedbacks_v1',
   SERVICES: 'nfc_tenant_services_v1',
+  PRODUCTS: 'nfc_tenant_products_v1',
   APPOINTMENTS: 'nfc_tenant_appointments_v1',
   PROFESSIONALS: 'nfc_tenant_professionals_v1',
   DELETED_COMPANIES: 'nfc_tenant_deleted_companies_v1',
@@ -54,6 +56,7 @@ let memoryRequests: PointRequest[] = [...INITIAL_REQUESTS]
 let memoryLogs: ActivityLog[] = [...INITIAL_LOGS]
 let memoryFeedbacks: PrivateFeedback[] = [...INITIAL_FEEDBACKS]
 let memoryServices: CompanyService[] = [...INITIAL_SERVICES]
+let memoryProducts: CompanyProduct[] = []
 let memoryAppointments: Appointment[] = []
 let memoryProfessionals: CompanyProfessional[] = [...INITIAL_PROFESSIONALS]
 
@@ -1254,9 +1257,11 @@ export function resetDemoData(): void {
   setItem(STORAGE_KEYS.LOGS, INITIAL_LOGS)
   setItem(STORAGE_KEYS.FEEDBACKS, INITIAL_FEEDBACKS)
   setItem(STORAGE_KEYS.SERVICES, [])
+  setItem(STORAGE_KEYS.PRODUCTS, [])
   setItem(STORAGE_KEYS.APPOINTMENTS, [])
   setItem(STORAGE_KEYS.PROFESSIONALS, [])
   memoryServices = []
+  memoryProducts = []
   memoryAppointments = []
   memoryProfessionals = []
   notifyDataChange()
@@ -1380,6 +1385,138 @@ export async function toggleCompanyServiceOnServerApi(
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ id: serviceId, companyId, toggleStatus: true }),
+    })
+    return res.ok
+  } catch {
+    return true
+  }
+}
+
+// ==========================================
+// 8.1 PRODUCTS (MULTI-TENANT CRUD & SERVER SYNC)
+// ==========================================
+
+export function getCompanyProducts(companyId: string): CompanyProduct[] {
+  if (!isBrowser()) {
+    return memoryProducts.filter((p) => p.companyId === companyId)
+  }
+  const all = getItem<CompanyProduct[]>(STORAGE_KEYS.PRODUCTS, memoryProducts) || []
+  return all
+    .filter((p) => p.companyId === companyId)
+    .sort((a, b) => {
+      const orderA = typeof a.order === 'number' ? a.order : 0
+      const orderB = typeof b.order === 'number' ? b.order : 0
+      if (orderA !== orderB) return orderA - orderB
+      return (b.createdAt || '').localeCompare(a.createdAt || '')
+    })
+}
+
+export function saveCompanyProductLocally(product: CompanyProduct): void {
+  if (!isBrowser()) return
+  const all = getItem<CompanyProduct[]>(STORAGE_KEYS.PRODUCTS, memoryProducts) || []
+  const idx = all.findIndex((p) => p.id === product.id && p.companyId === product.companyId)
+  let updated: CompanyProduct[]
+  if (idx >= 0) {
+    updated = [...all]
+    updated[idx] = product
+  } else {
+    updated = [product, ...all]
+  }
+  memoryProducts = updated
+  setItem(STORAGE_KEYS.PRODUCTS, updated)
+  notifyDataChange()
+}
+
+export function deleteCompanyProductLocally(productId: string, companyId: string): void {
+  if (!isBrowser()) return
+  const all = getItem<CompanyProduct[]>(STORAGE_KEYS.PRODUCTS, memoryProducts) || []
+  const updated = all.filter((p) => !(p.id === productId && p.companyId === companyId))
+  memoryProducts = updated
+  setItem(STORAGE_KEYS.PRODUCTS, updated)
+  notifyDataChange()
+}
+
+export async function fetchCompanyProductsFromServer(companyId: string): Promise<CompanyProduct[]> {
+  if (!companyId) return []
+  try {
+    const res = await fetch(`/api/products?companyId=${encodeURIComponent(companyId)}`)
+    if (res.ok) {
+      const data = await res.json()
+      if (Array.isArray(data.products)) {
+        if (isBrowser()) {
+          const currentAll = getItem<CompanyProduct[]>(STORAGE_KEYS.PRODUCTS, memoryProducts) || []
+          const otherProducts = currentAll.filter((p) => p.companyId !== companyId)
+          const merged = [...data.products, ...otherProducts]
+          memoryProducts = merged
+          setItem(STORAGE_KEYS.PRODUCTS, merged)
+          notifyDataChange()
+        }
+        return data.products
+      }
+    }
+  } catch (err) {
+    console.error('Error fetching products from server:', err)
+  }
+  return getCompanyProducts(companyId)
+}
+
+export async function saveCompanyProductOnServerApi(
+  product: CompanyProduct,
+  isEdit = false
+): Promise<{ success: boolean; product?: CompanyProduct; error?: string }> {
+  // Only cache locally immediately if not raw large base64
+  if (!product.photoUrl || !product.photoUrl.startsWith('data:')) {
+    saveCompanyProductLocally(product)
+  }
+  try {
+    const res = await fetch('/api/products', {
+      method: isEdit ? 'PUT' : 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(product),
+    })
+    const data = await res.json()
+    if (res.ok && data.success) {
+      if (data.product) {
+        saveCompanyProductLocally(data.product)
+      }
+      return { success: true, product: data.product || product }
+    }
+    return { success: false, error: data.error || 'Erro ao salvar produto no servidor.' }
+  } catch {
+    saveCompanyProductLocally(product)
+    return { success: true, product }
+  }
+}
+
+export async function deleteCompanyProductOnServerApi(
+  productId: string,
+  companyId: string
+): Promise<boolean> {
+  deleteCompanyProductLocally(productId, companyId)
+  try {
+    const res = await fetch(`/api/products?id=${encodeURIComponent(productId)}&companyId=${encodeURIComponent(companyId)}`, {
+      method: 'DELETE',
+    })
+    return res.ok
+  } catch {
+    return true
+  }
+}
+
+export async function toggleCompanyProductOnServerApi(
+  productId: string,
+  companyId: string
+): Promise<boolean> {
+  const all = getCompanyProducts(companyId)
+  const current = all.find((p) => p.id === productId)
+  if (current) {
+    saveCompanyProductLocally({ ...current, isActive: !current.isActive })
+  }
+  try {
+    const res = await fetch('/api/products', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id: productId, companyId, toggleStatus: true }),
     })
     return res.ok
   } catch {

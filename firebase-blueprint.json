@@ -148,6 +148,29 @@
         "isActive": { "type": "boolean" }
       },
       "required": ["id", "companyId", "name", "isActive"]
+    },
+    "Product": {
+      "title": "Product",
+      "description": "Establishment products catalog for showcase and external sales.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128 },
+        "companyId": { "type": "string", "maxLength": 128 },
+        "name": { "type": "string", "maxLength": 150 },
+        "photoUrl": { "type": "string", "maxLength": 2048 },
+        "category": { "type": "string", "maxLength": 100 },
+        "description": { "type": "string", "maxLength": 1000 },
+        "price": { "type": "number" },
+        "priceType": { "type": "string", "enum": ["fixed", "consult"] },
+        "promotionalPrice": { "type": "number" },
+        "isAvailable": { "type": "boolean" },
+        "purchaseUrl": { "type": "string", "maxLength": 2048 },
+        "order": { "type": "number" },
+        "isActive": { "type": "boolean" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "companyId", "name", "isActive"]
     }
   },
   "firestore": {
@@ -174,6 +197,10 @@
     "/services/{serviceId}": {
       "schema": "Service",
       "description": "Catalog of company services."
+    },
+    "/products/{productId}": {
+      "schema": "Product",
+      "description": "Catalog of company products."
     },
     "/appointments/{appointmentId}": {
       "schema": "Appointment",
