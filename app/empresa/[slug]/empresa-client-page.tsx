@@ -4,7 +4,7 @@ import React, { useState, useEffect } from 'react'
 import Link from 'next/link'
 import { Store, ArrowLeft, AlertTriangle, Loader2 } from 'lucide-react'
 import { Company, CompanyProduct, CompanyService, MenuItem } from '@/types/platform'
-import { getCompanyBySlug, DATA_CHANGE_EVENT, saveCompanyLocally } from '@/lib/storage'
+import { getCompanyBySlug, isCompanyDeleted, DATA_CHANGE_EVENT, saveCompanyLocally } from '@/lib/storage'
 import { PublicCompanyView } from '@/components/public/public-company-view'
 
 interface EmpresaClientPageProps {
@@ -22,11 +22,20 @@ export const EmpresaClientPage: React.FC<EmpresaClientPageProps> = ({
   initialServices,
   initialMenuItems,
 }) => {
-  const [company, setCompany] = useState<Company | null>(initialCompany || null)
+  const [company, setCompany] = useState<Company | null>(() => {
+    if (isCompanyDeleted(slug)) return null
+    return initialCompany || null
+  })
   const [isLoading, setIsLoading] = useState(!initialCompany)
 
   useEffect(() => {
     let isMounted = true
+
+    if (isCompanyDeleted(slug)) {
+      setCompany(null)
+      setIsLoading(false)
+      return
+    }
 
     const fetchCompanyData = async () => {
       // 1. Try local storage first
@@ -42,9 +51,17 @@ export const EmpresaClientPage: React.FC<EmpresaClientPageProps> = ({
         if (res.ok) {
           const data = await res.json()
           if (data.company && isMounted) {
-            setCompany(data.company)
-            saveCompanyLocally(data.company)
+            if (!isCompanyDeleted(data.company.id) && !isCompanyDeleted(data.company.slug)) {
+              setCompany(data.company)
+              saveCompanyLocally(data.company)
+            } else {
+              setCompany(null)
+            }
+          } else if (isMounted) {
+            setCompany(null)
           }
+        } else if (res.status === 404 && isMounted) {
+          setCompany(null)
         }
       } catch (err) {
         console.error('Error fetching company by slug:', err)
@@ -58,8 +75,12 @@ export const EmpresaClientPage: React.FC<EmpresaClientPageProps> = ({
     fetchCompanyData()
 
     const onDataChange = () => {
+      if (isCompanyDeleted(slug)) {
+        setCompany(null)
+        return
+      }
       const fresh = getCompanyBySlug(slug)
-      if (fresh) setCompany(fresh)
+      setCompany(fresh)
     }
 
     window.addEventListener(DATA_CHANGE_EVENT, onDataChange)

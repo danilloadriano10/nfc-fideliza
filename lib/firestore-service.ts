@@ -85,7 +85,12 @@ export async function ensureFirestoreInitialized(): Promise<void> {
       const deletedIds = new Set<string>()
       try {
         const deletedSnap = await getDocs(collection(db, DELETED_COMPANIES_COLLECTION))
-        deletedSnap.forEach((d) => deletedIds.add(d.id))
+        deletedSnap.forEach((d) => {
+          deletedIds.add(d.id.toLowerCase().trim())
+          const data = d.data()
+          if (data?.companyId) deletedIds.add(String(data.companyId).toLowerCase().trim())
+          if (data?.slug) deletedIds.add(String(data.slug).toLowerCase().trim())
+        })
       } catch {}
 
       // 2. Load existing data from data/platform-db.json or initial seeds
@@ -105,7 +110,9 @@ export async function ensureFirestoreInitialized(): Promise<void> {
 
       // 3. Migrate Companies to Firestore (skip if previously deleted)
       for (const comp of legacyData.companies) {
-        if (deletedIds.has(comp.id)) {
+        const idClean = comp.id.toLowerCase().trim()
+        const slugClean = (comp.slug || '').toLowerCase().trim()
+        if (deletedIds.has(idClean) || deletedIds.has(slugClean)) {
           continue // Never resurrect deleted company
         }
         const compRef = doc(db, COMPANIES_COLLECTION, comp.id)
@@ -218,14 +225,24 @@ export async function getFirestoreCompanies(): Promise<Company[]> {
     const deletedIds = new Set<string>()
     try {
       const delSnap = await getDocs(collection(db, DELETED_COMPANIES_COLLECTION))
-      delSnap.forEach((d) => deletedIds.add(d.id))
+      delSnap.forEach((d) => {
+        deletedIds.add(d.id.toLowerCase().trim())
+        const data = d.data()
+        if (data?.companyId) deletedIds.add(String(data.companyId).toLowerCase().trim())
+        if (data?.slug) deletedIds.add(String(data.slug).toLowerCase().trim())
+      })
     } catch {}
 
     const companies: Company[] = []
     snapshot.forEach((d) => {
       const comp = d.data() as Company
-      if (!deletedIds.has(comp.id)) {
-        companies.push(comp)
+      const idClean = (comp.id || d.id || '').toLowerCase().trim()
+      const slugClean = (comp.slug || '').toLowerCase().trim()
+      if (!deletedIds.has(idClean) && !deletedIds.has(slugClean)) {
+        companies.push({
+          ...comp,
+          id: comp.id || d.id,
+        })
       }
     })
     return companies.sort((a, b) => (a.name || '').localeCompare(b.name || ''))
@@ -239,16 +256,26 @@ export async function getFirestoreCompanyBySlug(slug: string): Promise<Company |
   await ensureFirestoreInitialized()
   const clean = slug.toLowerCase().trim()
   try {
+    // Check if slug itself is in deleted_companies
+    try {
+      const slugDelSnap = await getDoc(doc(db, DELETED_COMPANIES_COLLECTION, clean))
+      if (slugDelSnap.exists()) return null
+    } catch {}
+
     const collRef = collection(db, COMPANIES_COLLECTION)
     const q = query(collRef, where('slug', '==', clean))
     const snapshot = await getDocs(q)
     if (snapshot.empty) return null
     const comp = snapshot.docs[0].data() as Company
 
-    // Check if company is marked as deleted
+    // Check if company ID or slug is marked as deleted
     try {
       const delSnap = await getDoc(doc(db, DELETED_COMPANIES_COLLECTION, comp.id))
       if (delSnap.exists()) return null
+      if (comp.slug) {
+        const slugDel = await getDoc(doc(db, DELETED_COMPANIES_COLLECTION, comp.slug.toLowerCase().trim()))
+        if (slugDel.exists()) return null
+      }
     } catch {}
 
     return comp
@@ -260,13 +287,28 @@ export async function getFirestoreCompanyBySlug(slug: string): Promise<Company |
 export async function getFirestoreCompanyById(id: string): Promise<Company | null> {
   if (!id) return null
   await ensureFirestoreInitialized()
+  const cleanId = id.trim()
   try {
-    const docRef = doc(db, COMPANIES_COLLECTION, id)
+    try {
+      const delSnap = await getDoc(doc(db, DELETED_COMPANIES_COLLECTION, cleanId))
+      if (delSnap.exists()) return null
+    } catch {}
+
+    const docRef = doc(db, COMPANIES_COLLECTION, cleanId)
     const snap = await getDoc(docRef)
     if (!snap.exists()) return null
-    return snap.data() as Company
+    const comp = snap.data() as Company
+
+    try {
+      if (comp.slug) {
+        const slugDel = await getDoc(doc(db, DELETED_COMPANIES_COLLECTION, comp.slug.toLowerCase().trim()))
+        if (slugDel.exists()) return null
+      }
+    } catch {}
+
+    return comp
   } catch (err) {
-    handleFirestoreError(err, OperationType.GET, `${COMPANIES_COLLECTION}/${id}`)
+    handleFirestoreError(err, OperationType.GET, `${COMPANIES_COLLECTION}/${cleanId}`)
   }
 }
 
@@ -373,48 +415,162 @@ export async function saveFirestoreCompany(
   }
 }
 
+export async function getFirestoreDeletedCompanyIds(): Promise<string[]> {
+  await ensureFirestoreInitialized()
+  try {
+    const delSnap = await getDocs(collection(db, DELETED_COMPANIES_COLLECTION))
+    const ids = new Set<string>()
+    delSnap.forEach((d) => {
+      ids.add(d.id.toLowerCase().trim())
+      const data = d.data()
+      if (data?.companyId) ids.add(String(data.companyId).toLowerCase().trim())
+      if (data?.slug) ids.add(String(data.slug).toLowerCase().trim())
+      if (data?.id) ids.add(String(data.id).toLowerCase().trim())
+    })
+    return Array.from(ids).filter(Boolean)
+  } catch (err) {
+    console.error('Error fetching deleted company IDs from Firestore:', err)
+    return []
+  }
+}
+
 export async function deleteFirestoreCompany(companyId: string): Promise<boolean> {
   if (!companyId) return false
   await ensureFirestoreInitialized()
 
   try {
-    // 1. Delete Company document
-    const compRef = doc(db, COMPANIES_COLLECTION, companyId)
-    await deleteDoc(compRef)
+    // 1. Resolve real document ID and slug
+    let realId = companyId
+    let slug = ''
 
-    // 2. Mark as permanently deleted in deleted_companies to prevent resurrection
-    const delRef = doc(db, DELETED_COMPANIES_COLLECTION, companyId)
-    await setDoc(delRef, {
-      id: companyId,
-      companyId,
-      deletedAt: new Date().toISOString(),
-    })
+    const compDoc = await getDoc(doc(db, COMPANIES_COLLECTION, companyId))
+    if (compDoc.exists()) {
+      const data = compDoc.data() as Company
+      realId = data.id || companyId
+      slug = data.slug || ''
+    } else {
+      const q = query(
+        collection(db, COMPANIES_COLLECTION),
+        where('slug', '==', companyId.toLowerCase().trim())
+      )
+      const snap = await getDocs(q)
+      if (!snap.empty) {
+        realId = snap.docs[0].id
+        slug = (snap.docs[0].data() as Company).slug || ''
+      }
+    }
 
-    // 3. Cascade delete customers
-    const custColl = collection(db, CUSTOMERS_COLLECTION)
-    const custSnap = await getDocs(query(custColl, where('companyId', '==', companyId)))
-    const batch = writeBatch(db)
-    custSnap.forEach((d) => batch.delete(d.ref))
+    // 2. Permanently delete company document(s) from Firestore
+    await deleteDoc(doc(db, COMPANIES_COLLECTION, realId))
+    if (slug && slug !== realId) {
+      try {
+        await deleteDoc(doc(db, COMPANIES_COLLECTION, slug))
+      } catch {}
+    }
 
-    // 4. Cascade delete requests
-    const reqColl = collection(db, REQUESTS_COLLECTION)
-    const reqSnap = await getDocs(query(reqColl, where('companyId', '==', companyId)))
-    reqSnap.forEach((d) => batch.delete(d.ref))
+    // Delete any documents with matching slug or id in companies collection
+    if (slug) {
+      try {
+        const qSlug = query(
+          collection(db, COMPANIES_COLLECTION),
+          where('slug', '==', slug.toLowerCase().trim())
+        )
+        const snapSlug = await getDocs(qSlug)
+        for (const d of snapSlug.docs) {
+          await deleteDoc(d.ref)
+        }
+      } catch {}
+    }
 
-    // 5. Cascade delete feedbacks
-    const feedColl = collection(db, FEEDBACKS_COLLECTION)
-    const feedSnap = await getDocs(query(feedColl, where('companyId', '==', companyId)))
-    feedSnap.forEach((d) => batch.delete(d.ref))
+    try {
+      const qId = query(collection(db, COMPANIES_COLLECTION), where('id', '==', realId))
+      const snapId = await getDocs(qId)
+      for (const d of snapId.docs) {
+        await deleteDoc(d.ref)
+      }
+    } catch {}
 
-    // 6. Cascade delete logs
-    const logColl = collection(db, LOGS_COLLECTION)
-    const logSnap = await getDocs(query(logColl, where('companyId', '==', companyId)))
-    logSnap.forEach((d) => batch.delete(d.ref))
+    // 3. Register tombstone in deleted_companies so it NEVER resurrects on reboot or sync
+    const now = new Date().toISOString()
+    const tombstones = Array.from(
+      new Set([
+        realId,
+        realId.toLowerCase().trim(),
+        slug,
+        slug.toLowerCase().trim(),
+        companyId,
+        companyId.toLowerCase().trim(),
+      ])
+    ).filter(Boolean)
 
-    await batch.commit()
+    for (const tId of tombstones) {
+      try {
+        await setDoc(doc(db, DELETED_COMPANIES_COLLECTION, tId), {
+          id: realId,
+          companyId: realId,
+          slug: slug || realId,
+          deletedAt: now,
+        })
+      } catch (err) {
+        console.warn(`Failed writing tombstone ${tId}:`, err)
+      }
+    }
+
+    // 4. Cascade delete ALL records linked exclusively to this companyId
+    const targetIds = Array.from(
+      new Set([
+        realId,
+        realId.toLowerCase().trim(),
+        slug,
+        slug.toLowerCase().trim(),
+        companyId,
+        companyId.toLowerCase().trim(),
+      ])
+    ).filter(Boolean)
+
+    const collectionsToPurge = [
+      CUSTOMERS_COLLECTION,
+      REQUESTS_COLLECTION,
+      FEEDBACKS_COLLECTION,
+      LOGS_COLLECTION,
+      SERVICES_COLLECTION,
+      PRODUCTS_COLLECTION,
+      MENU_ITEMS_COLLECTION,
+      APPOINTMENTS_COLLECTION,
+      PROFESSIONALS_COLLECTION,
+    ]
+
+    for (const collName of collectionsToPurge) {
+      for (const targetId of targetIds) {
+        try {
+          const qDocs = query(collection(db, collName), where('companyId', '==', targetId))
+          const snapDocs = await getDocs(qDocs)
+          if (!snapDocs.empty) {
+            let currentBatch = writeBatch(db)
+            let opCount = 0
+            for (const docItem of snapDocs.docs) {
+              currentBatch.delete(docItem.ref)
+              opCount++
+              if (opCount >= 400) {
+                await currentBatch.commit()
+                currentBatch = writeBatch(db)
+                opCount = 0
+              }
+            }
+            if (opCount > 0) {
+              await currentBatch.commit()
+            }
+          }
+        } catch (err) {
+          console.warn(`Error purging collection ${collName} for company ${targetId}:`, err)
+        }
+      }
+    }
+
     return true
   } catch (err) {
     handleFirestoreError(err, OperationType.DELETE, `${COMPANIES_COLLECTION}/${companyId}`)
+    return false
   }
 }
 

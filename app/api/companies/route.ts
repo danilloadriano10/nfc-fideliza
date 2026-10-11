@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import {
   getServerCompanies,
+  getServerDeletedCompanyIds,
   getServerCompanyBySlug,
   saveServerCompany,
   deleteServerCompany,
@@ -26,7 +27,8 @@ export async function GET(req: NextRequest) {
     }
 
     const companies = await getServerCompanies()
-    return NextResponse.json({ companies })
+    const deletedIds = await getServerDeletedCompanyIds()
+    return NextResponse.json({ companies, deletedIds })
   } catch (err) {
     console.error('Error fetching companies from Firestore:', err)
     return NextResponse.json({ error: 'Erro interno ao buscar empresas', details: err instanceof Error ? err.message : String(err) }, { status: 500 })

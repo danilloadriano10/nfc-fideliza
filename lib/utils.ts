@@ -41,3 +41,18 @@ export function slugify(text: string): string {
     .replace(/\s+/g, "-")
     .replace(/-+/g, "-")
 }
+
+/**
+ * Generates direct WhatsApp chat link (wa.me)
+ */
+export function getWhatsappLink(raw: string, message?: string): string {
+  const digits = normalizePhone(raw)
+  if (!digits) return "#"
+  const countryCode = digits.startsWith("55") && digits.length >= 12 ? digits : `55${digits}`
+  const base = `https://wa.me/${countryCode}`
+  if (message) {
+    return `${base}?text=${encodeURIComponent(message)}`
+  }
+  return base
+}
+

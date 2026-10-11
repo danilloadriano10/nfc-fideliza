@@ -6,6 +6,7 @@
 
 import {
   getFirestoreCompanies,
+  getFirestoreDeletedCompanyIds,
   getFirestoreCompanyBySlug,
   getFirestoreCompanyById,
   saveFirestoreCompany,
@@ -75,6 +76,10 @@ ensureFirestoreInitialized().catch((err) => {
 
 export async function getServerCompanies(): Promise<Company[]> {
   return await getFirestoreCompanies()
+}
+
+export async function getServerDeletedCompanyIds(): Promise<string[]> {
+  return await getFirestoreDeletedCompanyIds()
 }
 
 export async function getServerCompanyBySlug(slug: string): Promise<Company | null> {

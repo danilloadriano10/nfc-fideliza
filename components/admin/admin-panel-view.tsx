@@ -33,6 +33,7 @@ import {
   MessageSquare,
   Radio,
   Clock,
+  Loader2,
 } from 'lucide-react'
 import { Company, Customer, ActivityLog, GlobalStats, PointRequest, PrivateFeedback } from '@/types/platform'
 import {
@@ -73,6 +74,16 @@ export const AdminPanelView: React.FC = () => {
   const [searchFilter, setSearchFilter] = useState('')
   const [isNewModalOpen, setIsNewModalOpen] = useState(false)
   const [editingCompany, setEditingCompany] = useState<Company | null>(null)
+
+  // Delete Company Confirmation Modal State
+  const [deleteModalTarget, setDeleteModalTarget] = useState<{
+    id: string
+    name: string
+    slug: string
+  } | null>(null)
+  const [deleteConfirmInput, setDeleteConfirmInput] = useState('')
+  const [isDeleting, setIsDeleting] = useState(false)
+  const [deleteError, setDeleteError] = useState<string | null>(null)
   const [toastText, setToastText] = useState<string | null>(null)
 
   const [isAuthenticated, setIsAuthenticated] = useState<boolean>(() => {
@@ -94,7 +105,13 @@ export const AdminPanelView: React.FC = () => {
     }
 
     loadData()
-    syncCompaniesFromServer().then(() => loadData())
+    syncCompaniesFromServer().then((fresh) => {
+      if (Array.isArray(fresh)) {
+        setCompanies(fresh)
+      } else {
+        loadData()
+      }
+    })
     const handleAuth = () => {
       const auth = isAdminAuthenticated()
       setIsAuthenticated(auth)
@@ -130,17 +147,66 @@ export const AdminPanelView: React.FC = () => {
     notify(`Status de ${name || 'empresa'} alterado com sucesso.`)
   }
 
-  const handleDeleteCompany = async (id: string, name: string) => {
-    if (
-      confirm(
-        `Atenção: Tem certeza que deseja EXCLUIR a empresa "${name}"? Esta ação removerá a empresa e seus registros de clientes e fidelidade permanentemente.`
+  const handleOpenDeleteModal = (id: string, name: string, slug?: string) => {
+    if (!id) return
+    setDeleteModalTarget({ id, name, slug: slug || '' })
+    setDeleteConfirmInput('')
+    setDeleteError(null)
+  }
+
+  const handleCloseDeleteModal = () => {
+    if (isDeleting) return
+    setDeleteModalTarget(null)
+    setDeleteConfirmInput('')
+    setDeleteError(null)
+  }
+
+  const handleConfirmDelete = async () => {
+    if (!deleteModalTarget || isDeleting) return
+    if (deleteConfirmInput.trim().toUpperCase() !== 'EXCLUIR') {
+      setDeleteError('Por favor, digite EXCLUIR exatamente para confirmar.')
+      return
+    }
+
+    const { id, name, slug } = deleteModalTarget
+    setIsDeleting(true)
+    setDeleteError(null)
+
+    // 1. Immediately remove from state for instant responsiveness in Admin Panel
+    setCompanies((prev) =>
+      prev.filter(
+        (c) =>
+          c &&
+          c.id !== id &&
+          c.slug !== id &&
+          (!slug || c.slug !== slug) &&
+          c.id.toLowerCase() !== id.toLowerCase()
       )
-    ) {
+    )
+
+    notify(`Excluindo empresa "${name}" definitivamente...`)
+
+    try {
+      // 2. Definitive deletion in Firestore with cascade of isolated tenant data
       const res = await deleteCompanyAsync(id)
+      await syncCompaniesFromServer()
+      loadData()
+
+      setIsDeleting(false)
+      setDeleteModalTarget(null)
+      setDeleteConfirmInput('')
+
       if (res) {
-        loadData()
+        notify(`Empresa "${name}" excluída definitivamente com sucesso.`)
+      } else {
         notify(`Empresa "${name}" excluída com sucesso.`)
       }
+    } catch (err) {
+      console.error('Erro ao excluir empresa:', err)
+      setIsDeleting(false)
+      setDeleteError('Falha ao processar exclusão no Firestore.')
+      loadData()
+      notify('Falha ao processar exclusão no Firestore.')
     }
   }
 
@@ -529,6 +595,16 @@ export const AdminPanelView: React.FC = () => {
                             </span>
                           </div>
                         )}
+                        <div className="flex justify-between items-center">
+                          <span className="text-neutral-400 text-[11px]">WhatsApp:</span>
+                          <span className="font-mono text-neutral-800 text-[11px] font-semibold">
+                            {comp.whatsapp && String(comp.whatsapp).trim() ? (
+                              formatPhone(comp.whatsapp)
+                            ) : (
+                              <span className="text-neutral-400 font-normal italic">Não cadastrado</span>
+                            )}
+                          </span>
+                        </div>
                         <div className="flex justify-between">
                           <span className="text-neutral-400 text-[11px]">Campanha:</span>
                           <span className="font-medium truncate max-w-[150px]">
@@ -585,6 +661,15 @@ export const AdminPanelView: React.FC = () => {
                             <span>Painel</span>
                           </Link>
                         </div>
+
+                        <button
+                          onClick={() => handleOpenDeleteModal(comp.id, compName, compSlug)}
+                          className="w-full py-1.5 px-2 text-center rounded-lg bg-red-50 hover:bg-red-100 text-red-700 border border-red-200 text-[11px] font-semibold transition-all flex items-center justify-center gap-1.5 shadow-xs cursor-pointer"
+                          title="Excluir empresa definitivamente do Firestore"
+                        >
+                          <Trash2 className="w-3.5 h-3.5 text-red-600" />
+                          <span>Excluir empresa</span>
+                        </button>
                       </div>
                     </div>
                   )
@@ -687,6 +772,7 @@ export const AdminPanelView: React.FC = () => {
                 <thead>
                   <tr className="border-b border-neutral-200 text-neutral-400 uppercase tracking-wider text-[10px]">
                     <th className="py-3 px-3">Empresa</th>
+                    <th className="py-3 px-3">WhatsApp</th>
                     <th className="py-3 px-3">URL Pública (NFC)</th>
                     <th className="py-3 px-3">Login do Proprietário</th>
                     <th className="py-3 px-3">Fidelidade</th>
@@ -719,9 +805,20 @@ export const AdminPanelView: React.FC = () => {
                             </div>
                             <div>
                               <span className="font-bold text-neutral-900 block">{compName}</span>
-                              <span className="text-[10px] text-neutral-400">{formatPhone(c.whatsapp) || 'Sem telefone'}</span>
+                              <span className="text-[10px] text-neutral-400 font-mono">ID: {c.id}</span>
                             </div>
                           </div>
+                        </td>
+                        <td className="py-3 px-3 font-mono">
+                          {c.whatsapp && String(c.whatsapp).trim() ? (
+                            <span className="bg-neutral-100 border border-neutral-200/80 px-2 py-0.5 rounded-md text-[11px] font-semibold text-neutral-900 inline-block">
+                              {formatPhone(c.whatsapp)}
+                            </span>
+                          ) : (
+                            <span className="text-neutral-400 text-[11px] italic">
+                              Não cadastrado
+                            </span>
+                          )}
                         </td>
                         <td className="py-3 px-3 font-mono text-neutral-600">
                           <div className="flex items-center gap-1.5">
@@ -771,7 +868,7 @@ export const AdminPanelView: React.FC = () => {
                           </button>
                         </td>
                         <td className="py-3 px-3 text-right">
-                          <div className="flex items-center justify-end gap-1.5">
+                          <div className="flex items-center justify-end gap-1.5 flex-wrap">
                             <button
                               onClick={() => handleOpenEdit(c)}
                               className="px-2 py-1 rounded-lg bg-white border border-neutral-200 hover:bg-neutral-50 text-neutral-800 text-[11px] font-medium transition-colors flex items-center gap-1 shadow-xs"
@@ -801,11 +898,12 @@ export const AdminPanelView: React.FC = () => {
                             </Link>
 
                             <button
-                              onClick={() => handleDeleteCompany(c.id, compName)}
-                              className="p-1 rounded-lg bg-red-50 hover:bg-red-100 text-red-600 border border-red-100 transition-colors"
-                              title="Excluir empresa"
+                              onClick={() => handleOpenDeleteModal(c.id, compName, compSlug)}
+                              className="px-2.5 py-1 rounded-lg bg-red-50 hover:bg-red-100 text-red-700 hover:text-red-800 border border-red-200 text-[11px] font-semibold transition-colors flex items-center gap-1 shadow-xs cursor-pointer"
+                              title={`Excluir empresa ${compName} definitivamente`}
                             >
-                              <Trash2 className="w-3.5 h-3.5" />
+                              <Trash2 className="w-3.5 h-3.5 text-red-600" />
+                              <span>Excluir empresa</span>
                             </button>
                           </div>
                         </td>
@@ -864,6 +962,16 @@ export const AdminPanelView: React.FC = () => {
                     <p className="text-xs text-neutral-500">
                       Gerencie a lista de clientes, saldo de pontos e histórico de validações no painel individual da empresa.
                     </p>
+                    <div className="flex items-center justify-between text-[11px] pt-2 border-t border-neutral-200/60">
+                      <span className="text-neutral-400">WhatsApp da Empresa:</span>
+                      <span className="font-mono text-neutral-800 font-semibold text-xs">
+                        {comp.whatsapp && String(comp.whatsapp).trim() ? (
+                          formatPhone(comp.whatsapp)
+                        ) : (
+                          <span className="text-neutral-400 font-normal italic">Não cadastrado</span>
+                        )}
+                      </span>
+                    </div>
                   </div>
                 )
               })}
@@ -991,6 +1099,105 @@ export const AdminPanelView: React.FC = () => {
         }}
         companyToEdit={editingCompany}
       />
+
+      {/* Confirmation Modal for Definitive Company Deletion */}
+      {deleteModalTarget && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs animate-in fade-in duration-150"
+          role="dialog"
+          aria-modal="true"
+        >
+          <div className="bg-white rounded-3xl max-w-md w-full border border-red-100 shadow-2xl p-6 sm:p-7 space-y-5 relative">
+            <div className="flex items-start gap-3.5">
+              <div className="w-12 h-12 rounded-2xl bg-red-100 text-red-600 flex items-center justify-center shrink-0 border border-red-200">
+                <Trash2 className="w-6 h-6" />
+              </div>
+              <div className="space-y-1">
+                <h3 className="text-base font-bold text-neutral-900 leading-tight">
+                  Excluir empresa definitivamente
+                </h3>
+                <p className="text-xs text-neutral-500">
+                  Esta ação é irreversível no Firestore e não pode ser desfeita.
+                </p>
+              </div>
+            </div>
+
+            <div className="p-3.5 bg-red-50/80 border border-red-200/90 rounded-2xl space-y-2 text-xs text-red-900">
+              <p className="font-semibold text-red-950">
+                Você está prestes a excluir: <span className="underline font-bold">{deleteModalTarget.name}</span>
+              </p>
+              <ul className="list-disc list-inside space-y-1 text-[11px] text-red-800">
+                <li>O cadastro da empresa no Firestore</li>
+                <li>Todos os clientes vinculados exclusivamente ao ID desta empresa</li>
+                <li>Solicitações de pontos, histórico de atividades e avaliações</li>
+                <li>Serviços, produtos, cardápio e agendamentos</li>
+                <li>A URL pública <code>/empresa/{deleteModalTarget.slug}</code> deixará de existir</li>
+              </ul>
+            </div>
+
+            <div className="space-y-2">
+              <label className="block text-xs font-semibold text-neutral-800">
+                Para confirmar a exclusão, digite <span className="text-red-600 font-bold tracking-wide">EXCLUIR</span> abaixo:
+              </label>
+              <input
+                type="text"
+                value={deleteConfirmInput}
+                onChange={(e) => {
+                  setDeleteConfirmInput(e.target.value)
+                  if (deleteError) setDeleteError(null)
+                }}
+                onKeyDown={(e) => {
+                  if (
+                    e.key === 'Enter' &&
+                    deleteConfirmInput.trim().toUpperCase() === 'EXCLUIR' &&
+                    !isDeleting
+                  ) {
+                    handleConfirmDelete()
+                  }
+                }}
+                placeholder="Digite EXCLUIR"
+                disabled={isDeleting}
+                autoFocus
+                className="w-full px-3.5 py-2.5 rounded-xl border border-neutral-300 focus:outline-hidden focus:border-red-500 focus:ring-2 focus:ring-red-200 text-sm font-semibold tracking-wider text-neutral-900 placeholder:text-neutral-400 placeholder:tracking-normal placeholder:font-normal uppercase"
+              />
+              {deleteError && (
+                <p className="text-[11px] text-red-600 font-medium">
+                  {deleteError}
+                </p>
+              )}
+            </div>
+
+            <div className="flex items-center justify-end gap-2.5 pt-2">
+              <button
+                type="button"
+                onClick={handleCloseDeleteModal}
+                disabled={isDeleting}
+                className="px-4 py-2.5 rounded-xl border border-neutral-200 bg-white hover:bg-neutral-50 text-neutral-700 text-xs font-semibold transition-all disabled:opacity-50 cursor-pointer"
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                onClick={handleConfirmDelete}
+                disabled={deleteConfirmInput.trim().toUpperCase() !== 'EXCLUIR' || isDeleting}
+                className="px-4 py-2.5 rounded-xl bg-red-600 hover:bg-red-700 text-white text-xs font-semibold transition-all flex items-center gap-1.5 shadow-xs disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
+              >
+                {isDeleting ? (
+                  <>
+                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                    <span>Excluindo...</span>
+                  </>
+                ) : (
+                  <>
+                    <Trash2 className="w-3.5 h-3.5" />
+                    <span>Confirmar Exclusão</span>
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

@@ -76,19 +76,24 @@ export function getDeletedCompanyIds(): string[] {
 export function recordDeletedCompanyId(companyId: string, slug?: string): void {
   if (!isBrowser() || !companyId) return
   const current = getDeletedCompanyIds()
-  const toAdd = [companyId]
+  const toAdd = [companyId, companyId.toLowerCase().trim()]
   if (slug) {
-    toAdd.push(slug.toLowerCase().trim())
+    toAdd.push(slug, slug.toLowerCase().trim())
   }
-  const updated = Array.from(new Set([...current, ...toAdd]))
+  const updated = Array.from(new Set([...current, ...toAdd])).filter(Boolean)
   setItem(STORAGE_KEYS.DELETED_COMPANIES, updated)
 }
 
 export function mergeDeletedCompanyIds(ids: string[]): void {
   if (!isBrowser() || !Array.isArray(ids)) return
   const current = getDeletedCompanyIds()
-  const cleaned = ids.map((id) => (typeof id === 'string' ? id.trim() : '')).filter(Boolean)
-  const updated = Array.from(new Set([...current, ...cleaned]))
+  const toAdd: string[] = []
+  ids.forEach((id) => {
+    if (typeof id === 'string' && id.trim()) {
+      toAdd.push(id.trim(), id.toLowerCase().trim())
+    }
+  })
+  const updated = Array.from(new Set([...current, ...toAdd])).filter(Boolean)
   setItem(STORAGE_KEYS.DELETED_COMPANIES, updated)
 }
 
@@ -128,14 +133,19 @@ function setItem<T>(key: string, value: T): void {
 // ==========================================
 
 export function getAllCompanies(): Company[] {
-  const deletedIds = getDeletedCompanyIds()
+  const deletedIds = getDeletedCompanyIds().map((id) => id.toLowerCase().trim())
   let list: Company[]
   if (!isBrowser()) {
     list = memoryCompanies
   } else {
     list = getItem<Company[]>(STORAGE_KEYS.COMPANIES, INITIAL_COMPANIES)
   }
-  return list.filter((c) => !deletedIds.includes(c.id))
+  return list.filter((c) => {
+    if (!c) return false
+    const idClean = (c.id || '').toLowerCase().trim()
+    const slugClean = (c.slug || '').toLowerCase().trim()
+    return !deletedIds.includes(idClean) && !deletedIds.includes(slugClean)
+  })
 }
 
 export function getAllPointRequests(): PointRequest[] {
@@ -149,17 +159,33 @@ export function getAllPrivateFeedbacks(): PrivateFeedback[] {
 }
 
 export function getCompanyBySlug(slug: string): Company | null {
-  const companies = getAllCompanies()
+  if (!slug) return null
   const cleanSlug = slug.toLowerCase().trim()
-  return companies.find((c) => c.slug.toLowerCase() === cleanSlug) || null
+  if (isCompanyDeleted(cleanSlug)) return null
+  const companies = getAllCompanies()
+  const comp = companies.find((c) => c.slug.toLowerCase() === cleanSlug) || null
+  if (comp && (isCompanyDeleted(comp.id) || (comp.slug && isCompanyDeleted(comp.slug)))) {
+    return null
+  }
+  return comp
 }
 
 export function getCompanyById(id: string): Company | null {
+  if (!id) return null
+  const cleanId = id.trim()
+  if (isCompanyDeleted(cleanId)) return null
   const companies = getAllCompanies()
-  return companies.find((c) => c.id === id) || null
+  const comp = companies.find((c) => c.id === cleanId) || null
+  if (comp && (isCompanyDeleted(comp.id) || (comp.slug && isCompanyDeleted(comp.slug)))) {
+    return null
+  }
+  return comp
 }
 
 export function saveCompanyLocally(company: Company): void {
+  if (!company || isCompanyDeleted(company.id) || (company.slug && isCompanyDeleted(company.slug))) {
+    return
+  }
   const current = getAllCompanies()
   const idx = current.findIndex((c) => c.id === company.id || c.slug.toLowerCase() === company.slug.toLowerCase())
   let updated: Company[]
@@ -305,45 +331,77 @@ export function toggleCompanyStatus(companyId: string): boolean {
 
 export function deleteCompany(companyId: string): boolean {
   if (!companyId) return false
-  recordDeletedCompanyId(companyId)
+  const companies = getAllCompanies()
+  const matched = companies.find(
+    (c) => c.id === companyId || (c.slug && c.slug.toLowerCase() === companyId.toLowerCase())
+  )
+  const targetId = matched?.id || companyId
+  const targetSlug = matched?.slug || ''
+
+  recordDeletedCompanyId(targetId, targetSlug)
 
   // Remove from memory
-  memoryCompanies = memoryCompanies.filter((c) => c.id !== companyId)
+  memoryCompanies = memoryCompanies.filter(
+    (c) => c.id !== targetId && c.id !== companyId && (!targetSlug || c.slug !== targetSlug)
+  )
 
   // Remove from localStorage
-  const currentRaw = getItem<Company[]>(STORAGE_KEYS.COMPANIES, INITIAL_COMPANIES)
-  const filtered = currentRaw.filter((c) => c.id !== companyId)
+  const currentRaw = getItem<Company[]>(STORAGE_KEYS.COMPANIES, [])
+  const filtered = currentRaw.filter(
+    (c) => c.id !== targetId && c.id !== companyId && (!targetSlug || c.slug !== targetSlug)
+  )
   setItem(STORAGE_KEYS.COMPANIES, filtered)
 
-  // Cascade delete isolated company data
-  const customers = getItem<Customer[]>(STORAGE_KEYS.CUSTOMERS, INITIAL_CUSTOMERS).filter(
-    (c) => c.companyId !== companyId
+  // Cascade delete isolated company data across all storage keys
+  const targetIds = Array.from(new Set([targetId, targetSlug, companyId])).filter(Boolean)
+  const matchesTarget = (cid?: string) => Boolean(cid && targetIds.includes(cid))
+
+  const customers = getItem<Customer[]>(STORAGE_KEYS.CUSTOMERS, []).filter(
+    (c) => !matchesTarget(c.companyId)
   )
   setItem(STORAGE_KEYS.CUSTOMERS, customers)
 
-  const requests = getItem<PointRequest[]>(STORAGE_KEYS.REQUESTS, INITIAL_REQUESTS).filter(
-    (r) => r.companyId !== companyId
+  const requests = getItem<PointRequest[]>(STORAGE_KEYS.REQUESTS, []).filter(
+    (r) => !matchesTarget(r.companyId)
   )
   setItem(STORAGE_KEYS.REQUESTS, requests)
 
-  const logs = getItem<ActivityLog[]>(STORAGE_KEYS.LOGS, INITIAL_LOGS).filter(
-    (l) => l.companyId !== companyId
+  const logs = getItem<ActivityLog[]>(STORAGE_KEYS.LOGS, []).filter(
+    (l) => !matchesTarget(l.companyId)
   )
   setItem(STORAGE_KEYS.LOGS, logs)
 
-  const feedbacks = getItem<PrivateFeedback[]>(STORAGE_KEYS.FEEDBACKS, INITIAL_FEEDBACKS).filter(
-    (f) => f.companyId !== companyId
+  const feedbacks = getItem<PrivateFeedback[]>(STORAGE_KEYS.FEEDBACKS, []).filter(
+    (f) => !matchesTarget(f.companyId)
   )
   setItem(STORAGE_KEYS.FEEDBACKS, feedbacks)
 
+  const services = getItem<CompanyService[]>(STORAGE_KEYS.SERVICES, []).filter(
+    (s) => !matchesTarget(s.companyId)
+  )
+  setItem(STORAGE_KEYS.SERVICES, services)
+
+  const products = getItem<CompanyProduct[]>(STORAGE_KEYS.PRODUCTS, []).filter(
+    (p) => !matchesTarget(p.companyId)
+  )
+  setItem(STORAGE_KEYS.PRODUCTS, products)
+
+  const menuItems = getItem<MenuItem[]>(STORAGE_KEYS.MENU_ITEMS, []).filter(
+    (m) => !matchesTarget(m.companyId)
+  )
+  setItem(STORAGE_KEYS.MENU_ITEMS, menuItems)
+
+  const appointments = getItem<Appointment[]>(STORAGE_KEYS.APPOINTMENTS, []).filter(
+    (a) => !matchesTarget(a.companyId)
+  )
+  setItem(STORAGE_KEYS.APPOINTMENTS, appointments)
+
+  const professionals = getItem<CompanyProfessional[]>(STORAGE_KEYS.PROFESSIONALS, []).filter(
+    (p) => !matchesTarget(p.companyId)
+  )
+  setItem(STORAGE_KEYS.PROFESSIONALS, professionals)
+
   notifyDataChange()
-
-  if (isBrowser()) {
-    fetch(`/api/companies?id=${encodeURIComponent(companyId)}`, {
-      method: 'DELETE',
-    }).catch((err) => console.error('Error deleting company on server:', err))
-  }
-
   return true
 }
 
@@ -360,8 +418,10 @@ export async function deleteCompanyAsync(companyId: string): Promise<boolean> {
       if (res.ok && data.success) {
         return true
       }
+      return false
     } catch (err) {
       console.error('Error deleting company on server:', err)
+      return false
     }
   }
   return true
@@ -1207,13 +1267,21 @@ export async function fetchFeedbacksForCompany(companyId: string): Promise<Priva
 
 export async function syncCompaniesFromServer(): Promise<Company[]> {
   if (!isBrowser()) return memoryCompanies
-  const deletedIds = getDeletedCompanyIds()
   try {
     const res = await fetch('/api/companies')
     if (res.ok) {
       const data = await res.json()
+      if (Array.isArray(data.deletedIds)) {
+        mergeDeletedCompanyIds(data.deletedIds)
+      }
+      const deletedIds = getDeletedCompanyIds().map((id) => id.toLowerCase().trim())
       if (Array.isArray(data.companies)) {
-        const filtered = data.companies.filter((c: Company) => !deletedIds.includes(c.id))
+        const filtered = data.companies.filter((c: Company) => {
+          if (!c) return false
+          const idClean = (c.id || '').toLowerCase().trim()
+          const slugClean = (c.slug || '').toLowerCase().trim()
+          return !deletedIds.includes(idClean) && !deletedIds.includes(slugClean)
+        })
         setItem(STORAGE_KEYS.COMPANIES, filtered)
         memoryCompanies = filtered
         notifyDataChange()
@@ -1255,7 +1323,14 @@ export function getGlobalPlatformStats(): GlobalStats {
 
 export function resetDemoData(): void {
   if (!isBrowser()) return
-  setItem(STORAGE_KEYS.COMPANIES, INITIAL_COMPANIES)
+  const deletedIds = getDeletedCompanyIds().map((id) => id.toLowerCase().trim())
+  const filteredCompanies = INITIAL_COMPANIES.filter((c) => {
+    const idClean = (c.id || '').toLowerCase().trim()
+    const slugClean = (c.slug || '').toLowerCase().trim()
+    return !deletedIds.includes(idClean) && !deletedIds.includes(slugClean)
+  })
+  setItem(STORAGE_KEYS.COMPANIES, filteredCompanies)
+  memoryCompanies = filteredCompanies
   setItem(STORAGE_KEYS.CUSTOMERS, INITIAL_CUSTOMERS)
   setItem(STORAGE_KEYS.REQUESTS, INITIAL_REQUESTS)
   setItem(STORAGE_KEYS.LOGS, INITIAL_LOGS)
