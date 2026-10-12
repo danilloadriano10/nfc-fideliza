@@ -5,7 +5,7 @@ export interface PublicSectionDef {
   title: string
   shortTitle: string
   description: string
-  iconName: 'Sparkles' | 'LayoutGrid' | 'Scissors' | 'UtensilsCrossed' | 'Package' | 'Gift' | 'Star' | 'MapPin' | 'Calendar'
+  iconName: 'Sparkles' | 'LayoutGrid' | 'Scissors' | 'UtensilsCrossed' | 'Package' | 'Gift' | 'Star' | 'MapPin' | 'Calendar' | 'MessageCircle' | 'Wifi' | 'MessageSquare' | 'Instagram'
   defaultOrder: number
   categoryTag: string
   accentColor: string
@@ -13,24 +13,14 @@ export interface PublicSectionDef {
 
 export const ALL_PUBLIC_SECTIONS: PublicSectionDef[] = [
   {
-    id: 'featured',
-    title: 'Destaque Principal',
-    shortTitle: 'Destaque',
-    description: 'Card hero em destaque no topo para conversão e ação rápida do cliente',
-    iconName: 'Sparkles',
+    id: 'whatsapp',
+    title: 'WhatsApp Oficial',
+    shortTitle: 'WhatsApp',
+    description: 'Atendimento direto e suporte rápido via WhatsApp',
+    iconName: 'MessageCircle',
     defaultOrder: 1,
-    categoryTag: 'Destaque',
-    accentColor: '#8B5CF6',
-  },
-  {
-    id: 'quick_access',
-    title: 'Acessos Rápidos',
-    shortTitle: 'Atalhos',
-    description: 'Grade de botões diretos (WhatsApp, Wi-Fi, Redes Sociais, etc.)',
-    iconName: 'LayoutGrid',
-    defaultOrder: 2,
-    categoryTag: 'Atalhos',
-    accentColor: '#3B82F6',
+    categoryTag: 'Contato',
+    accentColor: '#10B981',
   },
   {
     id: 'services',
@@ -38,19 +28,9 @@ export const ALL_PUBLIC_SECTIONS: PublicSectionDef[] = [
     shortTitle: 'Serviços',
     description: 'Vitrine visual de serviços com fotos grandes, valores e agendamento',
     iconName: 'Scissors',
-    defaultOrder: 3,
+    defaultOrder: 2,
     categoryTag: 'Serviços',
     accentColor: '#EC4899',
-  },
-  {
-    id: 'menu',
-    title: 'Cardápio',
-    shortTitle: 'Cardápio',
-    description: 'Cardápio digital interativo com categorias, fotos e pedidos',
-    iconName: 'UtensilsCrossed',
-    defaultOrder: 4,
-    categoryTag: 'Cardápio',
-    accentColor: '#10B981',
   },
   {
     id: 'products',
@@ -58,9 +38,29 @@ export const ALL_PUBLIC_SECTIONS: PublicSectionDef[] = [
     shortTitle: 'Produtos',
     description: 'Vitrine de produtos comerciais com preços, fotos e promoções',
     iconName: 'Package',
-    defaultOrder: 5,
+    defaultOrder: 3,
     categoryTag: 'Produtos',
     accentColor: '#F59E0B',
+  },
+  {
+    id: 'appointments',
+    title: 'Agendamento Online',
+    shortTitle: 'Agendamento',
+    description: 'Reserva de horários online para atendimento',
+    iconName: 'Calendar',
+    defaultOrder: 4,
+    categoryTag: 'Agendamento',
+    accentColor: '#6366F1',
+  },
+  {
+    id: 'menu',
+    title: 'Cardápio',
+    shortTitle: 'Cardápio',
+    description: 'Cardápio digital interativo com categorias, fotos e pedidos',
+    iconName: 'UtensilsCrossed',
+    defaultOrder: 5,
+    categoryTag: 'Cardápio',
+    accentColor: '#10B981',
   },
   {
     id: 'loyalty',
@@ -74,12 +74,12 @@ export const ALL_PUBLIC_SECTIONS: PublicSectionDef[] = [
   },
   {
     id: 'reviews',
-    title: 'Avaliações',
+    title: 'Avaliações do Google',
     shortTitle: 'Avaliações',
     description: 'Avaliação no Google com nota por estrelas e link direto de feedback',
     iconName: 'Star',
     defaultOrder: 7,
-    categoryTag: 'Google Reviews',
+    categoryTag: 'Avaliações do Google',
     accentColor: '#EAB308',
   },
   {
@@ -92,6 +92,36 @@ export const ALL_PUBLIC_SECTIONS: PublicSectionDef[] = [
     categoryTag: 'Localização',
     accentColor: '#EF4444',
   },
+  {
+    id: 'wifi',
+    title: 'Wi-Fi Grátis',
+    shortTitle: 'Wi-Fi',
+    description: 'Acesso à rede Wi-Fi e conexão rápida',
+    iconName: 'Wifi',
+    defaultOrder: 9,
+    categoryTag: 'Conexão',
+    accentColor: '#06B6D4',
+  },
+  {
+    id: 'feedback',
+    title: 'Feedback Privado',
+    shortTitle: 'Feedback',
+    description: 'Canal de elogios, sugestões e críticas à gerência',
+    iconName: 'MessageSquare',
+    defaultOrder: 10,
+    categoryTag: 'Feedback',
+    accentColor: '#A855F7',
+  },
+  {
+    id: 'instagram',
+    title: 'Instagram',
+    shortTitle: 'Instagram',
+    description: 'Perfil oficial nas redes sociais',
+    iconName: 'Instagram',
+    defaultOrder: 11,
+    categoryTag: 'Redes Sociais',
+    accentColor: '#EC4899',
+  },
 ]
 
 /**
@@ -102,35 +132,42 @@ export function isSectionActiveForCompany(sectionId: string, company: Company): 
   if (!company) return false
 
   switch (sectionId) {
-    case 'featured':
-      // Active unless company explicitly disables highlight
-      return company.highlightModule !== 'none'
-
-    case 'quick_access':
-      // Always active as primary hub shortcuts
-      return true
+    case 'whatsapp':
+      return company.modules?.whatsapp !== false
 
     case 'services':
       return company.modules?.services !== false
 
-    case 'menu':
-      return company.modules?.menu !== false
-
     case 'products':
       return company.modules?.products !== false
+
+    case 'appointments':
+      return company.modules?.appointments !== false
+
+    case 'menu':
+      return company.modules?.menu !== false
 
     case 'loyalty':
       return company.modules?.loyalty !== false
 
     case 'reviews':
+    case 'googleReview':
       return company.modules?.googleReview !== false
 
     case 'location':
-      return company.modules?.location !== false || Boolean(company.addressText)
+    case 'contact':
+      return company.modules?.location !== false || Boolean(company.addressText) || Boolean(company.locationUrl)
+
+    case 'wifi':
+      return company.modules?.wifi !== false
+
+    case 'feedback':
+      return company.modules?.feedback !== false
+
+    case 'instagram':
+      return company.modules?.instagram !== false || Boolean(company.instagram)
 
     default:
-      // Automatic support for future modules:
-      // If a future module exists in company.modules, check its boolean flag
       const modKey = sectionId as keyof typeof company.modules
       if (company.modules && modKey in company.modules) {
         return company.modules[modKey] !== false

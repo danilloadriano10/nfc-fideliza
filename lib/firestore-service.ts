@@ -393,6 +393,11 @@ export async function saveFirestoreCompany(
     } else if (existing.publicSectionsOrder && Array.isArray(existing.publicSectionsOrder)) {
       finalCompany.publicSectionsOrder = existing.publicSectionsOrder
     }
+    if (company.featuredCards && Array.isArray(company.featuredCards)) {
+      finalCompany.featuredCards = company.featuredCards
+    } else if (existing.featuredCards && Array.isArray(existing.featuredCards)) {
+      finalCompany.featuredCards = existing.featuredCards
+    }
   } else {
     // New company registration
     finalCompany.createdAt = company.createdAt || new Date().toISOString()
@@ -403,6 +408,9 @@ export async function saveFirestoreCompany(
     }
     if (company.publicSectionsOrder && Array.isArray(company.publicSectionsOrder)) {
       finalCompany.publicSectionsOrder = company.publicSectionsOrder
+    }
+    if (company.featuredCards && Array.isArray(company.featuredCards)) {
+      finalCompany.featuredCards = company.featuredCards
     }
     if (finalCompany.ownerAuth?.password) {
       const pass = finalCompany.ownerAuth.password.trim()

@@ -50,6 +50,7 @@ import {
   ChevronUp,
   ChevronDown,
   Instagram,
+  MessageCircle,
 } from 'lucide-react'
 import confetti from 'canvas-confetti'
 import { BRAND_COLOR_PRESETS, sanitizeHex, getGradientContrastTextColor } from '@/lib/colors'
@@ -139,6 +140,12 @@ export const CompanyPanelView: React.FC<CompanyPanelViewProps> = ({
     primaryColor: initialCompany.primaryColor || '#6D28D9',
     secondaryColor: initialCompany.secondaryColor || '#8B5CF6',
     highlightModule: initialCompany.highlightModule || 'auto',
+    featuredCards: initialCompany.featuredCards || [
+      'whatsapp',
+      'appointments',
+      'googleReview',
+      'loyalty',
+    ],
     modules: {
       ...initialCompany.modules,
       services: initialCompany.modules?.services ?? false,
@@ -201,13 +208,15 @@ export const CompanyPanelView: React.FC<CompanyPanelViewProps> = ({
     icon: React.ComponentType<{ className?: string }>
     color: string
   }> = [
+    { key: 'whatsapp', label: 'WhatsApp', icon: MessageCircle, color: 'text-emerald-600 bg-emerald-50 border-emerald-200' },
     { key: 'services', label: 'Serviços', icon: Scissors, color: 'text-violet-600 bg-violet-50 border-violet-200' },
     { key: 'products', label: 'Catálogo de Produtos', icon: Package, color: 'text-blue-600 bg-blue-50 border-blue-200' },
     { key: 'appointments', label: 'Agendamento', icon: Calendar, color: 'text-indigo-600 bg-indigo-50 border-indigo-200' },
     { key: 'menu', label: 'Cardápio', icon: UtensilsCrossed, color: 'text-amber-600 bg-amber-50 border-amber-200' },
     { key: 'loyalty', label: 'Fidelidade', icon: Gift, color: 'text-emerald-600 bg-emerald-50 border-emerald-200' },
-    { key: 'googleReview', label: 'Avaliações', icon: Star, color: 'text-amber-500 bg-amber-50 border-amber-200' },
-    { key: 'contact', label: 'Contato/Localização', icon: MapPin, color: 'text-rose-600 bg-rose-50 border-rose-200' },
+    { key: 'googleReview', label: 'Avaliações do Google', icon: Star, color: 'text-amber-500 bg-amber-50 border-amber-200' },
+    { key: 'location', label: 'Localização', icon: MapPin, color: 'text-rose-600 bg-rose-50 border-rose-200' },
+    { key: 'contact', label: 'Contato', icon: MapPin, color: 'text-rose-600 bg-rose-50 border-rose-200' },
     { key: 'wifi', label: 'Wi-Fi', icon: Wifi, color: 'text-cyan-600 bg-cyan-50 border-cyan-200' },
     { key: 'feedback', label: 'Feedback Privado', icon: MessageSquare, color: 'text-purple-600 bg-purple-50 border-purple-200' },
     { key: 'instagram', label: 'Instagram', icon: Instagram, color: 'text-pink-600 bg-pink-50 border-pink-200' },
@@ -216,14 +225,15 @@ export const CompanyPanelView: React.FC<CompanyPanelViewProps> = ({
   // Requisitos: Mostrar somente os módulos ativos
   const activeOrderedModules = React.useMemo(() => {
     const activeKeysSet = new Set<string>()
+    if (formData.modules?.whatsapp) activeKeysSet.add('whatsapp')
     if (formData.modules?.services) activeKeysSet.add('services')
     if (formData.modules?.products) activeKeysSet.add('products')
     if (formData.modules?.appointments) activeKeysSet.add('appointments')
     if (formData.modules?.menu) activeKeysSet.add('menu')
     if (formData.modules?.loyalty) activeKeysSet.add('loyalty')
     if (formData.modules?.googleReview) activeKeysSet.add('googleReview')
-    if (formData.modules?.location || formData.modules?.whatsapp || formData.addressText || formData.locationUrl) {
-      activeKeysSet.add('contact')
+    if (formData.modules?.location || formData.addressText || formData.locationUrl) {
+      activeKeysSet.add('location')
     }
     if (formData.modules?.wifi) activeKeysSet.add('wifi')
     if (formData.modules?.feedback) activeKeysSet.add('feedback')
@@ -3062,74 +3072,125 @@ export const CompanyPanelView: React.FC<CompanyPanelViewProps> = ({
                 </div>
               )}
 
-              {/* Destaque Principal da Página Pública */}
-              <div className="pt-5 border-t border-neutral-100 space-y-3">
-                <div className="flex items-center gap-2">
-                  <div className="w-7 h-7 rounded-lg bg-violet-100 text-violet-700 flex items-center justify-center">
-                    <Sparkles className="w-4 h-4" />
+              {/* 4 Cards de Destaque Flutuantes da Página Pública */}
+              <div className="pt-5 border-t border-neutral-100 space-y-4">
+                <div className="flex items-start justify-between gap-3">
+                  <div className="flex items-center gap-2.5">
+                    <div className="w-8 h-8 rounded-xl bg-violet-100 text-violet-700 flex items-center justify-center shrink-0">
+                      <Sparkles className="w-4 h-4" />
+                    </div>
+                    <div>
+                      <h4 className="text-sm font-bold text-neutral-900">
+                        4 Cards de Destaque Flutuantes (Topo da Página)
+                      </h4>
+                      <p className="text-xs text-neutral-500">
+                        Escolha quais 4 recursos ativos aparecerão nos cards em layout 2x2 flutuante logo abaixo da capa/perfil. Somente módulos ativos podem ser selecionados.
+                      </p>
+                    </div>
                   </div>
-                  <div>
-                    <h4 className="text-xs font-bold text-neutral-900">
-                      Destaque Principal na Página Pública
-                    </h4>
-                    <p className="text-[11px] text-neutral-500">
-                      Escolha qual módulo ativo ocupará o grande card roxo de destaque no topo da página.
-                    </p>
-                  </div>
-                </div>
-
-                <div className="max-w-md">
-                  <select
-                    value={formData.highlightModule || 'auto'}
-                    onChange={(e) =>
+                  <button
+                    type="button"
+                    onClick={() => {
                       setFormData({
                         ...formData,
-                        highlightModule: e.target.value,
+                        featuredCards: ['whatsapp', 'appointments', 'googleReview', 'loyalty'],
                       })
-                    }
-                    className="w-full px-3.5 py-2.5 rounded-xl border border-neutral-300 text-xs bg-white text-neutral-900 font-semibold focus:ring-2 focus:ring-violet-500 focus:outline-none"
+                      showToast('success', 'Destaques redefinidos para os 4 padrões!')
+                    }}
+                    className="text-xs font-semibold text-violet-600 hover:text-violet-800 transition-colors whitespace-nowrap cursor-pointer shrink-0"
                   >
-                    <option value="auto">
-                      ⚡ Automático (prioriza o principal serviço ativo)
-                    </option>
-                    {Boolean(formData.modules?.products) && (
-                      <option value="products">📦 Catálogo de Produtos</option>
-                    )}
-                    {Boolean(formData.modules?.appointments) && (
-                      <option value="appointments">📅 Agendamento Online</option>
-                    )}
-                    {Boolean(formData.modules?.services) && (
-                      <option value="services">✂️ Catálogo de Serviços</option>
-                    )}
-                    {Boolean(formData.modules?.loyalty) && (
-                      <option value="loyalty">🎁 Cartão Fidelidade</option>
-                    )}
-                    {Boolean(formData.modules?.whatsapp) && (
-                      <option value="whatsapp">💬 WhatsApp Direto</option>
-                    )}
-                    {Boolean(formData.modules?.googleReview) && (
-                      <option value="googleReview">⭐ Avaliação Google</option>
-                    )}
-                    {Boolean(formData.modules?.menu) && (
-                      <option value="menu">📖 Cardápio Digital</option>
-                    )}
-                    {Boolean(formData.modules?.wifi) && (
-                      <option value="wifi">📶 Conexão Wi-Fi</option>
-                    )}
-                    {Boolean(formData.modules?.location) && (
-                      <option value="location">📍 Localização e Rota</option>
-                    )}
-                    {Boolean(formData.modules?.feedback) && (
-                      <option value="feedback">💭 Feedback Privado</option>
-                    )}
-                    {Boolean(formData.modules?.instagram) && (
-                      <option value="instagram">📸 Instagram</option>
-                    )}
-                  </select>
-                  <p className="text-[10px] text-neutral-400 mt-1.5 leading-relaxed">
-                    O card se adapta automaticamente. Caso o módulo configurado seja desativado, o sistema selecionará outro recurso ativo automaticamente.
-                  </p>
+                    Restaurar Padrão
+                  </button>
                 </div>
+
+                {(() => {
+                  const ALL_HIGHLIGHTABLE_MODULES = [
+                    { id: 'whatsapp', name: 'WhatsApp Direto', icon: '💬', modKey: 'whatsapp' as const },
+                    { id: 'appointments', name: 'Agendamento Online', icon: '📅', modKey: 'appointments' as const },
+                    { id: 'googleReview', name: 'Avaliações do Google', icon: '⭐', modKey: 'googleReview' as const },
+                    { id: 'loyalty', name: 'Cartão Fidelidade', icon: '🎁', modKey: 'loyalty' as const },
+                    { id: 'menu', name: 'Cardápio Digital', icon: '📖', modKey: 'menu' as const },
+                    { id: 'products', name: 'Catálogo de Produtos', icon: '📦', modKey: 'products' as const },
+                    { id: 'services', name: 'Nossos Serviços', icon: '✂️', modKey: 'services' as const },
+                    { id: 'location', name: 'Localização e Rota', icon: '📍', modKey: 'location' as const },
+                    { id: 'wifi', name: 'Wi-Fi Grátis', icon: '📶', modKey: 'wifi' as const },
+                    { id: 'feedback', name: 'Feedback Privado', icon: '💭', modKey: 'feedback' as const },
+                    { id: 'instagram', name: 'Instagram', icon: '📸', modKey: 'instagram' as const },
+                  ]
+
+                  const activeHighlightModules = ALL_HIGHLIGHTABLE_MODULES.filter((m) =>
+                    Boolean(formData.modules?.[m.modKey])
+                  )
+
+                  const rawList = formData.featuredCards && formData.featuredCards.length > 0
+                    ? formData.featuredCards
+                    : ['whatsapp', 'appointments', 'googleReview', 'loyalty']
+
+                  const slotsList = [...rawList]
+                  while (slotsList.length < 4) {
+                    const nextAvail = activeHighlightModules.find((m) => !slotsList.includes(m.id))
+                    slotsList.push(nextAvail ? nextAvail.id : 'whatsapp')
+                  }
+
+                  if (activeHighlightModules.length === 0) {
+                    return (
+                      <div className="p-4 rounded-2xl bg-amber-50 border border-amber-200 text-amber-800 text-xs">
+                        ⚠️ Nenhum módulo está ativo no momento. Ative os recursos desejados na seção de <strong>Recursos da sua DiretoLink</strong> acima para selecioná-los como destaques.
+                      </div>
+                    )
+                  }
+
+                  return (
+                    <div className="space-y-3">
+                      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 max-w-2xl">
+                        {[
+                          { label: 'Card 1 (Primeiro)', slot: 0 },
+                          { label: 'Card 2 (Segundo)', slot: 1 },
+                          { label: 'Card 3 (Terceiro)', slot: 2 },
+                          { label: 'Card 4 (Quarto)', slot: 3 },
+                        ].map(({ label, slot }) => {
+                          const currentVal = slotsList[slot] || ''
+                          const isStillActive = activeHighlightModules.some((m) => m.id === currentVal)
+
+                          return (
+                            <div
+                              key={slot}
+                              className="p-3 rounded-2xl border border-neutral-200 bg-neutral-50/70 space-y-1.5"
+                            >
+                              <label className="text-[11px] font-bold text-neutral-600 flex items-center justify-between">
+                                <span>{label}</span>
+                                {!isStillActive && (
+                                  <span className="text-[10px] text-rose-500 font-medium">Inativo</span>
+                                )}
+                              </label>
+                              <select
+                                value={currentVal}
+                                onChange={(e) => {
+                                  const updated = [...slotsList.slice(0, 4)]
+                                  updated[slot] = e.target.value
+                                  setFormData({
+                                    ...formData,
+                                    featuredCards: updated,
+                                  })
+                                }}
+                                className="w-full px-3 py-2 rounded-xl border border-neutral-300 text-xs bg-white text-neutral-900 font-semibold focus:ring-2 focus:ring-violet-500 focus:outline-none"
+                              >
+                                {activeHighlightModules.map((mod) => (
+                                  <option key={mod.id} value={mod.id}>
+                                    {mod.icon} {mod.name}
+                                  </option>
+                                ))}
+                              </select>
+                            </div>
+                          )
+                        })}
+                      </div>
+                      <p className="text-[11px] text-neutral-400">
+                        💡 Esses 4 cards aparecem alinhados um do lado do outro em tamanhos iguais sobre a parte inferior da capa (no lugar da antiga logo flutuante), enquanto a logo fica centralizada no meio da capa. Mais abaixo, todas as seções ativas continuam visíveis normalmente segundo a Ordem da Página Pública.
+                      </p>
+                    </div>
+                  )
+                })()}
               </div>
 
               {/* Próximos Recursos Preview */}

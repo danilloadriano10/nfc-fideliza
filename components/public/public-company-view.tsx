@@ -246,8 +246,11 @@ export const PublicCompanyView: React.FC<PublicCompanyViewProps> = ({
   const handleGoogleReview = useCallback(() => {
     if (company.googleReviewUrl) {
       window.open(company.googleReviewUrl, '_blank', 'noopener,noreferrer')
+    } else {
+      const q = encodeURIComponent(`${company.name} avaliações`)
+      window.open(`https://www.google.com/search?q=${q}`, '_blank', 'noopener,noreferrer')
     }
-  }, [company.googleReviewUrl])
+  }, [company.googleReviewUrl, company.name])
 
   // Open Menu (External link or Scroll to internal cardápio)
   const handleOpenMenu = useCallback(() => {
@@ -261,17 +264,6 @@ export const PublicCompanyView: React.FC<PublicCompanyViewProps> = ({
     }
   }, [isExternalMenu, company.menuUrl])
 
-  // Open WhatsApp
-  const handleOpenWhatsApp = useCallback(() => {
-    const raw = company.whatsapp || ''
-    const phoneClean = raw.replace(/\D/g, '')
-    const phoneWithDdi = phoneClean.startsWith('55') ? phoneClean : `55${phoneClean}`
-    const msg = encodeURIComponent(
-      `Olá! Estou visitando a ${company.name} e gostaria de falar com vocês.`
-    )
-    window.open(`https://wa.me/${phoneWithDdi}?text=${msg}`, '_blank', 'noopener,noreferrer')
-  }, [company.whatsapp, company.name])
-
   // Open Location
   const handleOpenLocation = useCallback(() => {
     if (company.locationUrl) {
@@ -283,6 +275,21 @@ export const PublicCompanyView: React.FC<PublicCompanyViewProps> = ({
       window.open(targetUrl, '_blank', 'noopener,noreferrer')
     }
   }, [company.locationUrl, company.addressText])
+
+  // Open WhatsApp
+  const handleOpenWhatsApp = useCallback(() => {
+    const raw = company.whatsapp || ''
+    const phoneClean = raw.replace(/\D/g, '')
+    if (phoneClean) {
+      const phoneWithDdi = phoneClean.startsWith('55') ? phoneClean : `55${phoneClean}`
+      const msg = encodeURIComponent(
+        `Olá! Estou visitando a ${company.name} e gostaria de falar com vocês.`
+      )
+      window.open(`https://wa.me/${phoneWithDdi}?text=${msg}`, '_blank', 'noopener,noreferrer')
+    } else {
+      handleOpenLocation()
+    }
+  }, [company.whatsapp, company.name, handleOpenLocation])
 
   // Open Instagram
   const handleOpenInstagram = useCallback(() => {
@@ -346,48 +353,30 @@ export const PublicCompanyView: React.FC<PublicCompanyViewProps> = ({
 
   // Active Modules strictly respected
   const activeModules = useMemo(() => {
-    const isCatalogExternal = company.productCatalog?.mode === 'external'
-    const hasExternalUrl = Boolean(company.productCatalog?.externalUrl)
-
-    // A company has products active if:
-    // 1) company.modules?.products is explicitly true
-    // 2) OR company.modules?.products !== false AND (products.length > 0 || (isCatalogExternal && hasExternalUrl))
-    const hasProductsExplicit = company.modules?.products === true
-    const hasProductsImplicit =
-      company.modules?.products !== false &&
-      (products.length > 0 || (isCatalogExternal && hasExternalUrl))
-
-    const isProductsEnabled =
-      (hasProductsExplicit || hasProductsImplicit) &&
-      (!isCatalogExternal || hasExternalUrl)
+    const isModEnabled = (key: string, fallback: boolean) => {
+      if (company.modules && typeof company.modules[key as keyof typeof company.modules] === 'boolean') {
+        return Boolean(company.modules[key as keyof typeof company.modules])
+      }
+      return fallback
+    }
 
     return {
-      products: Boolean(isProductsEnabled),
-      appointments: Boolean(company.modules?.appointments),
-      services: Boolean(
-        company.modules?.services !== false &&
-          (company.modules?.services || services.length > 0)
-      ),
-      loyalty:
-        Boolean(company.modules?.loyalty ?? true) &&
-        Boolean(company.loyaltyProgram?.isActive ?? true),
-      whatsapp:
-        Boolean(company.modules?.whatsapp ?? true) && Boolean(company.whatsapp),
-      googleReview:
-        Boolean(company.modules?.googleReview ?? true) &&
-        Boolean(company.googleReviewUrl),
-      menu:
-        Boolean(company.modules?.menu ?? true) &&
-        (company.menuMode === 'internal' ||
+      products: isModEnabled('products', products.length > 0),
+      appointments: isModEnabled('appointments', false),
+      services: isModEnabled('services', services.length > 0),
+      loyalty: isModEnabled('loyalty', Boolean(company.loyaltyProgram?.isActive ?? true)),
+      whatsapp: isModEnabled('whatsapp', Boolean(company.whatsapp)),
+      googleReview: isModEnabled('googleReview', Boolean(company.googleReviewUrl || company.rating)),
+      menu: isModEnabled(
+        'menu',
+        company.menuMode === 'internal' ||
           Boolean(company.menuUrl) ||
-          menuItems.length > 0),
-      wifi: Boolean(company.modules?.wifi ?? true) && Boolean(company.wifi?.ssid),
-      location:
-        Boolean(company.modules?.location ?? true) &&
-        Boolean(company.locationUrl || company.addressText),
-      feedback: Boolean(company.modules?.feedback ?? true),
-      instagram:
-        Boolean(company.modules?.instagram ?? true) && Boolean(company.instagram),
+          menuItems.length > 0
+      ),
+      wifi: isModEnabled('wifi', Boolean(company.wifi?.ssid)),
+      location: isModEnabled('location', Boolean(company.locationUrl || company.addressText)),
+      feedback: isModEnabled('feedback', false),
+      instagram: isModEnabled('instagram', Boolean(company.instagram)),
     }
   }, [company, products.length, services.length, menuItems.length])
 
@@ -553,291 +542,164 @@ export const PublicCompanyView: React.FC<PublicCompanyViewProps> = ({
   const hasFullLoyaltySection = Boolean(activeModules.loyalty && company.loyaltyProgram?.isActive)
   const hasFullProductsSection = Boolean(activeModules.products && !isExternalCatalog && activeProductsList.length > 0)
 
-  // Build items catalog for active modules
-  const allFeatureItems = useMemo<FeatureItem[]>(() => {
-    const items: FeatureItem[] = []
+  // Interface para os 4 cards de destaque flutuantes (layout 2x2 no celular)
+  interface HighlightCardItem {
+    id: string
+    title: string
+    description: string
+    icon: React.ReactNode
+    iconContainerClass: string
+    iconContainerStyle?: React.CSSProperties
+    onClick: () => void
+    isActive: boolean
+    badgeText?: string
+  }
 
-    // 0. Catálogo de Produtos (Vitrine ou Externo)
-    if (activeModules.products) {
-      if (isExternalCatalog) {
-        items.push({
-          id: 'products',
-          title: company.productCatalog?.externalButtonText || 'Ver Catálogo',
-          subtitle: 'Loja / Catálogo',
-          icon: <ShoppingBag className="w-5 h-5" />,
-          iconContainerClass: isDark
-            ? 'bg-violet-500/15 text-violet-400 border border-violet-500/25'
-            : 'bg-violet-50 text-violet-600 border border-violet-200/80',
-          iconContainerStyle: { color: '#8B5CF6' },
-          featuredTitle: company.productCatalog?.externalButtonText || 'Ver Catálogo',
-          featuredDescription: 'Conheça nossos produtos e faça seus pedidos em nossa vitrine oficial.',
-          featuredCta: company.productCatalog?.externalButtonText || 'Ver Catálogo',
-          featuredIcon: <ExternalLink className="w-5 h-5 stroke-[2.2]" />,
-          themeBg: 'bg-violet-50 text-violet-700 border-violet-100',
-          onClick: handleOpenCatalogExternal,
-        })
-      } else if (activeProductsList.length > 0) {
-        items.push({
-          id: 'products',
-          title: 'Produtos',
-          subtitle: `${activeProductsList.length} itens`,
-          icon: <Package className="w-5 h-5" />,
-          iconContainerClass: isDark
-            ? 'bg-violet-500/15 text-violet-400 border border-violet-500/25'
-            : 'bg-violet-50 text-violet-600 border border-violet-200/80',
-          iconContainerStyle: { color: '#8B5CF6' },
-          featuredTitle: 'Catálogo de Produtos',
-          featuredDescription: 'Explore nossos produtos exclusivos e fale direto no WhatsApp.',
-          featuredCta: 'Ver Catálogo',
-          featuredIcon: <Package className="w-5 h-5 stroke-[2.2]" />,
-          themeBg: 'bg-violet-50 text-violet-700 border-violet-100',
-          onClick: () => setIsProductsSheetOpen(true),
-        })
-      }
-    }
-
-    if (activeModules.appointments) {
-      items.push({
+  // Definições de todos os recursos disponíveis para os cards de destaque
+  const availableHighlightCards = useMemo<Record<string, HighlightCardItem>>(() => {
+    return {
+      whatsapp: {
+        id: 'whatsapp',
+        title: 'WhatsApp',
+        description: 'Atendimento direto',
+        icon: <MessageCircle className="w-5 h-5 text-[#25D366]" />,
+        iconContainerClass: isDark
+          ? 'bg-emerald-500/15 border border-emerald-500/25'
+          : 'bg-emerald-50 border border-emerald-200/80',
+        iconContainerStyle: { color: '#25D366' },
+        onClick: handleOpenWhatsApp,
+        isActive: Boolean(activeModules.whatsapp),
+      },
+      appointments: {
         id: 'appointments',
         title: 'Agendamento',
-        subtitle: 'Reserve online',
-        icon: <Calendar className="w-5 h-5" />,
+        description: 'Reserve seu horário online',
+        icon: <Calendar className="w-5 h-5 text-indigo-400" />,
         iconContainerClass: isDark
-          ? 'bg-indigo-500/15 text-indigo-400 border border-indigo-500/25'
-          : 'bg-indigo-50 text-indigo-600 border border-indigo-200/80',
+          ? 'bg-indigo-500/15 border border-indigo-500/25'
+          : 'bg-indigo-50 border border-indigo-200/80',
         iconContainerStyle: { color: '#6366F1' },
-        featuredTitle: 'Agendar Horário',
-        featuredDescription: 'Escolha seu serviço e horário em poucos segundos.',
-        featuredCta: 'Agendar Agora',
-        featuredIcon: <Calendar className="w-5 h-5 stroke-[2.2]" />,
-        themeBg: 'bg-violet-50 text-violet-700 border-violet-100',
         onClick: () => {
           setBookingService(null)
           setIsBookingOpen(true)
         },
-      })
-    }
-
-    if (activeModules.services) {
-      items.push({
-        id: 'services',
-        title: 'Serviços',
-        subtitle: activeServicesList.length > 0 ? `${activeServicesList.length} opções` : 'Ver catálogo',
-        icon: <Scissors className="w-5 h-5" />,
+        isActive: Boolean(activeModules.appointments),
+      },
+      googleReview: {
+        id: 'googleReview',
+        title: 'Avaliações do Google',
+        description: `${company.rating ? company.rating.toFixed(1) : '5.0'}★ no Google`,
+        icon: <Star className="w-5 h-5 fill-amber-400 text-amber-400" />,
         iconContainerClass: isDark
-          ? 'bg-purple-500/15 text-purple-400 border border-purple-500/25'
-          : 'bg-purple-50 text-purple-600 border border-purple-200/80',
-        iconContainerStyle: { color: '#8B5CF6' },
-        featuredTitle: 'Nossos Serviços',
-        featuredDescription: 'Confira a tabela completa de opções, valores e detalhes de cada serviço.',
-        featuredCta: 'Ver Serviços',
-        featuredIcon: <Scissors className="w-5 h-5 stroke-[2]" />,
-        themeBg: 'bg-purple-50 text-purple-700 border-purple-100',
-        onClick: () => setIsServicesOpen(true),
-      })
-    }
-
-    if (activeModules.loyalty) {
-      items.push({
+          ? 'bg-amber-500/15 border border-amber-500/25'
+          : 'bg-amber-50 border border-amber-200/80',
+        iconContainerStyle: { color: '#F59E0B' },
+        onClick: handleGoogleReview,
+        isActive: Boolean(activeModules.googleReview),
+      },
+      loyalty: {
         id: 'loyalty',
         title: 'Fidelidade',
-        subtitle:
-          customerPoints !== null
-            ? `${customerPoints}/${loyaltyProgram.goalPoints} pts`
-            : 'Ganhe prêmios',
+        description: hasAvailableReward
+          ? 'Prêmio pronto para resgate!'
+          : customerPoints !== null
+          ? `${customerPoints}/${loyaltyProgram.goalPoints} pontos`
+          : 'Ganhe prêmios e bônus',
         badgeText: hasAvailableReward ? 'Prêmio!' : undefined,
-        icon: <Gift className="w-5 h-5" />,
+        icon: <Gift className="w-5 h-5 text-orange-400" />,
         iconContainerClass: isDark
-          ? 'bg-orange-500/15 text-orange-400 border border-orange-500/25'
-          : 'bg-orange-50 text-orange-600 border border-orange-200/80',
+          ? 'bg-orange-500/15 border border-orange-500/25'
+          : 'bg-orange-50 border border-orange-200/80',
         iconContainerStyle: { color: '#F97316' },
-        featuredTitle: 'Cartão Fidelidade Digital',
-        featuredDescription:
-          customerPoints !== null
-            ? `Você já tem ${customerPoints} de ${loyaltyProgram.goalPoints} pontos acumulados.`
-            : `Acumule pontos em cada visita e ganhe "${loyaltyProgram.rewardDescription}" sem baixar nada!`,
-        featuredCta: hasAvailableReward ? 'Resgatar Prêmio' : 'Ver Meu Cartão',
-        featuredIcon: <Gift className="w-5 h-5 stroke-[2]" />,
-        themeBg: 'bg-amber-50 text-amber-700 border-amber-100',
         onClick: () => setIsLoyaltyOpen(true),
-      })
-    }
-
-    if (activeModules.whatsapp) {
-      items.push({
-        id: 'whatsapp',
-        title: 'WhatsApp',
-        subtitle: 'Mensagem',
-        icon: <MessageCircle className="w-5 h-5" />,
-        iconContainerClass: isDark
-          ? 'bg-emerald-500/15 text-emerald-400 border border-emerald-500/25'
-          : 'bg-emerald-50 text-emerald-600 border border-emerald-200/80',
-        iconContainerStyle: { color: '#25D366' },
-        featuredTitle: 'Falar no WhatsApp',
-        featuredDescription: 'Converse agora com nossa equipe para tirar dúvidas ou fazer pedidos.',
-        featuredCta: 'Chamar no WhatsApp',
-        featuredIcon: <MessageCircle className="w-5 h-5 stroke-[2]" />,
-        themeBg: 'bg-emerald-50 text-emerald-700 border-emerald-100',
-        onClick: handleOpenWhatsApp,
-      })
-    }
-
-    if (activeModules.googleReview) {
-      items.push({
-        id: 'googleReview',
-        title: 'Avaliações',
-        subtitle: `${company.rating ? company.rating.toFixed(1) : '4.9'}★ Google`,
-        icon: <Star className="w-5 h-5 fill-amber-400 text-amber-400" />,
-        iconContainerClass: isDark
-          ? 'bg-amber-500/15 text-amber-400 border border-amber-500/25'
-          : 'bg-amber-50 text-amber-600 border border-amber-200/80',
-        iconContainerStyle: { color: '#F59E0B' },
-        featuredTitle: 'Avalie Nossa Empresa',
-        featuredDescription: 'Sua opinião é fundamental para nós. Conte como foi sua experiência!',
-        featuredCta: 'Deixar Avaliação',
-        featuredIcon: <Star className="w-5 h-5 fill-current stroke-[2]" />,
-        themeBg: 'bg-amber-50 text-amber-600 border-amber-100',
-        onClick: handleGoogleReview,
-      })
-    }
-
-    if (activeModules.menu) {
-      items.push({
+        isActive: Boolean(activeModules.loyalty),
+      },
+      menu: {
         id: 'menu',
-        title: 'Cardápio',
-        subtitle: 'Ver opções',
-        icon: <BookOpen className="w-5 h-5" />,
+        title: 'Cardápio Digital',
+        description: isExternalMenu
+          ? 'Abrir cardápio oficial'
+          : activeMenuItemsList.length > 0
+          ? `${activeMenuItemsList.length} itens disponíveis`
+          : 'Ver opções e pedir',
+        icon: <BookOpen className="w-5 h-5 text-teal-400" />,
         iconContainerClass: isDark
-          ? 'bg-teal-500/15 text-teal-400 border border-teal-500/25'
-          : 'bg-teal-50 text-teal-600 border border-teal-200/80',
+          ? 'bg-teal-500/15 border border-teal-500/25'
+          : 'bg-teal-50 border border-teal-200/80',
         iconContainerStyle: { color: '#0D9488' },
-        featuredTitle: 'Cardápio Completo',
-        featuredDescription: 'Confira todas as nossas opções, pratos e novidades preparadas para você.',
-        featuredCta: 'Abrir Cardápio',
-        featuredIcon: <BookOpen className="w-5 h-5 stroke-[2]" />,
-        themeBg: 'bg-teal-50 text-teal-700 border-teal-100',
         onClick: handleOpenMenu,
-      })
-    }
-
-    if (activeModules.wifi) {
-      items.push({
+        isActive: Boolean(activeModules.menu),
+      },
+      products: {
+        id: 'products',
+        title: company.productCatalog?.externalButtonText || 'Produtos',
+        description: isExternalCatalog
+          ? 'Ver catálogo oficial'
+          : activeProductsList.length > 0
+          ? `${activeProductsList.length} itens disponíveis`
+          : 'Vitrine de produtos',
+        icon: <ShoppingBag className="w-5 h-5 text-violet-400" />,
+        iconContainerClass: isDark
+          ? 'bg-violet-500/15 border border-violet-500/25'
+          : 'bg-violet-50 border border-violet-200/80',
+        iconContainerStyle: { color: '#8B5CF6' },
+        onClick: isExternalCatalog ? handleOpenCatalogExternal : () => setIsProductsSheetOpen(true),
+        isActive: Boolean(activeModules.products),
+      },
+      services: {
+        id: 'services',
+        title: 'Nossos Serviços',
+        description: activeServicesList.length > 0
+          ? `${activeServicesList.length} opções disponíveis`
+          : 'Tabela de serviços',
+        icon: <Scissors className="w-5 h-5 text-purple-400" />,
+        iconContainerClass: isDark
+          ? 'bg-purple-500/15 border border-purple-500/25'
+          : 'bg-purple-50 border border-purple-200/80',
+        iconContainerStyle: { color: '#8B5CF6' },
+        onClick: () => setIsServicesOpen(true),
+        isActive: Boolean(activeModules.services),
+      },
+      location: {
+        id: 'location',
+        title: 'Localização',
+        description: company.addressText ? 'Como chegar até nós' : 'Ver rotas no mapa',
+        icon: <Navigation className="w-5 h-5 text-rose-400" />,
+        iconContainerClass: isDark
+          ? 'bg-rose-500/15 border border-rose-500/25'
+          : 'bg-rose-50 border border-rose-200/80',
+        iconContainerStyle: { color: '#EA4335' },
+        onClick: handleOpenLocation,
+        isActive: Boolean(activeModules.location),
+      },
+      wifi: {
         id: 'wifi',
-        title: 'Wi-Fi',
-        subtitle: 'Conectar',
-        icon: <Wifi className="w-5 h-5" />,
+        title: 'Wi-Fi Grátis',
+        description: company.wifi?.ssid ? `Rede: ${company.wifi.ssid}` : 'Toque para conectar',
+        icon: <Wifi className="w-5 h-5 text-sky-400" />,
         iconContainerClass: isDark
-          ? 'bg-sky-500/15 text-sky-400 border border-sky-500/25'
-          : 'bg-sky-50 text-sky-600 border border-sky-200/80',
+          ? 'bg-sky-500/15 border border-sky-500/25'
+          : 'bg-sky-50 border border-sky-200/80',
         iconContainerStyle: { color: '#0284C7' },
-        featuredTitle: 'Conectar ao Wi-Fi',
-        featuredDescription: `Acesse a rede "${company.wifi?.ssid}" em um toque sem complicação.`,
-        featuredCta: 'Conectar Agora',
-        featuredIcon: <Wifi className="w-5 h-5 stroke-[2]" />,
-        themeBg: 'bg-sky-50 text-sky-700 border-sky-100',
         onClick: handleOpenWifi,
-      })
-    }
-
-    if (activeModules.feedback) {
-      items.push({
+        isActive: Boolean(activeModules.wifi),
+      },
+      feedback: {
         id: 'feedback',
-        title: 'Feedback',
-        subtitle: 'Privado',
-        icon: <MessageSquareHeart className="w-5 h-5" />,
+        title: 'Feedback Privado',
+        description: 'Envie um recado à gerência',
+        icon: <MessageSquareHeart className="w-5 h-5 text-pink-400" />,
         iconContainerClass: isDark
-          ? 'bg-pink-500/15 text-pink-400 border border-pink-500/25'
-          : 'bg-pink-50 text-pink-600 border border-pink-200/80',
+          ? 'bg-pink-500/15 border border-pink-500/25'
+          : 'bg-pink-50 border border-pink-200/80',
         iconContainerStyle: { color: '#EC4899' },
-        featuredTitle: 'Deixe sua Sugestão',
-        featuredDescription: 'Envie um recado privado diretamente para a gerência do estabelecimento.',
-        featuredCta: 'Enviar Mensagem',
-        featuredIcon: <MessageSquareHeart className="w-5 h-5 stroke-[2]" />,
-        themeBg: 'bg-pink-50 text-pink-700 border-pink-100',
         onClick: () => setIsFeedbackOpen(true),
-      })
-    }
-
-    return items
-  }, [
-    activeModules,
-    activeServicesList,
-    activeProductsList,
-    isExternalCatalog,
-    customerPoints,
-    hasAvailableReward,
-    loyaltyProgram,
-    company,
-    isDark,
-    handleGoogleReview,
-    handleOpenMenu,
-    handleOpenWhatsApp,
-    handleOpenWifi,
-    handleOpenCatalogExternal,
-  ])
-
-  // Resolve configurable featured module
-  const featuredItem = useMemo<FeatureItem | null>(() => {
-    if (allFeatureItems.length === 0) return null
-
-    const configured = company.highlightModule || 'auto'
-
-    if (configured !== 'auto') {
-      const match = allFeatureItems.find((item) => item.id === configured)
-      if (match) return match
-    }
-
-    // Automatic priority order
-    const priority = ['products', 'appointments', 'services', 'loyalty', 'whatsapp', 'googleReview', 'menu', 'wifi', 'feedback']
-    for (const key of priority) {
-      const found = allFeatureItems.find((item) => item.id === key)
-      if (found) return found
-    }
-
-    return allFeatureItems[0] || null
-  }, [allFeatureItems, company.highlightModule])
-
-  // Acessos Rápidos: ações secundárias compactas SEM duplicar o que já tem seção dedicada
-  const quickAccessItems = useMemo(() => {
-    const list: FeatureItem[] = []
-
-    // 1. WhatsApp (Verde Oficial)
-    if (activeModules.whatsapp) {
-      list.push({
-        id: 'whatsapp',
-        title: 'WhatsApp',
-        subtitle: 'Mensagem',
-        icon: <MessageCircle className="w-5 h-5 text-[#25D366]" />,
-        iconContainerClass: isDark
-          ? 'bg-emerald-500/15 text-emerald-400 border border-emerald-500/25'
-          : 'bg-emerald-50 text-emerald-600 border border-emerald-200/80',
-        iconContainerStyle: { color: '#25D366' },
-        onClick: handleOpenWhatsApp,
-      })
-    }
-
-    // 2. Avaliações (Amarelo / Dourado Google)
-    if (activeModules.googleReview) {
-      list.push({
-        id: 'googleReview',
-        title: 'Avaliações',
-        subtitle: `${company.rating ? company.rating.toFixed(1) : '4.9'}★ Google`,
-        icon: <Star className="w-5 h-5 fill-amber-400 text-amber-400" />,
-        iconContainerClass: isDark
-          ? 'bg-amber-500/15 text-amber-400 border border-amber-500/25'
-          : 'bg-amber-50 text-amber-600 border border-amber-200/80',
-        iconContainerStyle: { color: '#F59E0B' },
-        onClick: handleGoogleReview,
-      })
-    }
-
-    // 3. Instagram (Gradiente Característico Original)
-    if (activeModules.instagram && company.instagram) {
-      const cleanInsta = company.instagram.replace(/^@/, '').trim()
-      list.push({
+        isActive: Boolean(activeModules.feedback),
+      },
+      instagram: {
         id: 'instagram',
         title: 'Instagram',
-        subtitle: `@${cleanInsta}`,
+        description: company.instagram ? `@${company.instagram.replace(/^@/, '')}` : 'Siga nosso perfil oficial',
         icon: <Instagram className="w-5 h-5 text-white" />,
         iconContainerClass: 'shadow-xs border border-white/10',
         iconContainerStyle: {
@@ -845,151 +707,76 @@ export const PublicCompanyView: React.FC<PublicCompanyViewProps> = ({
           color: '#ffffff',
         },
         onClick: handleOpenInstagram,
-      })
+        isActive: Boolean(activeModules.instagram),
+      },
     }
-
-    // 4. Rotas / Localização (Vermelho / Rosa Maps)
-    if (activeModules.location && (company.locationUrl || company.addressText)) {
-      list.push({
-        id: 'location',
-        title: 'Rotas',
-        subtitle: 'Como chegar',
-        icon: <Navigation className="w-5 h-5 text-[#EA4335]" />,
-        iconContainerClass: isDark
-          ? 'bg-rose-500/15 text-rose-400 border border-rose-500/25'
-          : 'bg-rose-50 text-rose-600 border border-rose-200/80',
-        iconContainerStyle: { color: '#EA4335' },
-        onClick: handleOpenLocation,
-      })
-    }
-
-    // 5. Wi-Fi (Azul)
-    if (activeModules.wifi && company.wifi?.ssid) {
-      list.push({
-        id: 'wifi',
-        title: 'Wi-Fi',
-        subtitle: 'Conectar',
-        icon: <Wifi className="w-5 h-5 text-[#0284C7]" />,
-        iconContainerClass: isDark
-          ? 'bg-sky-500/15 text-sky-400 border border-sky-500/25'
-          : 'bg-sky-50 text-sky-600 border border-sky-200/80',
-        iconContainerStyle: { color: '#0284C7' },
-        onClick: handleOpenWifi,
-      })
-    }
-
-    // 6. Feedback (Rosa / Magenta)
-    if (activeModules.feedback) {
-      list.push({
-        id: 'feedback',
-        title: 'Feedback',
-        subtitle: 'Privado',
-        icon: <MessageSquareHeart className="w-5 h-5 text-[#EC4899]" />,
-        iconContainerClass: isDark
-          ? 'bg-pink-500/15 text-pink-400 border border-pink-500/25'
-          : 'bg-pink-50 text-pink-600 border border-pink-200/80',
-        iconContainerStyle: { color: '#EC4899' },
-        onClick: () => setIsFeedbackOpen(true),
-      })
-    }
-
-    // 7. Cardápio (Teal) se ativo
-    if (activeModules.menu) {
-      list.push({
-        id: 'menu',
-        title: 'Cardápio',
-        subtitle: isExternalMenu ? 'Ver cardápio' : 'Ver opções & pedir',
-        icon: <BookOpen className="w-5 h-5" />,
-        iconContainerClass: isDark
-          ? 'bg-teal-500/15 text-teal-400 border border-teal-500/25'
-          : 'bg-teal-50 text-teal-600 border border-teal-200/80',
-        iconContainerStyle: { color: '#0D9488' },
-        onClick: handleOpenMenu,
-      })
-    }
-
-    // 8. Serviços (Roxo) - SOMENTE se NÃO houver a vitrine completa de serviços na página
-    if (activeModules.services && !hasFullServicesSection) {
-      list.push({
-        id: 'services',
-        title: 'Serviços',
-        subtitle: 'Ver opções',
-        icon: <Scissors className="w-5 h-5" />,
-        iconContainerClass: isDark
-          ? 'bg-purple-500/15 text-purple-400 border border-purple-500/25'
-          : 'bg-purple-50 text-purple-600 border border-purple-200/80',
-        iconContainerStyle: { color: '#8B5CF6' },
-        onClick: () => setIsServicesOpen(true),
-      })
-    }
-
-    // 9. Fidelidade (Laranja / Dourado) - SOMENTE se NÃO houver o cartão de fidelidade completo na página
-    if (activeModules.loyalty && !hasFullLoyaltySection) {
-      list.push({
-        id: 'loyalty',
-        title: 'Fidelidade',
-        subtitle: 'Clube VIP',
-        icon: <Gift className="w-5 h-5" />,
-        iconContainerClass: isDark
-          ? 'bg-orange-500/15 text-orange-400 border border-orange-500/25'
-          : 'bg-orange-50 text-orange-600 border border-orange-200/80',
-        iconContainerStyle: { color: '#F97316' },
-        onClick: () => setIsLoyaltyOpen(true),
-      })
-    }
-
-    // 10. Agendamento (Azul / Roxo) - SOMENTE se NÃO for o Destaque Principal
-    if (activeModules.appointments && featuredItem?.id !== 'appointments') {
-      list.push({
-        id: 'appointments',
-        title: 'Agendar',
-        subtitle: 'Horários',
-        icon: <Calendar className="w-5 h-5" />,
-        iconContainerClass: isDark
-          ? 'bg-indigo-500/15 text-indigo-400 border border-indigo-500/25'
-          : 'bg-indigo-50 text-indigo-600 border border-indigo-200/80',
-        iconContainerStyle: { color: '#6366F1' },
-        onClick: () => {
-          setBookingService(null)
-          setIsBookingOpen(true)
-        },
-      })
-    }
-
-    // 11. Catálogo Externo (Roxo / Violeta) - Se for catálogo externo e não for destaque
-    if (activeModules.products && isExternalCatalog && featuredItem?.id !== 'products') {
-      list.push({
-        id: 'products',
-        title: company.productCatalog?.externalButtonText || 'Catálogo',
-        subtitle: 'Loja',
-        icon: <ShoppingBag className="w-5 h-5 text-violet-400" />,
-        iconContainerClass: isDark
-          ? 'bg-violet-500/15 text-violet-400 border border-violet-500/25'
-          : 'bg-violet-50 text-violet-600 border border-violet-200/80',
-        iconContainerStyle: { color: '#8B5CF6' },
-        onClick: handleOpenCatalogExternal,
-      })
-    }
-
-    // Não repetir o item de Destaque Principal em Acessos Rápidos
-    return list.filter((item) => !featuredItem || item.id !== featuredItem.id)
   }, [
     activeModules,
-    hasFullServicesSection,
-    hasFullLoyaltySection,
-    isExternalCatalog,
-    featuredItem,
     company,
     isDark,
+    isExternalMenu,
+    isExternalCatalog,
+    activeMenuItemsList.length,
+    activeProductsList.length,
+    activeServicesList.length,
+    customerPoints,
+    hasAvailableReward,
+    loyaltyProgram.goalPoints,
     handleOpenWhatsApp,
     handleGoogleReview,
-    handleOpenInstagram,
-    handleOpenLocation,
-    handleOpenWifi,
     handleOpenMenu,
     handleOpenCatalogExternal,
-    isExternalMenu,
+    handleOpenLocation,
+    handleOpenWifi,
+    handleOpenInstagram,
   ])
+
+  // Resolve os 4 cards de destaque em layout 2x2 no celular
+  const featuredCardsList = useMemo<HighlightCardItem[]>(() => {
+    const configured = company.featuredCards && company.featuredCards.length > 0
+      ? company.featuredCards
+      : ['whatsapp', 'appointments', 'googleReview', 'loyalty']
+
+    const list: HighlightCardItem[] = []
+    const seen = new Set<string>()
+
+    // 1. Prioriza os configurados que estão ativos
+    for (const id of configured) {
+      const card = availableHighlightCards[id]
+      if (card && card.isActive && !seen.has(id)) {
+        list.push(card)
+        seen.add(id)
+        if (list.length === 4) break
+      }
+    }
+
+    // 2. Se houver menos de 4, completa com os primeiros módulos ativos disponíveis
+    if (list.length < 4) {
+      const fallbackOrder = [
+        'whatsapp',
+        'appointments',
+        'googleReview',
+        'loyalty',
+        'menu',
+        'products',
+        'services',
+        'location',
+        'wifi',
+        'feedback',
+        'instagram',
+      ]
+      for (const id of fallbackOrder) {
+        if (list.length >= 4) break
+        const card = availableHighlightCards[id]
+        if (card && card.isActive && !seen.has(id)) {
+          list.push(card)
+          seen.add(id)
+        }
+      }
+    }
+
+    return list.slice(0, 4)
+  }, [company.featuredCards, availableHighlightCards])
 
   // Calculate loyalty percentage
   const loyaltyProgressPercent = useMemo(() => {
@@ -1001,23 +788,28 @@ export const PublicCompanyView: React.FC<PublicCompanyViewProps> = ({
   // Public Page Dynamic Sections Order
   const effectivePageOrder = useMemo(() => {
     const defaultOrder = [
+      'whatsapp',
       'services',
       'products',
       'appointments',
       'menu',
       'loyalty',
       'googleReview',
+      'location',
       'contact',
       'wifi',
       'feedback',
       'instagram',
     ]
-    const saved = Array.isArray(company.cardOrder) ? company.cardOrder : []
+    const saved = Array.isArray(company.publicSectionsOrder) && company.publicSectionsOrder.length > 0
+      ? company.publicSectionsOrder
+      : Array.isArray(company.cardOrder) ? company.cardOrder : []
     const result: string[] = []
 
     saved.forEach((key) => {
-      if (defaultOrder.includes(key) && !result.includes(key)) {
-        result.push(key)
+      const normalizedKey = key === 'reviews' ? 'googleReview' : key === 'contact' ? 'location' : key
+      if (defaultOrder.includes(normalizedKey) && !result.includes(normalizedKey)) {
+        result.push(normalizedKey)
       }
     })
 
@@ -1028,7 +820,7 @@ export const PublicCompanyView: React.FC<PublicCompanyViewProps> = ({
     })
 
     return result
-  }, [company.cardOrder])
+  }, [company.publicSectionsOrder, company.cardOrder])
 
   return (
     <div
@@ -1052,7 +844,7 @@ export const PublicCompanyView: React.FC<PublicCompanyViewProps> = ({
         {/* ========================================================= */}
         <div className="relative w-full">
           {/* Foto de Capa Imersiva & Integração com o Fundo */}
-          <div className="relative w-full h-48 sm:h-52 bg-neutral-950 overflow-hidden">
+          <div className="relative w-full h-52 sm:h-56 bg-neutral-950 overflow-hidden">
             {company.coverUrl && !coverError ? (
               <>
                 <Image
@@ -1065,12 +857,14 @@ export const PublicCompanyView: React.FC<PublicCompanyViewProps> = ({
                   referrerPolicy="no-referrer"
                   onError={() => setCoverError(true)}
                 />
-                {/* Gradiente escuro concentrado APENAS na base da foto para transição suave com o fundo */}
+                {/* Overlay sutil para foco e alto contraste da logo no centro */}
+                <div className="absolute inset-0 bg-black/30 pointer-events-none" />
+                {/* Gradiente escuro concentrado na base da foto para transição suave com o fundo */}
                 <div
-                  className={`absolute bottom-0 left-0 right-0 h-12 sm:h-14 pointer-events-none ${
+                  className={`absolute bottom-0 left-0 right-0 h-14 sm:h-16 pointer-events-none ${
                     isDark
-                      ? 'bg-gradient-to-t from-[#0d0d12] via-[#0d0d12]/50 to-transparent'
-                      : 'bg-gradient-to-t from-white via-white/50 to-transparent'
+                      ? 'bg-gradient-to-t from-[#0d0d12] via-[#0d0d12]/60 to-transparent'
+                      : 'bg-gradient-to-t from-white via-white/60 to-transparent'
                   }`}
                 />
               </>
@@ -1081,7 +875,6 @@ export const PublicCompanyView: React.FC<PublicCompanyViewProps> = ({
               >
                 <div className="absolute -right-8 -top-8 w-36 h-36 rounded-full bg-white/20 blur-xl pointer-events-none" />
                 <div className="absolute right-0 bottom-0 w-28 h-28 rounded-full bg-black/25 blur-xl pointer-events-none" />
-                <Store className="w-10 h-10 opacity-35" style={{ color: contrastText }} />
                 <div
                   className={`absolute inset-0 pointer-events-none ${
                     isDark
@@ -1107,57 +900,118 @@ export const PublicCompanyView: React.FC<PublicCompanyViewProps> = ({
                 )}
               </button>
             </div>
-          </div>
 
-          {/* Logo sobreposto & Identidade da Empresa */}
-          <div className="px-5 -mt-14 sm:-mt-16 relative z-20 flex flex-col items-center text-center">
-            {/* Moldura do Logo com Gradiente e Contraste */}
-            <div
-              className="relative w-22 h-22 sm:w-24 sm:h-24 rounded-2xl p-[3px] shadow-2xl overflow-hidden flex items-center justify-center transition-transform hover:scale-105"
-              style={{
-                background: gradientBg,
-                boxShadow: `0 12px 28px -4px ${hexToRgba(primaryColor, isDark ? 0.55 : 0.4)}`,
-              }}
-            >
+            {/* LOGO CENTRALIZADA NO MEIO DA CAPA (A capa atrás e a logo na frente no centro) */}
+            <div className="absolute inset-0 z-10 flex items-center justify-center pointer-events-none">
               <div
-                className={`w-full h-full rounded-[13px] p-1 overflow-hidden flex items-center justify-center ${
-                  isDark ? 'bg-[#141419]' : 'bg-white'
-                }`}
+                className="relative w-22 h-22 sm:w-24 sm:h-24 rounded-2xl p-[3px] shadow-2xl overflow-hidden flex items-center justify-center pointer-events-auto transition-transform hover:scale-105"
+                style={{
+                  background: gradientBg,
+                  boxShadow: `0 12px 28px -4px ${hexToRgba(primaryColor, isDark ? 0.65 : 0.45)}`,
+                }}
               >
-                {company.logoUrl && !logoError ? (
-                  <Image
-                    src={company.logoUrl}
-                    alt={`${company.name} logo`}
-                    width={88}
-                    height={88}
-                    className="w-full h-full object-cover rounded-xl"
-                    referrerPolicy="no-referrer"
-                    onError={() => setLogoError(true)}
-                  />
-                ) : (
-                  <div
-                    className="w-full h-full rounded-xl flex items-center justify-center text-xl font-black shadow-inner"
-                    style={{
-                      background: gradientBg,
-                      color: contrastText,
-                    }}
-                  >
-                    {company.name.slice(0, 2).toUpperCase()}
-                  </div>
-                )}
+                <div
+                  className={`w-full h-full rounded-[13px] p-1 overflow-hidden flex items-center justify-center ${
+                    isDark ? 'bg-[#141419]' : 'bg-white'
+                  }`}
+                >
+                  {company.logoUrl && !logoError ? (
+                    <Image
+                      src={company.logoUrl}
+                      alt={`${company.name} logo`}
+                      width={88}
+                      height={88}
+                      className="w-full h-full object-cover rounded-xl"
+                      referrerPolicy="no-referrer"
+                      onError={() => setLogoError(true)}
+                    />
+                  ) : (
+                    <div
+                      className="w-full h-full rounded-xl flex items-center justify-center text-xl font-black shadow-inner"
+                      style={{
+                        background: gradientBg,
+                        color: contrastText,
+                      }}
+                    >
+                      {company.name.slice(0, 2).toUpperCase()}
+                    </div>
+                  )}
+                </div>
               </div>
             </div>
+          </div>
 
+          {/* ======================================================= */}
+          {/* 2. 4 CARDS DE DESTAQUE NO LUGAR DA LOGO FLUTUANTE        */}
+          {/* 4 CARDS UM DO LADO DO OUTRO EM TAMANHOS IGUAIS          */}
+          {/* ======================================================= */}
+          {featuredCardsList.length > 0 && (
+            <div className="px-2.5 sm:px-4 -mt-7 sm:-mt-8 relative z-20">
+              <div className="grid grid-cols-4 gap-1.5 sm:gap-2">
+                {featuredCardsList.map((card) => (
+                  <button
+                    key={card.id}
+                    type="button"
+                    onClick={card.onClick}
+                    className={`w-full text-center p-2 sm:p-2.5 rounded-2xl border transition-all duration-200 active:scale-95 hover:scale-[1.02] cursor-pointer group flex flex-col items-center justify-between shadow-2xs hover:shadow-md select-none relative overflow-hidden h-[96px] sm:h-[104px] ${
+                      isDark
+                        ? 'bg-[#141419]/95 hover:bg-[#1a1a22] border-white/[0.08] hover:border-white/20'
+                        : 'bg-white/95 hover:bg-neutral-50/90 border-neutral-200/90 hover:border-neutral-300'
+                    }`}
+                    style={{ WebkitTapHighlightColor: 'transparent' }}
+                  >
+                    {/* Badge flutuante (ex: Prêmio!) */}
+                    {card.badgeText && (
+                      <span className="absolute top-1 right-1 px-1 py-0.2 rounded-full text-[8px] font-black bg-amber-500 text-white shadow-2xs">
+                        {card.badgeText}
+                      </span>
+                    )}
+
+                    <div
+                      className={`w-8 h-8 sm:w-9 sm:h-9 rounded-xl flex items-center justify-center shrink-0 shadow-2xs transition-transform group-hover:scale-105 ${
+                        card.iconContainerClass
+                      }`}
+                      style={card.iconContainerStyle}
+                    >
+                      {card.icon}
+                    </div>
+
+                    <div className="min-w-0 w-full mt-1">
+                      <h3
+                        className={`text-[10px] sm:text-xs font-black tracking-tight truncate leading-tight ${
+                          isDark ? 'text-white' : 'text-neutral-900'
+                        }`}
+                      >
+                        {card.title}
+                      </h3>
+                      <p
+                        className={`text-[8.5px] sm:text-[9.5px] truncate mt-0.5 font-medium leading-tight ${
+                          isDark ? 'text-neutral-400' : 'text-neutral-500'
+                        }`}
+                      >
+                        {card.description}
+                      </p>
+                    </div>
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* ======================================================= */}
+          {/* 3. IDENTIDADE DA EMPRESA (NOME, STATUS, AVALIAÇÕES)     */}
+          {/* ======================================================= */}
+          <div className="px-4 mt-3 sm:mt-4 relative z-10 flex flex-col items-center text-center">
             {/* Nome da Empresa */}
             <h1
-              className={`mt-3 text-xl sm:text-2xl font-black tracking-tight leading-tight ${
+              className={`text-xl sm:text-2xl font-black tracking-tight leading-tight ${
                 isDark ? 'text-white' : 'text-neutral-900'
               }`}
             >
               {company.name}
             </h1>
 
-            {/* Tagline da Empresa (Categoria removida da interface pública conforme solicitação) */}
+            {/* Tagline da Empresa */}
             {company.tagline && (
               <p
                 className={`text-xs font-medium max-w-xs mt-1 leading-snug ${
@@ -1169,7 +1023,7 @@ export const PublicCompanyView: React.FC<PublicCompanyViewProps> = ({
             )}
 
             {/* Linha de Metadados: Avaliação no Google & Status */}
-            <div className="flex items-center justify-center flex-wrap gap-2 mt-2.5">
+            <div className="flex items-center justify-center flex-wrap gap-2 mt-2">
               {/* Avaliação Google */}
               <button
                 type="button"
@@ -1230,177 +1084,49 @@ export const PublicCompanyView: React.FC<PublicCompanyViewProps> = ({
         </div>
 
         {/* ========================================================= */}
-        {/* CORPO PRINCIPAL COM CONTEÚDO PREMIUM                     */}
+        {/* CORPO PRINCIPAL COM CONTEÚDO (ORDEM DINÂMICA)            */}
         {/* ========================================================= */}
         <div className="px-4 sm:px-5 mt-5 flex-1 flex flex-col space-y-6">
-
-          {/* ======================================================= */}
-          {/* 2. DESTAQUE PRINCIPAL (HERO CARD COMPACTO & CONVERSÃO)  */}
-          {/* ======================================================= */}
-          {featuredItem && (
-            <div
-              onClick={featuredItem.onClick}
-              className="w-full relative overflow-hidden rounded-2xl sm:rounded-3xl p-3.5 sm:p-4 shadow-lg cursor-pointer active:scale-[0.985] transition-all duration-200 group border select-none"
-              style={{
-                background: gradientBg,
-                color: contrastText,
-                borderColor: isDark
-                  ? 'rgba(255,255,255,0.18)'
-                  : isLightContrast
-                  ? 'rgba(0,0,0,0.08)'
-                  : 'rgba(255,255,255,0.2)',
-                boxShadow: `0 10px 24px -6px ${hexToRgba(primaryColor, isDark ? 0.5 : 0.35)}`,
-                WebkitTapHighlightColor: 'transparent',
-              }}
-            >
-              {/* Efeitos de iluminação modernos sobre o gradiente */}
-              <div
-                className="absolute -right-6 -top-6 w-28 h-28 rounded-full blur-xl pointer-events-none opacity-30"
-                style={{ backgroundColor: secondaryColor }}
-              />
-              <div
-                className="absolute right-0 bottom-0 w-24 h-24 rounded-full blur-lg pointer-events-none opacity-25"
-                style={{ backgroundColor: primaryColor }}
-              />
-
-              <div className="relative z-10 flex flex-col items-start text-left">
-                {/* Linha com Ícone e Título */}
-                <div className="flex items-center gap-2.5">
-                  <div
-                    className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl backdrop-blur-md flex items-center justify-center shrink-0 shadow-inner border"
-                    style={{
-                      backgroundColor: isLightContrast
-                        ? 'rgba(0, 0, 0, 0.08)'
-                        : 'rgba(255, 255, 255, 0.2)',
-                      borderColor: isLightContrast
-                        ? 'rgba(0, 0, 0, 0.12)'
-                        : 'rgba(255, 255, 255, 0.25)',
-                      color: contrastText,
-                    }}
-                  >
-                    {featuredItem.featuredIcon}
-                  </div>
-                  <h3
-                    className="text-base sm:text-lg font-black tracking-tight leading-tight"
-                    style={{ color: contrastText }}
-                  >
-                    {featuredItem.featuredTitle}
-                  </h3>
-                </div>
-
-                {/* Descrição Curta */}
-                <p
-                  className="text-xs leading-snug mt-1.5 mb-2.5 max-w-[340px]"
-                  style={{
-                    color: isLightContrast
-                      ? 'rgba(23, 23, 23, 0.85)'
-                      : 'rgba(255, 255, 255, 0.92)',
-                  }}
-                >
-                  {featuredItem.featuredDescription}
-                </p>
-
-                {/* Botão CTA Compacto */}
-                <div
-                  className="inline-flex items-center gap-1.5 px-3.5 py-1.5 sm:py-2 rounded-xl text-xs font-bold shadow-md transition-transform group-hover:scale-[1.02]"
-                  style={{
-                    backgroundColor: isLightContrast ? '#171717' : '#ffffff',
-                    color: isLightContrast ? '#ffffff' : '#171717',
-                  }}
-                >
-                  <span>{featuredItem.featuredCta}</span>
-                  <ArrowRight
-                    className="w-3.5 h-3.5 stroke-[2.5] group-hover:translate-x-0.5 transition-transform"
-                    style={{
-                      color: isLightContrast ? '#fcd34d' : primaryColor,
-                    }}
-                  />
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* ======================================================= */}
-          {/* 3. ACESSOS RÁPIDOS: GRID 3 COLUNAS COM CORES REAIS      */}
-          {/* ======================================================= */}
-          {quickAccessItems.length > 0 && (
-            <div className="space-y-2">
-              <div className="flex items-center justify-between px-0.5">
-                <div className="flex items-center gap-1.5">
-                  <span
-                    className="w-1.5 h-3 rounded-full"
-                    style={{ backgroundColor: primaryColor }}
-                  />
-                  <h2
-                    className={`text-xs font-extrabold uppercase tracking-wider ${
-                      isDark ? 'text-neutral-400' : 'text-neutral-600'
-                    }`}
-                  >
-                    Acessos Rápidos
-                  </h2>
-                </div>
-                <span
-                  className={`text-[10px] font-medium ${
-                    isDark ? 'text-neutral-500' : 'text-neutral-400'
-                  }`}
-                >
-                  Toque para abrir
-                </span>
-              </div>
-
-              {/* Grid de 3 colunas no celular (3 em cima + 3 embaixo) preenchendo toda a largura */}
-              <div className="grid grid-cols-3 gap-2 sm:gap-2.5">
-                {quickAccessItems.map((item) => (
-                  <button
-                    key={item.id}
-                    type="button"
-                    onClick={item.onClick}
-                    className={`w-full flex flex-col items-center justify-center py-3 px-2 rounded-2xl active:scale-95 transition-all duration-150 cursor-pointer group relative select-none ${
-                      isDark
-                        ? 'bg-[#141419] hover:bg-[#1a1a22] border border-white/[0.07] hover:border-white/15'
-                        : 'bg-neutral-50/90 hover:bg-neutral-100/90 border border-neutral-200/60'
-                    }`}
-                    style={{ WebkitTapHighlightColor: 'transparent' }}
-                  >
-                    {/* Badge flutuante quando houver */}
-                    {item.badgeText && (
-                      <span className="absolute -top-1 -right-1 px-1.5 py-0.2 rounded-full text-[8px] font-black bg-amber-500 text-white shadow-2xs">
-                        {item.badgeText}
-                      </span>
-                    )}
-
-                    {/* Ícone com sua cor autêntica específica */}
-                    <div
-                      className={`w-11 h-11 rounded-2xl flex items-center justify-center shadow-xs transition-transform group-hover:scale-105 ${
-                        item.iconContainerClass || ''
-                      }`}
-                      style={item.iconContainerStyle}
-                    >
-                      {item.icon}
-                    </div>
-
-                    {/* Rótulo Compacto */}
-                    <span
-                      className={`mt-2 text-xs font-bold text-center truncate max-w-full ${
-                        isDark
-                          ? 'text-neutral-200 group-hover:text-white'
-                          : 'text-neutral-800 group-hover:text-neutral-950'
-                      }`}
-                    >
-                      {item.title}
-                    </span>
-                  </button>
-                ))}
-              </div>
-            </div>
-          )}
 
           {/* ======================================================= */}
           {/* 4. SEÇÕES E CARDS DA PÁGINA PÚBLICA (ORDEM DINÂMICA)     */}
           {/* ======================================================= */}
           {(() => {
             const sectionElements: Record<string, React.ReactNode> = {
-              services: activeServicesList.length > 0 ? (
+              whatsapp: activeModules.whatsapp ? (
+                <div
+                  key="whatsapp"
+                  className={`rounded-3xl p-4 sm:p-4.5 border flex items-center justify-between gap-3 ${
+                    isDark
+                      ? 'bg-[#141419] border-white/[0.08] shadow-sm'
+                      : 'bg-white border-neutral-200/80 shadow-2xs'
+                  }`}
+                >
+                  <div className="flex items-center gap-3 min-w-0">
+                    <div className="w-10 h-10 rounded-2xl bg-emerald-500/15 text-emerald-400 border border-emerald-500/30 flex items-center justify-center shrink-0">
+                      <MessageCircle className="w-5 h-5 text-[#25D366]" />
+                    </div>
+                    <div className="min-w-0">
+                      <h4 className={`text-xs sm:text-sm font-bold truncate ${isDark ? 'text-white' : 'text-neutral-900'}`}>
+                        WhatsApp Oficial
+                      </h4>
+                      <p className={`text-[11px] truncate mt-0.5 ${isDark ? 'text-neutral-400' : 'text-neutral-500'}`}>
+                        {company.whatsapp ? `Atendimento: ${company.whatsapp}` : 'Fale diretamente com nossa equipe'}
+                      </p>
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={handleOpenWhatsApp}
+                    className="px-3.5 py-2 rounded-xl text-xs font-bold bg-emerald-600 hover:bg-emerald-500 active:scale-95 text-white shrink-0 cursor-pointer shadow-xs transition-all flex items-center gap-1.5"
+                  >
+                    <MessageCircle className="w-3.5 h-3.5" />
+                    <span>Conversar</span>
+                  </button>
+                </div>
+              ) : null,
+              services: activeModules.services ? (
+                activeServicesList.length > 0 ? (
             <div className="space-y-3 pt-1">
               <div className="flex items-center justify-between px-0.5">
                 <div className="flex items-center gap-1.5">
@@ -1621,7 +1347,46 @@ export const PublicCompanyView: React.FC<PublicCompanyViewProps> = ({
                 </button>
               )}
             </div>
-          ) : null,
+          ) : (
+            <div
+              key="services-card"
+              className={`rounded-3xl p-4.5 sm:p-5 border space-y-3 ${
+                isDark ? 'bg-[#141419] border-white/[0.08] shadow-sm' : 'bg-white border-neutral-200/80 shadow-2xs'
+              }`}
+            >
+              <div className="flex items-center gap-2.5">
+                <div
+                  className="w-9 h-9 rounded-xl flex items-center justify-center text-white shadow-xs"
+                  style={{ backgroundColor: primaryColor }}
+                >
+                  <Scissors className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className={`text-sm font-black tracking-tight ${isDark ? 'text-white' : 'text-neutral-900'}`}>
+                    Nossos Serviços
+                  </h3>
+                  <p className={`text-[11px] ${isDark ? 'text-neutral-400' : 'text-neutral-500'}`}>
+                    Consulte nossos serviços e agende seu atendimento
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  if (activeModules.appointments) {
+                    setIsBookingOpen(true)
+                  } else {
+                    handleOpenWhatsApp()
+                  }
+                }}
+                className="w-full py-2.5 px-4 rounded-xl text-xs font-bold text-white shadow-xs flex items-center justify-center gap-2 cursor-pointer transition-all active:scale-[0.99]"
+                style={{ backgroundColor: primaryColor }}
+              >
+                <Scissors className="w-3.5 h-3.5" />
+                <span>Consultar Serviços</span>
+              </button>
+            </div>
+          )) : null,
               products: (activeProductsList.length > 0 && !isExternalCatalog && company.modules?.products !== false) ? (
             <div
               className={`rounded-3xl p-4.5 sm:p-5 space-y-4 border ${
@@ -1929,6 +1694,39 @@ export const PublicCompanyView: React.FC<PublicCompanyViewProps> = ({
               >
                 <span>{company.productCatalog?.externalButtonText || 'Ver Catálogo'}</span>
                 <ExternalLink className="w-3.5 h-3.5 opacity-80" />
+              </button>
+            </div>
+          ) : activeModules.products ? (
+            <div
+              key="products-card"
+              className={`rounded-3xl p-4.5 sm:p-5 border flex items-center justify-between gap-3 ${
+                isDark ? 'bg-[#121217] border-white/[0.08] shadow-sm' : 'bg-white border-neutral-200/80 shadow-2xs'
+              }`}
+            >
+              <div className="flex items-center gap-3 min-w-0">
+                <div
+                  className="w-10 h-10 rounded-2xl flex items-center justify-center text-white shadow-xs shrink-0"
+                  style={{ backgroundColor: primaryColor }}
+                >
+                  <Package className="w-5 h-5" />
+                </div>
+                <div className="min-w-0">
+                  <h4 className={`font-black text-xs sm:text-sm truncate ${isDark ? 'text-white' : 'text-neutral-900'}`}>
+                    Catálogo de Produtos
+                  </h4>
+                  <p className={`text-[11px] truncate mt-0.5 ${isDark ? 'text-neutral-400' : 'text-neutral-500'}`}>
+                    Conheça nossa seleção de produtos disponíveis
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsProductsSheetOpen(true)}
+                className="px-4 py-2.5 rounded-xl font-bold text-xs text-white shadow-sm flex items-center gap-1.5 shrink-0 transition-opacity hover:opacity-90 active:scale-95 cursor-pointer"
+                style={{ backgroundColor: primaryColor }}
+              >
+                <span>Ver Produtos</span>
+                <ChevronRight className="w-3.5 h-3.5" />
               </button>
             </div>
           ) : null,
@@ -2279,31 +2077,64 @@ export const PublicCompanyView: React.FC<PublicCompanyViewProps> = ({
                 <ExternalLink className="w-3.5 h-3.5 opacity-80" />
               </button>
             </div>
+          ) : activeModules.menu ? (
+            <div
+              key="menu-card"
+              className={`rounded-3xl p-4.5 sm:p-5 border flex items-center justify-between gap-3 ${
+                isDark ? 'bg-[#121217] border-white/[0.08] shadow-sm' : 'bg-white border-neutral-200/80 shadow-2xs'
+              }`}
+            >
+              <div className="flex items-center gap-3 min-w-0">
+                <div
+                  className="w-10 h-10 rounded-2xl flex items-center justify-center text-white shadow-xs shrink-0"
+                  style={{ backgroundColor: primaryColor }}
+                >
+                  <UtensilsCrossed className="w-5 h-5" />
+                </div>
+                <div className="min-w-0">
+                  <h4 className={`font-black text-xs sm:text-sm truncate ${isDark ? 'text-white' : 'text-neutral-900'}`}>
+                    Cardápio Digital
+                  </h4>
+                  <p className={`text-[11px] truncate mt-0.5 ${isDark ? 'text-neutral-400' : 'text-neutral-500'}`}>
+                    Confira nossas opções de pratos, porções e bebidas
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={handleOpenMenu}
+                className="px-4 py-2.5 rounded-xl font-bold text-xs text-white shadow-sm flex items-center gap-1.5 shrink-0 transition-opacity hover:opacity-90 active:scale-95 cursor-pointer"
+                style={{ backgroundColor: primaryColor }}
+              >
+                <span>Ver Cardápio</span>
+                <ExternalLink className="w-3.5 h-3.5 opacity-80" />
+              </button>
+            </div>
           ) : null,
               loyalty: activeModules.loyalty ? (
             <div
-              className={`rounded-3xl p-5 border relative overflow-hidden space-y-4 ${
+              className={`rounded-3xl p-4.5 sm:p-5 border relative overflow-hidden space-y-3.5 ${
                 isDark
-                  ? 'border-white/[0.08] shadow-lg'
-                  : 'shadow-sm'
+                  ? 'border-white/[0.08] shadow-sm'
+                  : 'shadow-2xs'
               }`}
               style={{
                 background: isDark
-                  ? `linear-gradient(135deg, ${hexToRgba(primaryColor, 0.18)} 0%, #131318 45%, ${hexToRgba(secondaryColor, 0.12)} 100%)`
-                  : `linear-gradient(135deg, ${hexToRgba(primaryColor, 0.05)} 0%, #ffffff 50%, ${hexToRgba(secondaryColor, 0.08)} 100%)`,
-                borderColor: hexToRgba(primaryColor, isDark ? 0.28 : 0.22),
+                  ? `linear-gradient(135deg, ${hexToRgba(primaryColor, 0.16)} 0%, #131318 50%, ${hexToRgba(secondaryColor, 0.1)} 100%)`
+                  : `linear-gradient(135deg, ${hexToRgba(primaryColor, 0.05)} 0%, #ffffff 50%, ${hexToRgba(secondaryColor, 0.07)} 100%)`,
+                borderColor: hexToRgba(primaryColor, isDark ? 0.28 : 0.2),
               }}
             >
               {/* Efeito decorativo sutil */}
               <div
-                className="absolute top-0 right-0 w-36 h-36 rounded-full blur-2xl pointer-events-none opacity-25"
+                className="absolute top-0 right-0 w-32 h-32 rounded-full blur-2xl pointer-events-none opacity-20"
                 style={{ backgroundColor: primaryColor }}
               />
 
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
+              <div className="flex items-center justify-between relative z-10">
+                <div className="flex items-center gap-2.5">
                   <div
-                    className="w-9 h-9 rounded-xl flex items-center justify-center shadow-xs"
+                    className="w-9 h-9 rounded-xl flex items-center justify-center shadow-xs text-white"
                     style={{
                       background: gradientBg,
                       color: contrastText,
@@ -2316,7 +2147,7 @@ export const PublicCompanyView: React.FC<PublicCompanyViewProps> = ({
                       className="text-[10px] font-bold uppercase tracking-wider block"
                       style={{ color: primaryColor }}
                     >
-                      Programa de Vantagens
+                      Programa de Fidelidade
                     </span>
                     <h3
                       className={`text-sm font-black tracking-tight ${
@@ -2328,138 +2159,39 @@ export const PublicCompanyView: React.FC<PublicCompanyViewProps> = ({
                   </div>
                 </div>
 
-                {hasAvailableReward && (
+                {hasAvailableReward ? (
                   <span className="px-2.5 py-1 rounded-full bg-emerald-500/20 text-emerald-300 text-[10px] font-extrabold uppercase tracking-wide border border-emerald-500/40 flex items-center gap-1">
                     <Award className="w-3 h-3" />
                     <span>Prêmio Pronto!</span>
                   </span>
+                ) : (
+                  <span
+                    className="text-[11px] font-bold font-mono px-2 py-0.5 rounded-full"
+                    style={{
+                      backgroundColor: hexToRgba(primaryColor, isDark ? 0.2 : 0.1),
+                      color: isDark ? '#ffffff' : primaryColor,
+                    }}
+                  >
+                    Meta: {loyaltyProgram.goalPoints} pts
+                  </span>
                 )}
               </div>
 
-              {/* Status dos Pontos & Progresso Visual */}
-              <div className="space-y-2">
-                <div className="flex items-end justify-between">
-                  <div>
-                    <span
-                      className={`text-[11px] ${
-                        isDark ? 'text-neutral-400' : 'text-neutral-500'
-                      }`}
-                    >
-                      Seu saldo atual
-                    </span>
-                    <p
-                      className={`text-base sm:text-lg font-black ${
-                        isDark ? 'text-white' : 'text-neutral-900'
-                      }`}
-                    >
-                      {customerPoints !== null ? `${customerPoints} ` : '0 '}
-                      <span
-                        className={`text-xs font-normal ${
-                          isDark ? 'text-neutral-400' : 'text-neutral-500'
-                        }`}
-                      >
-                        de {loyaltyProgram.goalPoints} pontos
-                      </span>
-                    </p>
-                  </div>
-                  <span
-                    className="text-xs font-bold font-mono"
-                    style={{ color: primaryColor }}
-                  >
-                    {loyaltyProgressPercent}%
-                  </span>
-                </div>
-
-                {/* Barra de Progresso Visual */}
-                <div
-                  className={`w-full h-2.5 rounded-full overflow-hidden p-0.5 ${
-                    isDark ? 'bg-neutral-800/90' : 'bg-neutral-200/80'
+              {loyaltyProgram.rewardDescription && (
+                <p
+                  className={`text-xs leading-relaxed relative z-10 ${
+                    isDark ? 'text-neutral-300' : 'text-neutral-600'
                   }`}
                 >
-                  <div
-                    className="h-full rounded-full transition-all duration-500"
-                    style={{
-                      width: `${Math.max(5, loyaltyProgressPercent)}%`,
-                      background: gradientBg,
-                    }}
-                  />
-                </div>
-
-                {/* Carimbos Digitais de Progresso (Punch Card) */}
-                <div className="flex flex-wrap items-center justify-center gap-1.5 pt-1.5">
-                  {Array.from({
-                    length: Math.min(10, loyaltyProgram.goalPoints || 10),
-                  }).map((_, idx) => {
-                    const isEarned = (customerPoints || 0) > idx
-                    const isGoal = idx === Math.min(10, loyaltyProgram.goalPoints || 10) - 1
-
-                    return (
-                      <div
-                        key={idx}
-                        className={`w-7 h-7 sm:w-7.5 sm:h-7.5 rounded-full flex items-center justify-center text-[10px] font-black transition-all ${
-                          isEarned
-                            ? 'shadow-xs scale-105'
-                            : isGoal
-                            ? isDark
-                              ? 'border border-amber-500/50 text-amber-300 bg-amber-950/40'
-                              : 'border border-amber-300 text-amber-700 bg-amber-50'
-                            : isDark
-                            ? 'bg-neutral-800/80 border border-neutral-700/60 text-neutral-400'
-                            : 'bg-neutral-100 border border-neutral-200 text-neutral-400'
-                        }`}
-                        style={{
-                          background: isEarned ? gradientBg : undefined,
-                          color: isEarned ? contrastText : undefined,
-                        }}
-                      >
-                        {isEarned ? (
-                          <Check className="w-3.5 h-3.5 stroke-[3]" />
-                        ) : isGoal ? (
-                          <Gift className="w-3.5 h-3.5 text-amber-400" />
-                        ) : (
-                          <span>{idx + 1}</span>
-                        )}
-                      </div>
-                    )
-                  })}
-                </div>
-              </div>
-
-              {/* Recompensa */}
-              <div
-                className="p-3 rounded-2xl flex items-start gap-2.5 text-left border"
-                style={{
-                  backgroundColor: hexToRgba(primaryColor, isDark ? 0.12 : 0.05),
-                  borderColor: hexToRgba(primaryColor, isDark ? 0.28 : 0.15),
-                }}
-              >
-                <Sparkles
-                  className="w-4 h-4 shrink-0 mt-0.5"
-                  style={{ color: primaryColor }}
-                />
-                <div className="text-xs">
-                  <span
-                    className={`font-bold block ${
-                      isDark ? 'text-white' : 'text-neutral-900'
-                    }`}
-                  >
-                    Próxima Recompensa:
-                  </span>
-                  <span
-                    className={`leading-snug ${
-                      isDark ? 'text-neutral-300' : 'text-neutral-600'
-                    }`}
-                  >
-                    {loyaltyProgram.rewardDescription}
-                  </span>
-                </div>
-              </div>
+                  Acumule pontos em cada visita e ganhe <strong className="font-bold" style={{ color: isDark ? '#fcd34d' : primaryColor }}>&ldquo;{loyaltyProgram.rewardDescription}&rdquo;</strong>.
+                </p>
+              )}
 
               {/* Botão de Ação: Ver Meu Cartão */}
               <button
                 type="button"
                 onClick={() => setIsLoyaltyOpen(true)}
-                className="w-full py-2.5 px-4 rounded-xl text-xs font-bold shadow-xs hover:opacity-95 active:scale-[0.99] transition-all flex items-center justify-center gap-2 cursor-pointer"
+                className="w-full py-2.5 px-4 rounded-xl text-xs font-bold shadow-xs hover:opacity-95 active:scale-[0.99] transition-all flex items-center justify-center gap-2 cursor-pointer relative z-10"
                 style={{
                   background: gradientBg,
                   color: contrastText,
@@ -2469,10 +2201,11 @@ export const PublicCompanyView: React.FC<PublicCompanyViewProps> = ({
                 <span>
                   {hasAvailableReward ? 'Resgatar Prêmio Disponível' : 'Ver Meu Cartão Fidelidade'}
                 </span>
+                <ChevronRight className="w-3.5 h-3.5 opacity-80" />
               </button>
             </div>
           ) : null,
-              googleReview: (activeModules.googleReview && company.googleReviewUrl) ? (
+              googleReview: activeModules.googleReview ? (
             <div
               className={`rounded-3xl p-4.5 sm:p-5 space-y-3.5 ${
                 isDark
@@ -2498,7 +2231,7 @@ export const PublicCompanyView: React.FC<PublicCompanyViewProps> = ({
                         isDark ? 'text-neutral-200' : 'text-neutral-800'
                       }`}
                     >
-                      Google Reviews
+                      Avaliações do Google
                     </span>
                     <div className="flex items-center gap-0.5 mt-0.5">
                       {[...Array(5)].map((_, i) => (
@@ -2558,8 +2291,8 @@ export const PublicCompanyView: React.FC<PublicCompanyViewProps> = ({
               </button>
             </div>
           ) : null,
-              contact: company.addressText ? (
-            <div className="pt-1">
+              location: activeModules.location ? (
+            <div key="location" className="pt-1">
               <div
                 onClick={handleOpenLocation}
                 className={`w-full rounded-2xl p-3 flex items-center justify-between gap-3 active:scale-[0.99] transition-all cursor-pointer group ${
@@ -2585,14 +2318,14 @@ export const PublicCompanyView: React.FC<PublicCompanyViewProps> = ({
                         isDark ? 'text-white' : 'text-neutral-900'
                       }`}
                     >
-                      Endereço
+                      Localização e Endereço
                     </p>
                     <p
                       className={`text-[11px] truncate mt-0.5 ${
                         isDark ? 'text-neutral-400' : 'text-neutral-500'
                       }`}
                     >
-                      {company.addressText}
+                      {company.addressText || 'Como chegar ao nosso estabelecimento'}
                     </p>
                   </div>
                 </div>
@@ -2609,7 +2342,58 @@ export const PublicCompanyView: React.FC<PublicCompanyViewProps> = ({
               </div>
             </div>
           ) : null,
-              wifi: (activeModules.wifi && company.wifi?.ssid && (
+              contact: activeModules.location ? (
+            <div key="contact" className="pt-1">
+              <div
+                onClick={handleOpenLocation}
+                className={`w-full rounded-2xl p-3 flex items-center justify-between gap-3 active:scale-[0.99] transition-all cursor-pointer group ${
+                  isDark
+                    ? 'bg-[#141419] hover:bg-[#1a1a22] border border-white/[0.07] hover:border-white/15'
+                    : 'bg-white border border-neutral-200/80 hover:border-neutral-300 shadow-2xs hover:shadow-xs'
+                }`}
+                style={{ WebkitTapHighlightColor: 'transparent' }}
+              >
+                <div className="flex items-center gap-2.5 min-w-0">
+                  <div
+                    className={`w-8 h-8 rounded-xl flex items-center justify-center shrink-0 border ${
+                      isDark
+                        ? 'bg-rose-950/40 text-rose-400 border-rose-500/20'
+                        : 'bg-rose-50 text-rose-600 border-rose-100'
+                    }`}
+                  >
+                    <MapPin className="w-4 h-4" />
+                  </div>
+                  <div className="min-w-0">
+                    <p
+                      className={`text-xs font-bold truncate ${
+                        isDark ? 'text-white' : 'text-neutral-900'
+                      }`}
+                    >
+                      Localização e Endereço
+                    </p>
+                    <p
+                      className={`text-[11px] truncate mt-0.5 ${
+                        isDark ? 'text-neutral-400' : 'text-neutral-500'
+                      }`}
+                    >
+                      {company.addressText || 'Como chegar ao nosso estabelecimento'}
+                    </p>
+                  </div>
+                </div>
+                <div
+                  className={`shrink-0 px-2.5 py-1 rounded-lg text-[11px] font-bold transition-colors flex items-center gap-1 ${
+                    isDark
+                      ? 'bg-rose-950/40 text-rose-300 border border-rose-500/30 group-hover:bg-rose-900/50'
+                      : 'bg-rose-50 text-rose-700 group-hover:bg-rose-100'
+                  }`}
+                >
+                  <Navigation className="w-3 h-3" />
+                  <span>Como Chegar</span>
+                </div>
+              </div>
+            </div>
+          ) : null,
+              wifi: (activeModules.wifi && (
                 <div
                   key="wifi"
                   className={`rounded-3xl p-4 sm:p-4.5 border flex items-center justify-between gap-3 ${
@@ -2624,7 +2408,7 @@ export const PublicCompanyView: React.FC<PublicCompanyViewProps> = ({
                     </div>
                     <div className="min-w-0">
                       <h4 className={`text-xs font-bold truncate ${isDark ? 'text-white' : 'text-neutral-900'}`}>
-                        Wi-Fi Grátis: {company.wifi.ssid}
+                        {company.wifi?.ssid ? `Wi-Fi Grátis: ${company.wifi.ssid}` : 'Wi-Fi Grátis Disponível'}
                       </h4>
                       <p className={`text-[11px] truncate ${isDark ? 'text-neutral-400' : 'text-neutral-500'}`}>
                         Toque para ver a senha e conectar
@@ -2671,7 +2455,7 @@ export const PublicCompanyView: React.FC<PublicCompanyViewProps> = ({
                   </button>
                 </div>
               )),
-              instagram: (activeModules.instagram && company.instagram && (
+              instagram: (activeModules.instagram && (
                 <div
                   key="instagram"
                   className={`rounded-3xl p-4 sm:p-4.5 border flex items-center justify-between gap-3 ${
@@ -2686,7 +2470,7 @@ export const PublicCompanyView: React.FC<PublicCompanyViewProps> = ({
                     </div>
                     <div className="min-w-0">
                       <h4 className={`text-xs font-bold truncate ${isDark ? 'text-white' : 'text-neutral-900'}`}>
-                        @{company.instagram.replace(/^@/, '')}
+                        {company.instagram ? `@${company.instagram.replace(/^@/, '')}` : 'Instagram Oficial'}
                       </h4>
                       <p className={`text-[11px] truncate ${isDark ? 'text-neutral-400' : 'text-neutral-500'}`}>
                         Siga nosso perfil oficial no Instagram

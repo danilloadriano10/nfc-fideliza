@@ -13,6 +13,11 @@ import {
   Gift,
   Star,
   MapPin,
+  Calendar,
+  MessageCircle,
+  Wifi,
+  MessageSquare,
+  Instagram,
   Save,
   CheckCircle2,
   RotateCcw,
@@ -200,6 +205,16 @@ export const OrganizePageTab: React.FC<OrganizePageTabProps> = ({
         return <Star className={className} />
       case 'MapPin':
         return <MapPin className={className} />
+      case 'Calendar':
+        return <Calendar className={className} />
+      case 'MessageCircle':
+        return <MessageCircle className={className} />
+      case 'Wifi':
+        return <Wifi className={className} />
+      case 'MessageSquare':
+        return <MessageSquare className={className} />
+      case 'Instagram':
+        return <Instagram className={className} />
       default:
         return <LayoutGrid className={className} />
     }
