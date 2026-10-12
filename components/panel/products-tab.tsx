@@ -22,7 +22,7 @@ import {
   ArrowUpDown,
   Check,
 } from 'lucide-react'
-import { Company, CompanyProduct } from '@/types/platform'
+import { Company, CompanyProduct, ProductVariationOption } from '@/types/platform'
 import {
   getCompanyProducts,
   saveCompanyProductOnServerApi,
@@ -87,6 +87,9 @@ export const ProductsTab: React.FC<ProductsTabProps> = ({
   const [photoFile, setPhotoFile] = useState<File | null>(null)
   const [photoMode, setPhotoMode] = useState<'upload' | 'url'>('upload')
   const [isActive, setIsActive] = useState(true)
+  const [variations, setVariations] = useState<ProductVariationOption[]>([])
+  const [newVarName, setNewVarName] = useState('')
+  const [newVarPrice, setNewVarPrice] = useState('')
 
   // Deletion modal
   const [deletingProductId, setDeletingProductId] = useState<string | null>(null)
@@ -94,6 +97,52 @@ export const ProductsTab: React.FC<ProductsTabProps> = ({
   const showToast = (type: 'success' | 'error', text: string) => {
     setToastMessage({ type, text })
     setTimeout(() => setToastMessage(null), 3500)
+  }
+
+  // Variation helpers
+  const handleAddVariation = (customName?: string) => {
+    const valName = (customName || newVarName).trim()
+    if (!valName) return
+
+    if (variations.some((v) => v.name.toLowerCase() === valName.toLowerCase())) {
+      showToast('error', `A variação "${valName}" já foi adicionada.`)
+      return
+    }
+
+    const parsedP = newVarPrice.trim() !== '' ? parseFloat(newVarPrice.replace(',', '.')) : null
+    const newOption: ProductVariationOption = {
+      id: `var_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
+      name: valName,
+      price: parsedP != null && !isNaN(parsedP) ? parsedP : null,
+    }
+
+    setVariations((prev) => [...prev, newOption])
+    if (!customName) {
+      setNewVarName('')
+      setNewVarPrice('')
+    }
+  }
+
+  const handleRemoveVariation = (varId: string) => {
+    setVariations((prev) => prev.filter((v) => v.id !== varId))
+  }
+
+  const handleAddPresetVariations = (presetList: string[]) => {
+    setVariations((prev) => {
+      const existing = new Set(prev.map((v) => v.name.toLowerCase()))
+      const toAdd: ProductVariationOption[] = []
+      presetList.forEach((name) => {
+        if (!existing.has(name.toLowerCase())) {
+          existing.add(name.toLowerCase())
+          toAdd.push({
+            id: `var_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
+            name,
+            price: null,
+          })
+        }
+      })
+      return [...prev, ...toAdd]
+    })
   }
 
   // Load and sync products
@@ -136,6 +185,9 @@ export const ProductsTab: React.FC<ProductsTabProps> = ({
     setPhotoFile(null)
     setPhotoMode('upload')
     setIsActive(true)
+    setVariations([])
+    setNewVarName('')
+    setNewVarPrice('')
     setIsModalOpen(true)
   }
 
@@ -163,6 +215,9 @@ export const ProductsTab: React.FC<ProductsTabProps> = ({
     setPhotoFile(null)
     setPhotoMode('upload')
     setIsActive(prod.isActive !== false)
+    setVariations(Array.isArray(prod.variations) ? prod.variations : [])
+    setNewVarName('')
+    setNewVarPrice('')
     setIsModalOpen(true)
   }
 
@@ -251,6 +306,11 @@ export const ProductsTab: React.FC<ProductsTabProps> = ({
         priceType,
         price: parsedPrice != null && !isNaN(parsedPrice) ? parsedPrice : null,
         promotionalPrice: parsedPromoPrice != null && !isNaN(parsedPromoPrice) ? parsedPromoPrice : null,
+        variations: variations.map((v) => ({
+          id: v.id,
+          name: v.name.trim(),
+          price: typeof v.price === 'number' && !isNaN(v.price) ? v.price : null,
+        })),
         isAvailable,
         purchaseUrl: purchaseUrl.trim() || undefined,
         order: Number(order) || 0,
@@ -893,6 +953,118 @@ export const ProductsTab: React.FC<ProductsTabProps> = ({
                   placeholder="Detalhes, especificações, tamanho, ingredientes ou diferenciais..."
                   className="w-full px-3.5 py-2.5 rounded-xl bg-neutral-50 border border-neutral-200 text-xs text-neutral-900 focus:outline-none focus:ring-2 focus:ring-violet-500 resize-none"
                 />
+              </div>
+
+              {/* Tamanhos e Variações Opcionais */}
+              <div className="space-y-3 p-3.5 rounded-2xl bg-neutral-50 border border-neutral-200">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <label className="text-xs font-bold text-neutral-800 flex items-center gap-1.5">
+                      <span>Tamanhos e Variações</span>
+                      <span className="text-[10px] text-neutral-400 font-normal">(Opcional)</span>
+                    </label>
+                    <p className="text-[11px] text-neutral-500 mt-0.5">
+                      Adicione tamanhos (ex: P, M, G, 38, 40) ou variações disponíveis para o cliente escolher.
+                    </p>
+                  </div>
+                  {variations.length > 0 && (
+                    <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-violet-100 text-violet-700">
+                      {variations.length} {variations.length === 1 ? 'variação' : 'variações'}
+                    </span>
+                  )}
+                </div>
+
+                {/* Atalhos Rápidos */}
+                <div className="flex items-center gap-1.5 flex-wrap">
+                  <span className="text-[10px] text-neutral-400 font-medium">Adicionar atalhos:</span>
+                  <button
+                    type="button"
+                    onClick={() => handleAddPresetVariations(['P', 'M', 'G', 'GG'])}
+                    className="px-2 py-0.5 rounded-lg text-[10px] font-semibold bg-white hover:bg-neutral-100 border border-neutral-200 text-neutral-700 cursor-pointer transition-colors"
+                  >
+                    + P, M, G, GG
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleAddPresetVariations(['36', '38', '40', '42'])}
+                    className="px-2 py-0.5 rounded-lg text-[10px] font-semibold bg-white hover:bg-neutral-100 border border-neutral-200 text-neutral-700 cursor-pointer transition-colors"
+                  >
+                    + 36, 38, 40, 42
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleAddPresetVariations(['Tamanho Único'])}
+                    className="px-2 py-0.5 rounded-lg text-[10px] font-semibold bg-white hover:bg-neutral-100 border border-neutral-200 text-neutral-700 cursor-pointer transition-colors"
+                  >
+                    + Tamanho Único
+                  </button>
+                </div>
+
+                {/* Input de nova variação */}
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    value={newVarName}
+                    onChange={(e) => setNewVarName(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        e.preventDefault()
+                        handleAddVariation()
+                      }
+                    }}
+                    placeholder="Nome da variação (ex: G, 42, Preto...)"
+                    className="flex-1 px-3 py-1.5 rounded-xl bg-white border border-neutral-200 text-xs text-neutral-900 focus:outline-none focus:ring-2 focus:ring-violet-500"
+                  />
+                  <input
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    value={newVarPrice}
+                    onChange={(e) => setNewVarPrice(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        e.preventDefault()
+                        handleAddVariation()
+                      }
+                    }}
+                    placeholder="Preço (R$, opcional)"
+                    className="w-28 px-3 py-1.5 rounded-xl bg-white border border-neutral-200 text-xs font-mono text-neutral-900 focus:outline-none focus:ring-2 focus:ring-violet-500"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => handleAddVariation()}
+                    className="px-3.5 py-1.5 rounded-xl bg-violet-600 hover:bg-violet-700 text-white font-bold text-xs shrink-0 cursor-pointer transition-colors active:scale-95"
+                  >
+                    Adicionar
+                  </button>
+                </div>
+
+                {/* Lista de Variações Cadastradas */}
+                {variations.length > 0 && (
+                  <div className="flex items-center gap-1.5 flex-wrap pt-1">
+                    {variations.map((v) => (
+                      <span
+                        key={v.id}
+                        className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-white border border-neutral-200 text-xs font-semibold text-neutral-800 shadow-2xs"
+                      >
+                        <span>{v.name}</span>
+                        {v.price != null && (
+                          <span className="text-[10px] font-mono text-emerald-600 font-bold">
+                            (R$ {v.price.toFixed(2).replace('.', ',')})
+                          </span>
+                        )}
+                        <button
+                          type="button"
+                          onClick={() => handleRemoveVariation(v.id)}
+                          className="w-3.5 h-3.5 rounded-full hover:bg-neutral-100 text-neutral-400 hover:text-rose-500 flex items-center justify-center cursor-pointer transition-colors"
+                          title="Remover variação"
+                        >
+                          <X className="w-2.5 h-2.5" />
+                        </button>
+                      </span>
+                    ))}
+                  </div>
+                )}
               </div>
 
               {/* Purchase URL (optional) */}

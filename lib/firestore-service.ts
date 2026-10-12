@@ -1693,6 +1693,8 @@ export async function saveFirestoreProduct(
     updatedAt: now,
     createdAt: product.createdAt || now,
     photoUrl: finalPhoto || '',
+    photos: Array.isArray(product.photos) ? product.photos : (finalPhoto ? [finalPhoto] : []),
+    variations: Array.isArray(product.variations) ? product.variations : [],
   }
 
   try {

@@ -164,16 +164,24 @@ export interface MenuConfig {
   categories?: string[]
 }
 
+export interface ProductVariationOption {
+  id: string
+  name: string // Ex: "P", "M", "G", "38", "Preto"
+  price?: number | null // Preço opcional se houver variação de valor
+}
+
 export interface CompanyProduct {
   id: string
   companyId: string
   name: string
   photoUrl?: string
+  photos?: string[] // Múltiplas fotos opcionais
   category?: string
   price?: number | null // null or undefined indicates "Sob consulta"
   priceType?: 'fixed' | 'consult'
   promotionalPrice?: number | null
   description?: string
+  variations?: ProductVariationOption[] // Tamanhos/variações opcionais
   isAvailable?: boolean // default true
   purchaseUrl?: string
   order?: number // default 0

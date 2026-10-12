@@ -632,7 +632,9 @@ export const PublicCompanyView: React.FC<PublicCompanyViewProps> = ({
       },
       products: {
         id: 'products',
-        title: company.productCatalog?.externalButtonText || 'Produtos',
+        title: isExternalCatalog
+          ? (company.productCatalog?.externalButtonText || 'Ver Catálogo')
+          : 'Catálogo de Produtos',
         description: isExternalCatalog
           ? 'Ver catálogo oficial'
           : activeProductsList.length > 0
@@ -1432,17 +1434,15 @@ export const PublicCompanyView: React.FC<PublicCompanyViewProps> = ({
                   </div>
                 </div>
 
-                {activeProductsList.length > 4 && (
-                  <button
-                    type="button"
-                    onClick={() => setIsProductsSheetOpen(true)}
-                    className="text-xs font-bold transition-opacity hover:opacity-85 flex items-center gap-0.5 cursor-pointer"
-                    style={{ color: primaryColor }}
-                  >
-                    <span>Ver todos</span>
-                    <ChevronRight className="w-3.5 h-3.5" />
-                  </button>
-                )}
+                <button
+                  type="button"
+                  onClick={() => setIsProductsSheetOpen(true)}
+                  className="text-xs font-bold transition-opacity hover:opacity-85 flex items-center gap-0.5 cursor-pointer"
+                  style={{ color: primaryColor }}
+                >
+                  <span>Ver todos</span>
+                  <ChevronRight className="w-3.5 h-3.5" />
+                </button>
               </div>
 
               {/* Filtros de Categoria (se houver mais de uma categoria) */}
