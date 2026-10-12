@@ -46,6 +46,10 @@ import {
   Sun,
   Package,
   UtensilsCrossed,
+  GripVertical,
+  ChevronUp,
+  ChevronDown,
+  Instagram,
 } from 'lucide-react'
 import confetti from 'canvas-confetti'
 import { BRAND_COLOR_PRESETS, sanitizeHex, getGradientContrastTextColor } from '@/lib/colors'
@@ -108,6 +112,7 @@ type TabType =
   | 'loyalty'
   | 'rewards'
   | 'feedbacks'
+  | 'order'
   | 'settings'
   | 'appearance'
 
@@ -151,8 +156,145 @@ export const CompanyPanelView: React.FC<CompanyPanelViewProps> = ({
       rewardDescription: 'Recompensa de Fidelidade',
       campaignName: 'Cartão Fidelidade',
     },
+    cardOrder: initialCompany.cardOrder || [
+      'services',
+      'products',
+      'appointments',
+      'menu',
+      'loyalty',
+      'googleReview',
+      'contact',
+      'wifi',
+      'feedback',
+      'instagram',
+    ],
   }))
   const [isSaving, setIsSaving] = useState(false)
+
+  // Public Page Sections / Cards Order State
+  const [orderedModuleKeys, setOrderedModuleKeys] = useState<string[]>(() => {
+    const defaultOrder = [
+      'services',
+      'products',
+      'appointments',
+      'menu',
+      'loyalty',
+      'googleReview',
+      'contact',
+      'wifi',
+      'feedback',
+      'instagram',
+    ]
+    const saved = Array.isArray(initialCompany.cardOrder) ? initialCompany.cardOrder : []
+    const validSaved = saved.filter((k) => defaultOrder.includes(k))
+    const missing = defaultOrder.filter((k) => !validSaved.includes(k))
+    return [...validSaved, ...missing]
+  })
+  const [isSavingOrder, setIsSavingOrder] = useState(false)
+  const [draggedIndex, setDraggedIndex] = useState<number | null>(null)
+  const [dragOverIndex, setDragOverIndex] = useState<number | null>(null)
+  const [touchDragIndex, setTouchDragIndex] = useState<number | null>(null)
+
+  const ALL_ORDERABLE_MODULES: Array<{
+    key: string
+    label: string
+    icon: React.ComponentType<{ className?: string }>
+    color: string
+  }> = [
+    { key: 'services', label: 'Serviços', icon: Scissors, color: 'text-violet-600 bg-violet-50 border-violet-200' },
+    { key: 'products', label: 'Catálogo de Produtos', icon: Package, color: 'text-blue-600 bg-blue-50 border-blue-200' },
+    { key: 'appointments', label: 'Agendamento', icon: Calendar, color: 'text-indigo-600 bg-indigo-50 border-indigo-200' },
+    { key: 'menu', label: 'Cardápio', icon: UtensilsCrossed, color: 'text-amber-600 bg-amber-50 border-amber-200' },
+    { key: 'loyalty', label: 'Fidelidade', icon: Gift, color: 'text-emerald-600 bg-emerald-50 border-emerald-200' },
+    { key: 'googleReview', label: 'Avaliações', icon: Star, color: 'text-amber-500 bg-amber-50 border-amber-200' },
+    { key: 'contact', label: 'Contato/Localização', icon: MapPin, color: 'text-rose-600 bg-rose-50 border-rose-200' },
+    { key: 'wifi', label: 'Wi-Fi', icon: Wifi, color: 'text-cyan-600 bg-cyan-50 border-cyan-200' },
+    { key: 'feedback', label: 'Feedback Privado', icon: MessageSquare, color: 'text-purple-600 bg-purple-50 border-purple-200' },
+    { key: 'instagram', label: 'Instagram', icon: Instagram, color: 'text-pink-600 bg-pink-50 border-pink-200' },
+  ]
+
+  // Requisitos: Mostrar somente os módulos ativos
+  const activeOrderedModules = React.useMemo(() => {
+    const activeKeysSet = new Set<string>()
+    if (formData.modules?.services) activeKeysSet.add('services')
+    if (formData.modules?.products) activeKeysSet.add('products')
+    if (formData.modules?.appointments) activeKeysSet.add('appointments')
+    if (formData.modules?.menu) activeKeysSet.add('menu')
+    if (formData.modules?.loyalty) activeKeysSet.add('loyalty')
+    if (formData.modules?.googleReview) activeKeysSet.add('googleReview')
+    if (formData.modules?.location || formData.modules?.whatsapp || formData.addressText || formData.locationUrl) {
+      activeKeysSet.add('contact')
+    }
+    if (formData.modules?.wifi) activeKeysSet.add('wifi')
+    if (formData.modules?.feedback) activeKeysSet.add('feedback')
+    if (formData.modules?.instagram) activeKeysSet.add('instagram')
+
+    const result: typeof ALL_ORDERABLE_MODULES = []
+    orderedModuleKeys.forEach((key) => {
+      if (activeKeysSet.has(key)) {
+        const item = ALL_ORDERABLE_MODULES.find((m) => m.key === key)
+        if (item) result.push(item)
+      }
+    })
+
+    // If any active module is not yet in orderedModuleKeys, append it
+    activeKeysSet.forEach((key) => {
+      if (!result.some((m) => m.key === key)) {
+        const item = ALL_ORDERABLE_MODULES.find((m) => m.key === key)
+        if (item) result.push(item)
+      }
+    })
+
+    return result
+  }, [formData.modules, formData.addressText, formData.locationUrl, orderedModuleKeys])
+
+  const handleMoveModule = (fromIndex: number, toIndex: number) => {
+    if (toIndex < 0 || toIndex >= activeOrderedModules.length) return
+    const reordered = [...activeOrderedModules]
+    const [moved] = reordered.splice(fromIndex, 1)
+    reordered.splice(toIndex, 0, moved)
+
+    const newActiveKeys = reordered.map((m) => m.key)
+    const remainingKeys = orderedModuleKeys.filter((k) => !newActiveKeys.includes(k))
+    const updatedAllKeys = [...newActiveKeys, ...remainingKeys]
+
+    setOrderedModuleKeys(updatedAllKeys)
+    setFormData((prev) => ({
+      ...prev,
+      cardOrder: updatedAllKeys,
+    }))
+  }
+
+  const handleSaveCardOrder = async () => {
+    setIsSavingOrder(true)
+    const activeKeys = activeOrderedModules.map((m) => m.key)
+    const remainingKeys = orderedModuleKeys.filter((k) => !activeKeys.includes(k))
+    const finalOrder = [...activeKeys, ...remainingKeys]
+
+    const updatedToSave: Company = {
+      ...company,
+      ...formData,
+      cardOrder: finalOrder,
+    }
+
+    try {
+      const res = await saveCompanyAsync(updatedToSave)
+      setIsSavingOrder(false)
+      if (res.success) {
+        const saved = res.company || updatedToSave
+        setCompany(saved)
+        setFormData(saved)
+        setOrderedModuleKeys(finalOrder)
+        showToast('success', 'Ordem da página pública salva com sucesso!')
+      } else {
+        showToast('error', res.error || 'Erro ao salvar ordem da página.')
+      }
+    } catch (err) {
+      setIsSavingOrder(false)
+      console.error('Erro ao salvar ordem:', err)
+      showToast('error', 'Falha ao salvar ordem no servidor.')
+    }
+  }
 
   // Company Access Credentials & Password state
   const [ownerUsername, setOwnerUsername] = useState(
@@ -366,6 +508,7 @@ export const CompanyPanelView: React.FC<CompanyPanelViewProps> = ({
 
     const updatedToSave: Company = {
       ...formData,
+      cardOrder: orderedModuleKeys,
       ownerAuth: {
         ...(formData.ownerAuth || {}),
         username: ownerUsername.trim() || formData.slug,
@@ -598,6 +741,7 @@ export const CompanyPanelView: React.FC<CompanyPanelViewProps> = ({
               icon: Award,
             },
             { id: 'feedbacks', label: 'Feedbacks', count: totalFeedbacks, icon: MessageSquare },
+            { id: 'order', label: 'Ordem da Página', icon: SlidersHorizontal },
             { id: 'settings', label: 'Configurações', icon: Settings },
             { id: 'appearance', label: 'Aparência da Página', icon: Palette },
           ].map((tab) => {
@@ -607,7 +751,13 @@ export const CompanyPanelView: React.FC<CompanyPanelViewProps> = ({
               <button
                 key={tab.id}
                 onClick={() => {
-                  if (tab.id === 'appearance') {
+                  if (tab.id === 'order') {
+                    setActiveTab('settings')
+                    setTimeout(() => {
+                      const el = document.getElementById('secao-ordem')
+                      if (el) el.scrollIntoView({ behavior: 'smooth' })
+                    }, 50)
+                  } else if (tab.id === 'appearance') {
                     setActiveTab('settings')
                     setTimeout(() => {
                       const el = document.getElementById('secao-aparencia')
@@ -656,6 +806,39 @@ export const CompanyPanelView: React.FC<CompanyPanelViewProps> = ({
         {/* ============================================== */}
         {activeTab === 'dashboard' && (
           <div className="space-y-6">
+            {/* Quick Action: Ordem da Página Pública */}
+            <div className="p-4 sm:p-5 rounded-3xl bg-gradient-to-r from-violet-50 to-indigo-50 border border-violet-200/90 shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-2xl bg-violet-600 text-white flex items-center justify-center shrink-0 shadow-xs">
+                  <SlidersHorizontal className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-xs sm:text-sm font-bold text-neutral-900 flex items-center gap-2">
+                    <span>Ordem da Página Pública</span>
+                    <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-violet-100 text-violet-700">
+                      {activeOrderedModules.length} {activeOrderedModules.length === 1 ? 'ativo' : 'ativos'}
+                    </span>
+                  </h3>
+                  <p className="text-[11px] text-neutral-600">
+                    Organize visualmente a sequência de cards da sua Página Pública (Serviços, Catálogo, Agendamento, Cardápio, Fidelidade...).
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  setActiveTab('settings')
+                  setTimeout(() => {
+                    const el = document.getElementById('secao-ordem')
+                    if (el) el.scrollIntoView({ behavior: 'smooth' })
+                  }, 50)
+                }}
+                className="px-4 py-2.5 rounded-xl bg-violet-600 hover:bg-violet-700 active:scale-95 text-white text-xs font-bold shrink-0 shadow-xs flex items-center justify-center gap-1.5 transition-all self-start sm:self-auto cursor-pointer"
+              >
+                <SlidersHorizontal className="w-3.5 h-3.5" />
+                <span>Reorganizar Ordem</span>
+              </button>
+            </div>
             {/* Onboarding Welcome Banner if not yet completed */}
             {company.onboardingCompleted !== true && (
               <div className="p-4 sm:p-5 rounded-3xl bg-violet-50/80 border border-violet-200/90 shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-3">
@@ -1338,13 +1521,20 @@ export const CompanyPanelView: React.FC<CompanyPanelViewProps> = ({
                 href="#secao-modulos"
                 className="px-3 py-1.5 rounded-xl text-xs font-semibold text-neutral-600 hover:text-neutral-900 hover:bg-neutral-100 transition-all whitespace-nowrap"
               >
-                5. Módulos Ativos
+                5. Recursos & Módulos
+              </a>
+              <a
+                href="#secao-ordem"
+                className="px-3 py-1.5 rounded-xl text-xs font-bold text-violet-700 bg-violet-50 hover:bg-violet-100 border border-violet-200 transition-all whitespace-nowrap flex items-center gap-1.5"
+              >
+                <SlidersHorizontal className="w-3.5 h-3.5" />
+                <span>6. Ordem da Página Pública</span>
               </a>
               <a
                 href="#secao-seguranca"
                 className="px-3 py-1.5 rounded-xl text-xs font-semibold text-neutral-600 hover:text-neutral-900 hover:bg-neutral-100 transition-all whitespace-nowrap"
               >
-                6. Acesso & Senha
+                7. Acesso & Senha
               </a>
             </div>
 
@@ -2430,7 +2620,7 @@ export const CompanyPanelView: React.FC<CompanyPanelViewProps> = ({
             </div>
 
             {/* Recursos da sua DiretoLink */}
-            <div className="bg-white rounded-3xl border border-neutral-200/80 shadow-sm p-6 space-y-5">
+            <div id="secao-modulos" className="bg-white rounded-3xl border border-neutral-200/80 shadow-sm p-6 space-y-5">
               <div>
                 <h3 className="font-bold text-neutral-900 text-sm">
                   Recursos da sua DiretoLink
@@ -2479,6 +2669,226 @@ export const CompanyPanelView: React.FC<CompanyPanelViewProps> = ({
                     />
                   </label>
                 ))}
+              </div>
+
+              {/* ======================================================== */}
+              {/* SEÇÃO: ORDEM DA PÁGINA PÚBLICA (LOGO ABAIXO DOS RECURSOS) */}
+              {/* ======================================================== */}
+              <div id="secao-ordem" className="pt-5 border-t-2 border-violet-100 space-y-4">
+                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 bg-violet-50/60 p-4 rounded-2xl border border-violet-200/70">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-2xl bg-violet-600 text-white flex items-center justify-center shadow-xs shrink-0">
+                      <SlidersHorizontal className="w-5 h-5" />
+                    </div>
+                    <div>
+                      <h4 className="font-black text-neutral-900 text-sm uppercase tracking-wide flex items-center gap-2">
+                        <span>ORDEM DA PÁGINA PÚBLICA</span>
+                        <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-violet-200 text-violet-800">
+                          {activeOrderedModules.length} {activeOrderedModules.length === 1 ? 'módulo ativo' : 'módulos ativos'}
+                        </span>
+                      </h4>
+                      <p className="text-xs text-neutral-600">
+                        Reorganize visualmente a ordem de exibição das seções e cards da sua Página Pública. Arraste (⋮⋮) ou toque nas setas para cima/baixo.
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* Botão de Salvar Ordem */}
+                  <button
+                    type="button"
+                    onClick={handleSaveCardOrder}
+                    disabled={isSavingOrder || activeOrderedModules.length === 0}
+                    className="px-4 py-2.5 rounded-xl bg-violet-600 hover:bg-violet-700 active:scale-95 text-white font-bold text-xs shadow-xs transition-all flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-50 shrink-0"
+                  >
+                    {isSavingOrder ? (
+                      <>
+                        <span className="w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                        <span>Salvando ordem...</span>
+                      </>
+                    ) : (
+                      <>
+                        <Save className="w-3.5 h-3.5" />
+                        <span>Salvar ordem da página</span>
+                      </>
+                    )}
+                  </button>
+                </div>
+
+                {activeOrderedModules.length === 0 ? (
+                  <div className="p-6 rounded-2xl bg-neutral-50 border border-neutral-200 text-center space-y-1">
+                    <p className="text-xs font-semibold text-neutral-700">
+                      Nenhum recurso ativo no momento.
+                    </p>
+                    <p className="text-[11px] text-neutral-500">
+                      Marque os checkboxes acima em &quot;Recursos da sua DiretoLink&quot; para definir a ordem dos cards na página.
+                    </p>
+                  </div>
+                ) : (
+                  <div className="space-y-2.5">
+                    <div className="text-[11px] font-semibold text-neutral-500 flex items-center justify-between px-1">
+                      <span>Ordem de exibição na Página Pública (do topo para o final):</span>
+                      <span className="text-[10px] text-neutral-400">
+                        Arraste (⋮⋮) ou use as setas ▲ ▼ para organizar
+                      </span>
+                    </div>
+
+                    <div className="space-y-2" id="orderable-modules-container">
+                      {activeOrderedModules.map((item, index) => {
+                        const Icon = item.icon
+                        const isFirst = index === 0
+                        const isLast = index === activeOrderedModules.length - 1
+                        const isBeingDragged = draggedIndex === index || touchDragIndex === index
+                        const isDragOver = dragOverIndex === index
+
+                        return (
+                          <div
+                            key={item.key}
+                            data-module-index={index}
+                            draggable
+                            onDragStart={(e) => {
+                              setDraggedIndex(index)
+                              e.dataTransfer.effectAllowed = 'move'
+                              e.dataTransfer.setData('text/plain', String(index))
+                            }}
+                            onDragOver={(e) => {
+                              e.preventDefault()
+                              e.dataTransfer.dropEffect = 'move'
+                              if (dragOverIndex !== index) setDragOverIndex(index)
+                            }}
+                            onDrop={(e) => {
+                              e.preventDefault()
+                              if (draggedIndex !== null && draggedIndex !== index) {
+                                handleMoveModule(draggedIndex, index)
+                              }
+                              setDraggedIndex(null)
+                              setDragOverIndex(null)
+                            }}
+                            onDragEnd={() => {
+                              setDraggedIndex(null)
+                              setDragOverIndex(null)
+                            }}
+                            className={`flex items-center justify-between p-3 sm:p-3.5 rounded-2xl border transition-all select-none ${
+                              isBeingDragged
+                                ? 'opacity-40 border-dashed border-violet-400 bg-violet-50/50 scale-[0.98]'
+                                : isDragOver
+                                ? 'border-violet-500 ring-2 ring-violet-200 bg-violet-50/80 shadow-md scale-[1.01]'
+                                : 'bg-white border-neutral-200 hover:border-violet-300 hover:shadow-xs'
+                            }`}
+                          >
+                            {/* Lado Esquerdo: Grip Handle (⋮⋮), Posição #, Ícone e Rótulo */}
+                            <div className="flex items-center gap-2.5 sm:gap-3 min-w-0 flex-1">
+                              {/* Ícone de arrastar ⋮⋮ com suporte a toque e mouse */}
+                              <div
+                                className="text-neutral-400 hover:text-neutral-800 active:text-violet-600 cursor-grab active:cursor-grabbing p-1.5 rounded-lg hover:bg-neutral-100 transition-colors shrink-0 touch-none"
+                                title="Arraste para mover (⋮⋮)"
+                                onTouchStart={() => {
+                                  setTouchDragIndex(index)
+                                }}
+                                onTouchMove={(e) => {
+                                  const touch = e.touches[0]
+                                  const targetElement = document.elementFromPoint(touch.clientX, touch.clientY)
+                                  if (targetElement) {
+                                    const cardEl = targetElement.closest('[data-module-index]')
+                                    if (cardEl) {
+                                      const overIdx = Number(cardEl.getAttribute('data-module-index'))
+                                      if (
+                                        !isNaN(overIdx) &&
+                                        overIdx !== index &&
+                                        overIdx >= 0 &&
+                                        overIdx < activeOrderedModules.length
+                                      ) {
+                                        handleMoveModule(index, overIdx)
+                                        setTouchDragIndex(overIdx)
+                                      }
+                                    }
+                                  }
+                                }}
+                                onTouchEnd={() => {
+                                  setTouchDragIndex(null)
+                                }}
+                              >
+                                <GripVertical className="w-5 h-5 text-neutral-500" />
+                              </div>
+
+                              {/* Badge Numérica de Posição */}
+                              <span className="w-6 h-6 rounded-lg bg-neutral-100 text-neutral-700 font-black text-[11px] flex items-center justify-center shrink-0 border border-neutral-200">
+                                {index + 1}
+                              </span>
+
+                              {/* Ícone Estilizado do Módulo */}
+                              <div
+                                className={`w-8 h-8 rounded-xl flex items-center justify-center shrink-0 border ${item.color}`}
+                              >
+                                <Icon className="w-4 h-4" />
+                              </div>
+
+                              {/* Rótulo do Módulo */}
+                              <div className="min-w-0">
+                                <span className="text-xs sm:text-sm font-bold text-neutral-900 truncate block">
+                                  {item.label}
+                                </span>
+                                <span className="text-[10px] text-neutral-400 block truncate">
+                                  {index === 0 ? '1º card no topo da página pública' : `${index + 1}º card na página pública`}
+                                </span>
+                              </div>
+                            </div>
+
+                            {/* Lado Direito: Botões Subir / Descer para 1-toque no Celular e Desktop */}
+                            <div className="flex items-center gap-1.5 shrink-0 ml-2">
+                              <button
+                                type="button"
+                                onClick={() => handleMoveModule(index, index - 1)}
+                                disabled={isFirst}
+                                className="w-8 h-8 rounded-xl border border-neutral-200 hover:bg-neutral-100 active:bg-neutral-200 active:scale-90 text-neutral-700 disabled:opacity-30 disabled:cursor-not-allowed flex items-center justify-center transition-all cursor-pointer"
+                                title="Mover para cima"
+                                aria-label={`Mover ${item.label} para cima`}
+                              >
+                                <ChevronUp className="w-4 h-4" />
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => handleMoveModule(index, index + 1)}
+                                disabled={isLast}
+                                className="w-8 h-8 rounded-xl border border-neutral-200 hover:bg-neutral-100 active:bg-neutral-200 active:scale-90 text-neutral-700 disabled:opacity-30 disabled:cursor-not-allowed flex items-center justify-center transition-all cursor-pointer"
+                                title="Mover para baixo"
+                                aria-label={`Mover ${item.label} para baixo`}
+                              >
+                                <ChevronDown className="w-4 h-4" />
+                              </button>
+                            </div>
+                          </div>
+                        )
+                      })}
+                    </div>
+                  </div>
+                )}
+
+                {/* Rodapé da Seção com Botão de Salvar Ordem */}
+                {activeOrderedModules.length > 0 && (
+                  <div className="pt-2 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 border-t border-neutral-100">
+                    <p className="text-[11px] text-neutral-500">
+                      A ordem definida acima será gravada no Firestore por ID e renderizada exatamente nessa sequência na Página Pública.
+                    </p>
+                    <button
+                      type="button"
+                      onClick={handleSaveCardOrder}
+                      disabled={isSavingOrder}
+                      className="px-5 py-2.5 rounded-xl bg-violet-600 hover:bg-violet-700 active:scale-95 text-white font-bold text-xs shadow-sm transition-all flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50 shrink-0"
+                    >
+                      {isSavingOrder ? (
+                        <>
+                          <span className="w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                          <span>Salvando ordem...</span>
+                        </>
+                      ) : (
+                        <>
+                          <Save className="w-4 h-4" />
+                          <span>Salvar ordem da página</span>
+                        </>
+                      )}
+                    </button>
+                  </div>
+                )}
               </div>
 
               {/* Configuração Dedicada: Opções do Catálogo de Produtos ao ativar */}

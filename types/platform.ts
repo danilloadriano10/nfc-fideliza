@@ -221,6 +221,7 @@ export interface Company {
   loyaltyProgram: LoyaltyProgramConfig
   productCatalog?: ProductCatalogConfig
   highlightModule?: string // 'auto' | 'appointments' | 'services' | 'whatsapp' | 'loyalty' | 'googleReview' | 'menu' | etc.
+  cardOrder?: string[] // Custom display order for public page modules/cards
   theme?: 'dark' | 'light' // Public page appearance theme (Escuro / Claro)
   rating?: number
   reviewCount?: number

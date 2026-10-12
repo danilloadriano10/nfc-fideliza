@@ -383,11 +383,19 @@ export async function saveFirestoreCompany(
     if (company.onboardingCompleted === undefined && existing.onboardingCompleted !== undefined) {
       finalCompany.onboardingCompleted = existing.onboardingCompleted
     }
+    if (company.cardOrder && Array.isArray(company.cardOrder)) {
+      finalCompany.cardOrder = company.cardOrder
+    } else if (existing.cardOrder && Array.isArray(existing.cardOrder)) {
+      finalCompany.cardOrder = existing.cardOrder
+    }
   } else {
     // New company registration
     finalCompany.createdAt = company.createdAt || new Date().toISOString()
     finalCompany.origin = company.origin || 'admin'
     finalCompany.onboardingCompleted = company.onboardingCompleted ?? false
+    if (company.cardOrder && Array.isArray(company.cardOrder)) {
+      finalCompany.cardOrder = company.cardOrder
+    }
     if (finalCompany.ownerAuth?.password) {
       const pass = finalCompany.ownerAuth.password.trim()
       const isAlreadyHashed = /^[0-9a-f]{64}$/i.test(pass)

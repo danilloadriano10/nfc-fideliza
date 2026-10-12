@@ -998,6 +998,38 @@ export const PublicCompanyView: React.FC<PublicCompanyViewProps> = ({
     return Math.min(100, Math.round((customerPoints / goal) * 100))
   }, [customerPoints, loyaltyProgram.goalPoints])
 
+  // Public Page Dynamic Sections Order
+  const effectivePageOrder = useMemo(() => {
+    const defaultOrder = [
+      'services',
+      'products',
+      'appointments',
+      'menu',
+      'loyalty',
+      'googleReview',
+      'contact',
+      'wifi',
+      'feedback',
+      'instagram',
+    ]
+    const saved = Array.isArray(company.cardOrder) ? company.cardOrder : []
+    const result: string[] = []
+
+    saved.forEach((key) => {
+      if (defaultOrder.includes(key) && !result.includes(key)) {
+        result.push(key)
+      }
+    })
+
+    defaultOrder.forEach((key) => {
+      if (!result.includes(key)) {
+        result.push(key)
+      }
+    })
+
+    return result
+  }, [company.cardOrder])
+
   return (
     <div
       className={`min-h-screen sm:py-6 flex justify-center transition-colors duration-200 ${
@@ -1364,9 +1396,11 @@ export const PublicCompanyView: React.FC<PublicCompanyViewProps> = ({
           )}
 
           {/* ======================================================= */}
-          {/* 4. NOSSOS SERVIÇOS: VITRINE VISUAL COM FOTOS GRANDES     */}
+          {/* 4. SEÇÕES E CARDS DA PÁGINA PÚBLICA (ORDEM DINÂMICA)     */}
           {/* ======================================================= */}
-          {activeServicesList.length > 0 && (
+          {(() => {
+            const sectionElements: Record<string, React.ReactNode> = {
+              services: activeServicesList.length > 0 ? (
             <div className="space-y-3 pt-1">
               <div className="flex items-center justify-between px-0.5">
                 <div className="flex items-center gap-1.5">
@@ -1587,12 +1621,8 @@ export const PublicCompanyView: React.FC<PublicCompanyViewProps> = ({
                 </button>
               )}
             </div>
-          )}
-
-          {/* ======================================================= */}
-          {/* 4.5. SEÇÃO VISUAL: PRODUTOS (VITRINE OU EXTERNO)        */}
-          {/* ======================================================= */}
-          {activeProductsList.length > 0 && !isExternalCatalog && company.modules?.products !== false && (
+          ) : null,
+              products: (activeProductsList.length > 0 && !isExternalCatalog && company.modules?.products !== false) ? (
             <div
               className={`rounded-3xl p-4.5 sm:p-5 space-y-4 border ${
                 isDark
@@ -1904,12 +1934,58 @@ export const PublicCompanyView: React.FC<PublicCompanyViewProps> = ({
                 <ExternalLink className="w-3.5 h-3.5 opacity-80" />
               </button>
             </div>
-          )}
+          ) : null,
+              appointments: (activeModules.appointments && (
+                <div
+                  key="appointments"
+                  className={`rounded-3xl p-4.5 sm:p-5 border space-y-3.5 transition-all ${
+                    isDark
+                      ? 'bg-[#141419] border-white/[0.08] shadow-sm'
+                      : 'bg-white border-neutral-200/80 shadow-2xs'
+                  }`}
+                >
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2.5">
+                      <div
+                        className="w-9 h-9 rounded-xl flex items-center justify-center text-white shadow-xs"
+                        style={{ backgroundColor: primaryColor }}
+                      >
+                        <Calendar className="w-5 h-5" />
+                      </div>
+                      <div>
+                        <h3
+                          className={`text-sm font-black tracking-tight ${
+                            isDark ? 'text-white' : 'text-neutral-900'
+                          }`}
+                        >
+                          Agendamento Online
+                        </h3>
+                        <p
+                          className={`text-[11px] ${
+                            isDark ? 'text-neutral-400' : 'text-neutral-500'
+                          }`}
+                        >
+                          Escolha um serviço e reserve seu horário em poucos toques
+                        </p>
+                      </div>
+                    </div>
+                  </div>
 
-          {/* ======================================================= */}
-          {/* 4.7. SEÇÃO VISUAL: CARDÁPIO DIGITAL DIRETO LINK        */}
-          {/* ======================================================= */}
-          {activeModules.menu && !isExternalMenu && activeMenuItemsList.length > 0 && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setBookingService(null)
+                      setIsBookingOpen(true)
+                    }}
+                    className="w-full py-2.5 px-4 rounded-xl font-bold text-xs text-white shadow-xs flex items-center justify-center gap-2 cursor-pointer transition-all active:scale-[0.99] hover:opacity-90"
+                    style={{ backgroundColor: primaryColor }}
+                  >
+                    <Calendar className="w-4 h-4" />
+                    <span>Agendar Horário Agora</span>
+                  </button>
+                </div>
+              )),
+              menu: (activeModules.menu && !isExternalMenu && activeMenuItemsList.length > 0) ? (
             <div
               id="secao-cardapio"
               className={`rounded-3xl p-4.5 sm:p-5 space-y-4 border ${
@@ -2209,12 +2285,8 @@ export const PublicCompanyView: React.FC<PublicCompanyViewProps> = ({
                 <ExternalLink className="w-3.5 h-3.5 opacity-80" />
               </button>
             </div>
-          )}
-
-          {/* ======================================================= */}
-          {/* 5. SEÇÃO VISUAL: FIDELIDADE DIGITAL                     */}
-          {/* ======================================================= */}
-          {activeModules.loyalty && (
+          ) : null,
+              loyalty: activeModules.loyalty ? (
             <div
               className={`rounded-3xl p-5 border relative overflow-hidden space-y-4 ${
                 isDark
@@ -2405,12 +2477,8 @@ export const PublicCompanyView: React.FC<PublicCompanyViewProps> = ({
                 </span>
               </button>
             </div>
-          )}
-
-          {/* ======================================================= */}
-          {/* 6. SEÇÃO VISUAL: AVALIAÇÃO NO GOOGLE                    */}
-          {/* ======================================================= */}
-          {activeModules.googleReview && company.googleReviewUrl && (
+          ) : null,
+              googleReview: (activeModules.googleReview && company.googleReviewUrl) ? (
             <div
               className={`rounded-3xl p-4.5 sm:p-5 space-y-3.5 ${
                 isDark
@@ -2495,12 +2563,8 @@ export const PublicCompanyView: React.FC<PublicCompanyViewProps> = ({
                 <ExternalLink className="w-3.5 h-3.5 opacity-80" />
               </button>
             </div>
-          )}
-
-          {/* ======================================================= */}
-          {/* 7. INFORMAÇÕES COMPLEMENTARES (COMPACTO NO FINAL)       */}
-          {/* ======================================================= */}
-          {company.addressText && (
+          ) : null,
+              contact: company.addressText ? (
             <div className="pt-1">
               <div
                 onClick={handleOpenLocation}
@@ -2550,8 +2614,109 @@ export const PublicCompanyView: React.FC<PublicCompanyViewProps> = ({
                 </div>
               </div>
             </div>
-          )}
+          ) : null,
+              wifi: (activeModules.wifi && company.wifi?.ssid && (
+                <div
+                  key="wifi"
+                  className={`rounded-3xl p-4 sm:p-4.5 border flex items-center justify-between gap-3 ${
+                    isDark
+                      ? 'bg-[#141419] border-white/[0.08] shadow-sm'
+                      : 'bg-white border-neutral-200/80 shadow-2xs'
+                  }`}
+                >
+                  <div className="flex items-center gap-3 min-w-0">
+                    <div className="w-9 h-9 rounded-xl bg-cyan-500/15 text-cyan-400 border border-cyan-500/30 flex items-center justify-center shrink-0">
+                      <Wifi className="w-5 h-5" />
+                    </div>
+                    <div className="min-w-0">
+                      <h4 className={`text-xs font-bold truncate ${isDark ? 'text-white' : 'text-neutral-900'}`}>
+                        Wi-Fi Grátis: {company.wifi.ssid}
+                      </h4>
+                      <p className={`text-[11px] truncate ${isDark ? 'text-neutral-400' : 'text-neutral-500'}`}>
+                        Toque para ver a senha e conectar
+                      </p>
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setIsWifiOpen(true)}
+                    className="px-3.5 py-1.5 rounded-xl text-xs font-bold bg-cyan-600 hover:bg-cyan-500 text-white shrink-0 cursor-pointer shadow-xs active:scale-95 transition-all"
+                  >
+                    Conectar
+                  </button>
+                </div>
+              )),
+              feedback: (activeModules.feedback && (
+                <div
+                  key="feedback"
+                  className={`rounded-3xl p-4 sm:p-4.5 border flex items-center justify-between gap-3 ${
+                    isDark
+                      ? 'bg-[#141419] border-white/[0.08] shadow-sm'
+                      : 'bg-white border-neutral-200/80 shadow-2xs'
+                  }`}
+                >
+                  <div className="flex items-center gap-3 min-w-0">
+                    <div className="w-9 h-9 rounded-xl bg-purple-500/15 text-purple-400 border border-purple-500/30 flex items-center justify-center shrink-0">
+                      <MessageSquareHeart className="w-5 h-5" />
+                    </div>
+                    <div className="min-w-0">
+                      <h4 className={`text-xs font-bold truncate ${isDark ? 'text-white' : 'text-neutral-900'}`}>
+                        Feedback Privado
+                      </h4>
+                      <p className={`text-[11px] truncate ${isDark ? 'text-neutral-400' : 'text-neutral-500'}`}>
+                        Envie sua mensagem direta à administração
+                      </p>
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setIsFeedbackOpen(true)}
+                    className="px-3.5 py-1.5 rounded-xl text-xs font-bold bg-purple-600 hover:bg-purple-500 text-white shrink-0 cursor-pointer shadow-xs active:scale-95 transition-all"
+                  >
+                    Opinar
+                  </button>
+                </div>
+              )),
+              instagram: (activeModules.instagram && company.instagram && (
+                <div
+                  key="instagram"
+                  className={`rounded-3xl p-4 sm:p-4.5 border flex items-center justify-between gap-3 ${
+                    isDark
+                      ? 'bg-[#141419] border-white/[0.08] shadow-sm'
+                      : 'bg-white border-neutral-200/80 shadow-2xs'
+                  }`}
+                >
+                  <div className="flex items-center gap-3 min-w-0">
+                    <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-amber-500 via-rose-500 to-purple-600 text-white flex items-center justify-center shrink-0 shadow-xs">
+                      <Instagram className="w-5 h-5" />
+                    </div>
+                    <div className="min-w-0">
+                      <h4 className={`text-xs font-bold truncate ${isDark ? 'text-white' : 'text-neutral-900'}`}>
+                        @{company.instagram.replace(/^@/, '')}
+                      </h4>
+                      <p className={`text-[11px] truncate ${isDark ? 'text-neutral-400' : 'text-neutral-500'}`}>
+                        Siga nosso perfil oficial no Instagram
+                      </p>
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={handleOpenInstagram}
+                    className="px-3.5 py-1.5 rounded-xl text-xs font-bold bg-pink-600 hover:bg-pink-500 text-white shrink-0 cursor-pointer shadow-xs active:scale-95 transition-all flex items-center gap-1"
+                  >
+                    <span>Seguir</span>
+                    <ExternalLink className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+              )),
+            }
 
+            return effectivePageOrder.map((sectionKey) => {
+              const node = sectionElements[sectionKey]
+              if (!node) return null
+              return <React.Fragment key={sectionKey}>{node}</React.Fragment>
+            })
+          })()}
         </div>
 
         {/* ========================================================= */}
