@@ -1888,10 +1888,7 @@ export const PublicCompanyView: React.FC<PublicCompanyViewProps> = ({
                 </button>
               )}
             </div>
-          )}
-
-          {/* Banner do Catálogo Externo se configurado */}
-          {activeModules.products && isExternalCatalog && company.productCatalog?.externalUrl && (
+          ) : (activeModules.products && isExternalCatalog && company.productCatalog?.externalUrl) ? (
             <div
               className={`rounded-3xl p-4.5 sm:p-5 border flex items-center justify-between gap-3 ${
                 isDark
@@ -2239,10 +2236,7 @@ export const PublicCompanyView: React.FC<PublicCompanyViewProps> = ({
                 })}
               </div>
             </div>
-          )}
-
-          {/* Banner do Cardápio Externo se modo externo configurado */}
-          {activeModules.menu && isExternalMenu && company.menuUrl && (
+          ) : (activeModules.menu && isExternalMenu && company.menuUrl) ? (
             <div
               className={`rounded-3xl p-4.5 sm:p-5 border flex items-center justify-between gap-3 ${
                 isDark

@@ -388,6 +388,11 @@ export async function saveFirestoreCompany(
     } else if (existing.cardOrder && Array.isArray(existing.cardOrder)) {
       finalCompany.cardOrder = existing.cardOrder
     }
+    if (company.publicSectionsOrder && Array.isArray(company.publicSectionsOrder)) {
+      finalCompany.publicSectionsOrder = company.publicSectionsOrder
+    } else if (existing.publicSectionsOrder && Array.isArray(existing.publicSectionsOrder)) {
+      finalCompany.publicSectionsOrder = existing.publicSectionsOrder
+    }
   } else {
     // New company registration
     finalCompany.createdAt = company.createdAt || new Date().toISOString()
@@ -395,6 +400,9 @@ export async function saveFirestoreCompany(
     finalCompany.onboardingCompleted = company.onboardingCompleted ?? false
     if (company.cardOrder && Array.isArray(company.cardOrder)) {
       finalCompany.cardOrder = company.cardOrder
+    }
+    if (company.publicSectionsOrder && Array.isArray(company.publicSectionsOrder)) {
+      finalCompany.publicSectionsOrder = company.publicSectionsOrder
     }
     if (finalCompany.ownerAuth?.password) {
       const pass = finalCompany.ownerAuth.password.trim()

@@ -222,6 +222,7 @@ export interface Company {
   productCatalog?: ProductCatalogConfig
   highlightModule?: string // 'auto' | 'appointments' | 'services' | 'whatsapp' | 'loyalty' | 'googleReview' | 'menu' | etc.
   cardOrder?: string[] // Custom display order for public page modules/cards
+  publicSectionsOrder?: string[] // Custom display order for public page sections
   theme?: 'dark' | 'light' // Public page appearance theme (Escuro / Claro)
   rating?: number
   reviewCount?: number
