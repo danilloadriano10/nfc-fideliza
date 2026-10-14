@@ -25,6 +25,7 @@ import {
   ChevronUp,
   Copy,
   Info,
+  ArrowUpDown,
 } from 'lucide-react'
 import {
   Company,
@@ -43,10 +44,12 @@ import {
   toggleCompanyMenuItemStatusOnServerApi,
   fetchCompanyMenuItemsFromServer,
   saveCompanyLocally,
+  saveCompanyMenuItemsOrderOnServer,
   DATA_CHANGE_EVENT,
 } from '@/lib/storage'
 import { uploadCompanyImageFromClient, isBase64Image } from '@/lib/storage-client'
 import { INITIAL_MENU_ITEMS } from '@/lib/initial-data'
+import { OrganizeItemsModal } from './organize-items-modal'
 
 interface MenuTabProps {
   company: Company
@@ -84,6 +87,7 @@ export const MenuTab: React.FC<MenuTabProps> = ({ company, onCompanyUpdate }) =>
 
   // Modal State
   const [isModalOpen, setIsModalOpen] = useState(false)
+  const [isOrganizeModalOpen, setIsOrganizeModalOpen] = useState(false)
   const [editingItem, setEditingItem] = useState<MenuItem | null>(null)
   const [isSaving, setIsSaving] = useState(false)
   const [toastMessage, setToastMessage] = useState<{
@@ -698,16 +702,27 @@ export const MenuTab: React.FC<MenuTabProps> = ({ company, onCompanyUpdate }) =>
             <div className="flex items-center gap-2 flex-wrap">
               <button
                 onClick={handleOpenNewModal}
-                className="px-4 py-2.5 rounded-xl bg-teal-600 hover:bg-teal-700 text-white font-bold text-xs shadow-md shadow-teal-600/20 transition-all flex items-center gap-2"
+                className="px-4 py-2.5 rounded-xl bg-teal-600 hover:bg-teal-700 text-white font-bold text-xs shadow-md shadow-teal-600/20 transition-all flex items-center gap-2 cursor-pointer"
               >
                 <Plus className="w-4 h-4" />
                 <span>Novo Item do Cardápio</span>
               </button>
 
+              {menuItems.length > 1 && (
+                <button
+                  type="button"
+                  onClick={() => setIsOrganizeModalOpen(true)}
+                  className="px-3.5 py-2.5 rounded-xl bg-white hover:bg-neutral-50 active:scale-95 text-neutral-800 font-bold text-xs flex items-center justify-center gap-2 border border-neutral-200/90 shadow-2xs hover:border-teal-300 transition-all cursor-pointer"
+                >
+                  <ArrowUpDown className="w-4 h-4 text-teal-600" />
+                  <span>Organizar ordem</span>
+                </button>
+              )}
+
               {menuItems.length === 0 && (
                 <button
                   onClick={handleSeedDemoItems}
-                  className="px-3.5 py-2.5 rounded-xl bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-200 font-semibold text-xs transition-all flex items-center gap-1.5"
+                  className="px-3.5 py-2.5 rounded-xl bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-200 font-semibold text-xs transition-all flex items-center gap-1.5 cursor-pointer"
                 >
                   <Sparkles className="w-3.5 h-3.5 text-amber-600" />
                   <span>Carregar Exemplos Prontos</span>
@@ -1909,6 +1924,32 @@ export const MenuTab: React.FC<MenuTabProps> = ({ company, onCompanyUpdate }) =>
           </div>
         </div>
       )}
+
+      {/* Organize Menu Items Order Modal */}
+      <OrganizeItemsModal
+        isOpen={isOrganizeModalOpen}
+        onClose={() => setIsOrganizeModalOpen(false)}
+        title="Organizar Ordem do Cardápio"
+        subtitle="Defina a sequência em que os pratos e itens aparecem no cardápio da Página Pública."
+        itemTypeLabel="itens do cardápio"
+        items={menuItems.map((item) => ({
+          id: item.id,
+          name: item.name,
+          photoUrl: item.photoUrl,
+          category: item.category,
+          subtitle: item.price != null ? `R$ ${item.price.toFixed(2).replace('.', ',')}` : 'Sob consulta',
+        }))}
+        defaultIcon={<UtensilsCrossed className="w-5 h-5 text-teal-600" />}
+        accentColorClass="bg-teal-600 hover:bg-teal-700"
+        onSave={async (orderedIds, silent) => {
+          await saveCompanyMenuItemsOrderOnServer(company.id, orderedIds)
+          const updated = getCompanyMenuItems(company.id)
+          setMenuItems(updated)
+          if (!silent) {
+            showToast('success', 'Ordem do cardápio salva com sucesso!')
+          }
+        }}
+      />
     </div>
   )
 }

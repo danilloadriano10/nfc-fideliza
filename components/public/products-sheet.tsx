@@ -37,12 +37,19 @@ export const ProductsSheet: React.FC<ProductsSheetProps> = ({
     return products
       .filter((p) => p.companyId === company.id && p.isActive !== false)
       .sort((a, b) => {
+        if (Array.isArray(company.productsOrder) && company.productsOrder.length > 0) {
+          const idxA = company.productsOrder.indexOf(a.id)
+          const idxB = company.productsOrder.indexOf(b.id)
+          if (idxA !== -1 && idxB !== -1) return idxA - idxB
+          if (idxA !== -1) return -1
+          if (idxB !== -1) return 1
+        }
         const orderA = typeof a.order === 'number' ? a.order : 0
         const orderB = typeof b.order === 'number' ? b.order : 0
         if (orderA !== orderB) return orderA - orderB
         return (b.createdAt || '').localeCompare(a.createdAt || '')
       })
-  }, [products, company.id])
+  }, [products, company.id, company.productsOrder])
 
   // Categories list
   const categoriesWithCounts = useMemo(() => {

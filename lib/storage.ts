@@ -1353,11 +1353,30 @@ export function resetDemoData(): void {
 // ==========================================
 
 export function getCompanyServices(companyId: string): CompanyService[] {
+  const company = getCompanyById(companyId)
+  const servicesOrder = company?.servicesOrder
+
+  const sortServices = (list: CompanyService[]) => {
+    return list.sort((a, b) => {
+      if (Array.isArray(servicesOrder) && servicesOrder.length > 0) {
+        const idxA = servicesOrder.indexOf(a.id)
+        const idxB = servicesOrder.indexOf(b.id)
+        if (idxA !== -1 && idxB !== -1) return idxA - idxB
+        if (idxA !== -1) return -1
+        if (idxB !== -1) return 1
+      }
+      const orderA = typeof a.order === 'number' ? a.order : 0
+      const orderB = typeof b.order === 'number' ? b.order : 0
+      if (orderA !== orderB) return orderA - orderB
+      return (a.name || '').localeCompare(b.name || '')
+    })
+  }
+
   if (!isBrowser()) {
-    return memoryServices.filter((s) => s.companyId === companyId)
+    return sortServices(memoryServices.filter((s) => s.companyId === companyId))
   }
   const all = getItem<CompanyService[]>(STORAGE_KEYS.SERVICES, memoryServices) || []
-  return all.filter((s) => s.companyId === companyId)
+  return sortServices(all.filter((s) => s.companyId === companyId))
 }
 
 export function saveCompanyServiceLocally(service: CompanyService): void {
@@ -1473,23 +1492,75 @@ export async function toggleCompanyServiceOnServerApi(
   }
 }
 
+export function saveCompanyServicesOrderLocally(companyId: string, orderedIds: string[]): void {
+  if (!isBrowser() || !companyId || !Array.isArray(orderedIds)) return
+  const all = getItem<CompanyService[]>(STORAGE_KEYS.SERVICES, memoryServices) || []
+  const orderMap = new Map<string, number>()
+  orderedIds.forEach((id, idx) => orderMap.set(id, idx))
+
+  const updated = all.map((srv) => {
+    if (srv.companyId === companyId && orderMap.has(srv.id)) {
+      return { ...srv, order: orderMap.get(srv.id) }
+    }
+    return srv
+  })
+  memoryServices = updated
+  setItem(STORAGE_KEYS.SERVICES, updated)
+
+  // Update company document
+  const company = getCompanyById(companyId)
+  if (company) {
+    saveCompanyLocally({ ...company, servicesOrder: orderedIds })
+  }
+  notifyDataChange()
+}
+
+export async function saveCompanyServicesOrderOnServer(
+  companyId: string,
+  orderedIds: string[]
+): Promise<boolean> {
+  saveCompanyServicesOrderLocally(companyId, orderedIds)
+  try {
+    const res = await fetch('/api/services', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ companyId, reorder: orderedIds }),
+    })
+    return res.ok
+  } catch {
+    return true
+  }
+}
+
 // ==========================================
 // 8.1 PRODUCTS (MULTI-TENANT CRUD & SERVER SYNC)
 // ==========================================
 
 export function getCompanyProducts(companyId: string): CompanyProduct[] {
-  if (!isBrowser()) {
-    return memoryProducts.filter((p) => p.companyId === companyId)
-  }
-  const all = getItem<CompanyProduct[]>(STORAGE_KEYS.PRODUCTS, memoryProducts) || []
-  return all
-    .filter((p) => p.companyId === companyId)
-    .sort((a, b) => {
+  const company = getCompanyById(companyId)
+  const productsOrder = company?.productsOrder
+
+  const sortProducts = (list: CompanyProduct[]) => {
+    return list.sort((a, b) => {
+      if (Array.isArray(productsOrder) && productsOrder.length > 0) {
+        const idxA = productsOrder.indexOf(a.id)
+        const idxB = productsOrder.indexOf(b.id)
+        if (idxA !== -1 && idxB !== -1) return idxA - idxB
+        if (idxA !== -1) return -1
+        if (idxB !== -1) return 1
+      }
       const orderA = typeof a.order === 'number' ? a.order : 0
       const orderB = typeof b.order === 'number' ? b.order : 0
       if (orderA !== orderB) return orderA - orderB
       return (b.createdAt || '').localeCompare(a.createdAt || '')
     })
+  }
+
+  if (!isBrowser()) {
+    return sortProducts(memoryProducts.filter((p) => p.companyId === companyId))
+  }
+  const all = getItem<CompanyProduct[]>(STORAGE_KEYS.PRODUCTS, memoryProducts) || []
+  return sortProducts(all.filter((p) => p.companyId === companyId))
 }
 
 export function saveCompanyProductLocally(product: CompanyProduct): void {
@@ -1605,29 +1676,83 @@ export async function toggleCompanyProductOnServerApi(
   }
 }
 
+export function saveCompanyProductsOrderLocally(companyId: string, orderedIds: string[]): void {
+  if (!isBrowser() || !companyId || !Array.isArray(orderedIds)) return
+  const all = getItem<CompanyProduct[]>(STORAGE_KEYS.PRODUCTS, memoryProducts) || []
+  const orderMap = new Map<string, number>()
+  orderedIds.forEach((id, idx) => orderMap.set(id, idx))
+
+  const updated = all.map((prod) => {
+    if (prod.companyId === companyId && orderMap.has(prod.id)) {
+      return { ...prod, order: orderMap.get(prod.id) }
+    }
+    return prod
+  })
+  memoryProducts = updated
+  setItem(STORAGE_KEYS.PRODUCTS, updated)
+
+  // Update company document
+  const company = getCompanyById(companyId)
+  if (company) {
+    saveCompanyLocally({ ...company, productsOrder: orderedIds })
+  }
+  notifyDataChange()
+}
+
+export async function saveCompanyProductsOrderOnServer(
+  companyId: string,
+  orderedIds: string[]
+): Promise<boolean> {
+  saveCompanyProductsOrderLocally(companyId, orderedIds)
+  try {
+    const res = await fetch('/api/products', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ companyId, reorder: orderedIds }),
+    })
+    return res.ok
+  } catch {
+    return true
+  }
+}
+
 // ==========================================
 // 8.1 MENU ITEMS (CARDÁPIO DIGITAL DIRETO LINK)
 // ==========================================
 
 export function getCompanyMenuItems(companyId: string): MenuItem[] {
+  const company = getCompanyById(companyId)
+  const menuItemsOrder = company?.menuItemsOrder
+
+  const sortMenuItems = (list: MenuItem[]) => {
+    return list.sort((a, b) => {
+      if (Array.isArray(menuItemsOrder) && menuItemsOrder.length > 0) {
+        const idxA = menuItemsOrder.indexOf(a.id)
+        const idxB = menuItemsOrder.indexOf(b.id)
+        if (idxA !== -1 && idxB !== -1) return idxA - idxB
+        if (idxA !== -1) return -1
+        if (idxB !== -1) return 1
+      }
+      const orderA = typeof a.order === 'number' ? a.order : 0
+      const orderB = typeof b.order === 'number' ? b.order : 0
+      if (orderA !== orderB) return orderA - orderB
+      return (b.createdAt || '').localeCompare(a.createdAt || '')
+    })
+  }
+
   if (!isBrowser()) {
     const list = memoryMenuItems.filter((i) => i.companyId === companyId)
     if (list.length === 0) {
-      return INITIAL_MENU_ITEMS.filter((i) => i.companyId === companyId)
+      return sortMenuItems(INITIAL_MENU_ITEMS.filter((i) => i.companyId === companyId))
     }
-    return list
+    return sortMenuItems(list)
   }
   const all = getItem<MenuItem[]>(STORAGE_KEYS.MENU_ITEMS, memoryMenuItems) || []
   let compItems = all.filter((i) => i.companyId === companyId)
   if (compItems.length === 0) {
     compItems = INITIAL_MENU_ITEMS.filter((i) => i.companyId === companyId)
   }
-  return compItems.sort((a, b) => {
-    const orderA = typeof a.order === 'number' ? a.order : 0
-    const orderB = typeof b.order === 'number' ? b.order : 0
-    if (orderA !== orderB) return orderA - orderB
-    return (b.createdAt || '').localeCompare(a.createdAt || '')
-  })
+  return sortMenuItems(compItems)
 }
 
 export function saveCompanyMenuItemLocally(item: MenuItem): void {
@@ -1738,6 +1863,46 @@ export async function toggleCompanyMenuItemStatusOnServerApi(
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ id: itemId, companyId }),
+    })
+    return res.ok
+  } catch {
+    return true
+  }
+}
+
+export function saveCompanyMenuItemsOrderLocally(companyId: string, orderedIds: string[]): void {
+  if (!isBrowser() || !companyId || !Array.isArray(orderedIds)) return
+  const all = getItem<MenuItem[]>(STORAGE_KEYS.MENU_ITEMS, memoryMenuItems) || []
+  const orderMap = new Map<string, number>()
+  orderedIds.forEach((id, idx) => orderMap.set(id, idx))
+
+  const updated = all.map((item) => {
+    if (item.companyId === companyId && orderMap.has(item.id)) {
+      return { ...item, order: orderMap.get(item.id) }
+    }
+    return item
+  })
+  memoryMenuItems = updated
+  setItem(STORAGE_KEYS.MENU_ITEMS, updated)
+
+  // Update company document
+  const company = getCompanyById(companyId)
+  if (company) {
+    saveCompanyLocally({ ...company, menuItemsOrder: orderedIds })
+  }
+  notifyDataChange()
+}
+
+export async function saveCompanyMenuItemsOrderOnServer(
+  companyId: string,
+  orderedIds: string[]
+): Promise<boolean> {
+  saveCompanyMenuItemsOrderLocally(companyId, orderedIds)
+  try {
+    const res = await fetch('/api/menu', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ companyId, reorder: orderedIds }),
     })
     return res.ok
   } catch {

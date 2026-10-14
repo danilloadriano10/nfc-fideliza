@@ -48,6 +48,9 @@ import {
   getFirestoreProfessionals,
   saveFirestoreProfessional,
   deleteFirestoreProfessional,
+  saveFirestoreProductsOrder,
+  saveFirestoreServicesOrder,
+  saveFirestoreMenuItemsOrder,
   ensureFirestoreInitialized,
 } from './firestore-service'
 
@@ -374,3 +377,25 @@ export async function deleteServerProfessional(
 ): Promise<{ success: boolean; error?: string }> {
   return await deleteFirestoreProfessional(profId, companyId)
 }
+
+export async function saveServerProductsOrder(
+  companyId: string,
+  orderedIds: string[]
+): Promise<boolean> {
+  return await saveFirestoreProductsOrder(companyId, orderedIds)
+}
+
+export async function saveServerServicesOrder(
+  companyId: string,
+  orderedIds: string[]
+): Promise<boolean> {
+  return await saveFirestoreServicesOrder(companyId, orderedIds)
+}
+
+export async function saveServerMenuItemsOrder(
+  companyId: string,
+  orderedIds: string[]
+): Promise<boolean> {
+  return await saveFirestoreMenuItemsOrder(companyId, orderedIds)
+}
+

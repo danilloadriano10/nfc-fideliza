@@ -15,6 +15,7 @@ import {
 } from 'lucide-react'
 import { Company, CompanyProduct } from '@/types/platform'
 import { normalizePhone } from '@/lib/utils'
+import { buildProductWhatsAppMessage } from '@/lib/product-whatsapp'
 
 interface ProductDetailModalProps {
   product: CompanyProduct | null
@@ -71,8 +72,15 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
   const handleInterestWhatsApp = () => {
     const raw = company.whatsapp || ''
     const clean = normalizePhone(raw)
-    const varText = selectedVariation ? ` (Tamanho/Variação: ${selectedVariation})` : ''
-    const message = `Olá! Tenho interesse no produto "${product.name}"${varText} da ${company.name}. Gostaria de mais informações!`
+    const customTemplate =
+      company.productWhatsAppTemplate || company.productCatalog?.whatsappMessageTemplate
+
+    const message = buildProductWhatsAppMessage({
+      template: customTemplate,
+      product,
+      companyName: company.name,
+      selectedVariation,
+    })
 
     if (clean) {
       const phoneWithDdi = clean.startsWith('55') ? clean : `55${clean}`

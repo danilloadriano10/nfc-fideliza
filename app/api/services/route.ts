@@ -7,6 +7,7 @@ import {
   toggleServerServiceStatus,
   getServerCompanyById,
   getServerCompanyBySlug,
+  saveServerServicesOrder,
 } from '@/lib/server-storage'
 import { CompanyService } from '@/types/platform'
 import { uploadCompanyFileServer, isBase64Image } from '@/lib/storage-service'
@@ -183,7 +184,14 @@ export async function PUT(req: NextRequest) {
       category,
       isActive,
       toggleStatus,
+      reorder,
     } = body || {}
+
+    // Batch reorder path
+    if (reorder && Array.isArray(reorder) && companyId) {
+      const ok = await saveServerServicesOrder(companyId, reorder)
+      return NextResponse.json({ success: ok }, { status: ok ? 200 : 500 })
+    }
 
     if (!id || !companyId) {
       return NextResponse.json(

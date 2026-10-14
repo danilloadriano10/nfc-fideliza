@@ -21,6 +21,7 @@ import {
   Scissors,
   Check,
   Calendar,
+  ArrowUpDown,
 } from 'lucide-react'
 import { Company, CompanyService } from '@/types/platform'
 import {
@@ -29,9 +30,11 @@ import {
   deleteCompanyServiceOnServerApi,
   toggleCompanyServiceOnServerApi,
   fetchCompanyServicesFromServer,
+  saveCompanyServicesOrderOnServer,
   DATA_CHANGE_EVENT,
 } from '@/lib/storage'
 import { uploadCompanyImageFromClient, isBase64Image } from '@/lib/storage-client'
+import { OrganizeItemsModal } from './organize-items-modal'
 
 interface ServicesTabProps {
   company: Company
@@ -69,6 +72,7 @@ export const ServicesTab: React.FC<ServicesTabProps> = ({ company, onEnableModul
 
   // Modal State
   const [isModalOpen, setIsModalOpen] = useState(false)
+  const [isOrganizeModalOpen, setIsOrganizeModalOpen] = useState(false)
   const [editingService, setEditingService] = useState<CompanyService | null>(null)
   const [isSaving, setIsSaving] = useState(false)
   const [toastMessage, setToastMessage] = useState<{ text: string; type: 'success' | 'error' } | null>(null)
@@ -348,14 +352,27 @@ export const ServicesTab: React.FC<ServicesTabProps> = ({ company, onEnableModul
             </p>
           </div>
 
-          <button
-            type="button"
-            onClick={handleOpenCreate}
-            className="px-4 py-2.5 rounded-xl bg-violet-600 hover:bg-violet-700 text-white text-xs font-semibold shadow-xs flex items-center justify-center gap-2 transition-all cursor-pointer self-start sm:self-auto"
-          >
-            <Plus className="w-4 h-4" />
-            <span>Cadastrar Serviço</span>
-          </button>
+          <div className="flex items-center gap-2 flex-wrap self-start sm:self-auto">
+            {services.length > 1 && (
+              <button
+                type="button"
+                onClick={() => setIsOrganizeModalOpen(true)}
+                className="px-3.5 py-2.5 rounded-xl bg-white hover:bg-neutral-50 active:scale-95 text-neutral-800 font-bold text-xs flex items-center justify-center gap-2 border border-neutral-200/90 shadow-2xs hover:border-violet-300 transition-all cursor-pointer"
+              >
+                <ArrowUpDown className="w-4 h-4 text-violet-600" />
+                <span>Organizar ordem</span>
+              </button>
+            )}
+
+            <button
+              type="button"
+              onClick={handleOpenCreate}
+              className="px-4 py-2.5 rounded-xl bg-violet-600 hover:bg-violet-700 text-white text-xs font-semibold shadow-xs flex items-center justify-center gap-2 transition-all cursor-pointer"
+            >
+              <Plus className="w-4 h-4" />
+              <span>Cadastrar Serviço</span>
+            </button>
+          </div>
         </div>
 
         {/* Filter Bar & Search */}
@@ -835,6 +852,32 @@ export const ServicesTab: React.FC<ServicesTabProps> = ({ company, onEnableModul
           </div>
         </div>
       )}
+
+      {/* Organize Services Order Modal */}
+      <OrganizeItemsModal
+        isOpen={isOrganizeModalOpen}
+        onClose={() => setIsOrganizeModalOpen(false)}
+        title="Organizar Ordem dos Serviços"
+        subtitle="Defina a sequência em que seus serviços aparecem na lista da Página Pública."
+        itemTypeLabel="serviços"
+        items={services.map((s) => ({
+          id: s.id,
+          name: s.name,
+          photoUrl: s.photoUrl,
+          category: s.category,
+          subtitle: s.price != null ? `R$ ${s.price.toFixed(2).replace('.', ',')}` : 'Sob consulta',
+        }))}
+        defaultIcon={<Scissors className="w-5 h-5 text-violet-600" />}
+        accentColorClass="bg-violet-600 hover:bg-violet-700"
+        onSave={async (orderedIds, silent) => {
+          await saveCompanyServicesOrderOnServer(company.id, orderedIds)
+          const updated = getCompanyServices(company.id)
+          setServices(updated)
+          if (!silent) {
+            showToast('success', 'Ordem dos serviços salva com sucesso!')
+          }
+        }}
+      />
     </div>
   )
 }

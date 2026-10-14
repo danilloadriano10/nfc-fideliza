@@ -33,7 +33,7 @@ import {
   ALL_PUBLIC_SECTIONS,
   getActivePublicSections,
 } from '@/lib/public-sections'
-import { saveCompanyAsync } from '@/lib/storage'
+import { saveCompanyAsync, saveCompanyLocally, saveCompany } from '@/lib/storage'
 import Link from 'next/link'
 
 interface OrganizePageTabProps {
@@ -56,7 +56,7 @@ export const OrganizePageTab: React.FC<OrganizePageTabProps> = ({
   const [touchDragging, setTouchDragging] = useState<number | null>(null)
 
   // Keep track of unsaved changes compared to company.publicSectionsOrder
-  const savedOrderIds = (company.publicSectionsOrder || []).join(',')
+  const savedOrderIds = (company.publicSectionsOrder || company.cardOrder || []).join(',')
   const currentOrderIds = sections.map((s) => s.id).join(',')
   const hasChanges = savedOrderIds !== currentOrderIds
 
@@ -65,13 +65,28 @@ export const OrganizePageTab: React.FC<OrganizePageTabProps> = ({
     setSections(getActivePublicSections(company))
   }, [company])
 
-  // Move helper
+  // Move helper with immediate persistence so page refresh never resets
   const reorder = (fromIndex: number, toIndex: number) => {
     if (fromIndex === toIndex || toIndex < 0 || toIndex >= sections.length) return
     const updated = [...sections]
     const [moved] = updated.splice(fromIndex, 1)
     updated.splice(toIndex, 0, moved)
     setSections(updated)
+
+    // AUTO-SAVE IMMEDIATELY on every move (drag or arrow) so refreshing the page NEVER reverts the order!
+    const newOrder = updated.map((s) => s.id)
+    const updatedCompany: Company = {
+      ...company,
+      publicSectionsOrder: newOrder,
+      cardOrder: newOrder,
+    }
+
+    saveCompanyLocally(updatedCompany)
+    saveCompany(updatedCompany)
+    onCompanyUpdate(updatedCompany)
+    saveCompanyAsync(updatedCompany).catch((err) => {
+      console.error('Erro ao auto-salvar ordem no Firestore:', err)
+    })
   }
 
   const handleMoveUp = (index: number) => {
@@ -159,7 +174,11 @@ export const OrganizePageTab: React.FC<OrganizePageTabProps> = ({
     const updatedCompany: Company = {
       ...company,
       publicSectionsOrder: newOrder,
+      cardOrder: newOrder,
     }
+
+    saveCompanyLocally(updatedCompany)
+    saveCompany(updatedCompany)
 
     try {
       const res = await saveCompanyAsync(updatedCompany)

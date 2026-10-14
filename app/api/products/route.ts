@@ -8,6 +8,7 @@ import {
   getServerCompanyById,
   getServerCompanyBySlug,
   saveServerCompany,
+  saveServerProductsOrder,
 } from '@/lib/server-storage'
 import { CompanyProduct } from '@/types/platform'
 import { uploadCompanyFileServer, isBase64Image } from '@/lib/storage-service'
@@ -173,7 +174,13 @@ export async function POST(req: NextRequest) {
 export async function PUT(req: NextRequest) {
   try {
     const body = await req.json()
-    const { id, companyId, toggleStatus } = body || {}
+    const { id, companyId, toggleStatus, reorder } = body || {}
+
+    // Batch reorder path
+    if (reorder && Array.isArray(reorder) && companyId) {
+      const ok = await saveServerProductsOrder(companyId, reorder)
+      return NextResponse.json({ success: ok }, { status: ok ? 200 : 500 })
+    }
 
     if (!id || !companyId) {
       return NextResponse.json(

@@ -36,8 +36,22 @@ export const ServicesSheet: React.FC<ServicesSheetProps> = ({
 
   if (!isOpen) return null
 
-  // Filter only active services for customers
-  const activeServices = services.filter((s) => s.isActive !== false)
+  // Filter only active services for customers sorted by custom order
+  const activeServices = services
+    .filter((s) => s.isActive !== false)
+    .sort((a, b) => {
+      if (Array.isArray(company.servicesOrder) && company.servicesOrder.length > 0) {
+        const idxA = company.servicesOrder.indexOf(a.id)
+        const idxB = company.servicesOrder.indexOf(b.id)
+        if (idxA !== -1 && idxB !== -1) return idxA - idxB
+        if (idxA !== -1) return -1
+        if (idxB !== -1) return 1
+      }
+      const orderA = typeof a.order === 'number' ? a.order : 0
+      const orderB = typeof b.order === 'number' ? b.order : 0
+      if (orderA !== orderB) return orderA - orderB
+      return (a.name || '').localeCompare(b.name || '')
+    })
 
   // Categories list
   const categories = Array.from(

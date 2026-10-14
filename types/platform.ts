@@ -77,6 +77,7 @@ export interface CompanyService {
   priceType?: 'fixed' | 'consult'
   durationMinutes?: number | null // approximate duration in minutes (e.g., 30, 45, 60)
   category?: string
+  order?: number // Ordem de exibição definida pela empresa
   isActive: boolean
   createdAt: string
   updatedAt?: string
@@ -88,6 +89,7 @@ export interface ProductCatalogConfig {
   mode: ProductCatalogMode // 'internal' | 'external'
   externalButtonText?: string // Default: "Ver Catálogo"
   externalUrl?: string
+  whatsappMessageTemplate?: string // Mensagem personalizada do WhatsApp para produtos ({produto}, {preco}, {variacao}, {empresa})
 }
 
 export type MenuMode = 'external' | 'internal'
@@ -228,10 +230,14 @@ export interface Company {
   modules: CompanyModules
   loyaltyProgram: LoyaltyProgramConfig
   productCatalog?: ProductCatalogConfig
+  productWhatsAppTemplate?: string // Mensagem personalizada do WhatsApp para produtos ({produto}, {preco}, {variacao}, {empresa})
   highlightModule?: string // 'auto' | 'appointments' | 'services' | 'whatsapp' | 'loyalty' | 'googleReview' | 'menu' | etc.
   featuredCards?: string[] // IDs of the 4 featured highlight cards chosen for the top of the public page
   cardOrder?: string[] // Custom display order for public page modules/cards
   publicSectionsOrder?: string[] // Custom display order for public page sections
+  productsOrder?: string[] // Custom display order for catalog products
+  servicesOrder?: string[] // Custom display order for company services
+  menuItemsOrder?: string[] // Custom display order for digital menu items
   theme?: 'dark' | 'light' // Public page appearance theme (Escuro / Claro)
   rating?: number
   reviewCount?: number

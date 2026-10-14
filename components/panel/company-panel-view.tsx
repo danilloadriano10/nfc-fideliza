@@ -73,6 +73,8 @@ import {
   fetchFeedbacksForCompany,
   fetchCompanyCustomersFromServer,
   saveCompany,
+  saveCompanyLocally,
+  getCompanyBySlug,
   saveCompanyAsync,
   directAddPoint,
   redeemReward,
@@ -180,23 +182,61 @@ export const CompanyPanelView: React.FC<CompanyPanelViewProps> = ({
 
   // Public Page Sections / Cards Order State
   const [orderedModuleKeys, setOrderedModuleKeys] = useState<string[]>(() => {
-    const defaultOrder = [
+    const allKnownKeys = [
+      'whatsapp',
       'services',
       'products',
       'appointments',
       'menu',
       'loyalty',
       'googleReview',
+      'location',
       'contact',
       'wifi',
       'feedback',
       'instagram',
     ]
-    const saved = Array.isArray(initialCompany.cardOrder) ? initialCompany.cardOrder : []
-    const validSaved = saved.filter((k) => defaultOrder.includes(k))
-    const missing = defaultOrder.filter((k) => !validSaved.includes(k))
+    const local = typeof window !== 'undefined' ? getCompanyBySlug(initialCompany.slug) : null
+    const source = local || initialCompany
+    const saved =
+      Array.isArray(source.publicSectionsOrder) && source.publicSectionsOrder.length > 0
+        ? source.publicSectionsOrder
+        : Array.isArray(source.cardOrder) && source.cardOrder.length > 0
+        ? source.cardOrder
+        : []
+    const validSaved = saved.filter((k) => allKnownKeys.includes(k))
+    const missing = allKnownKeys.filter((k) => !validSaved.includes(k))
     return [...validSaved, ...missing]
   })
+
+  // Synchronize orderedModuleKeys whenever company updates
+  useEffect(() => {
+    const allKnownKeys = [
+      'whatsapp',
+      'services',
+      'products',
+      'appointments',
+      'menu',
+      'loyalty',
+      'googleReview',
+      'location',
+      'contact',
+      'wifi',
+      'feedback',
+      'instagram',
+    ]
+    const saved =
+      Array.isArray(company.publicSectionsOrder) && company.publicSectionsOrder.length > 0
+        ? company.publicSectionsOrder
+        : Array.isArray(company.cardOrder) && company.cardOrder.length > 0
+        ? company.cardOrder
+        : []
+    if (saved.length > 0) {
+      const validSaved = saved.filter((k) => allKnownKeys.includes(k))
+      const missing = allKnownKeys.filter((k) => !validSaved.includes(k))
+      setOrderedModuleKeys([...validSaved, ...missing])
+    }
+  }, [company.id, company.cardOrder, company.publicSectionsOrder])
   const [isSavingOrder, setIsSavingOrder] = useState(false)
   const [draggedIndex, setDraggedIndex] = useState<number | null>(null)
   const [dragOverIndex, setDragOverIndex] = useState<number | null>(null)
@@ -272,7 +312,31 @@ export const CompanyPanelView: React.FC<CompanyPanelViewProps> = ({
     setFormData((prev) => ({
       ...prev,
       cardOrder: updatedAllKeys,
+      publicSectionsOrder: updatedAllKeys,
     }))
+
+    const updatedCompany: Company = {
+      ...company,
+      ...formData,
+      cardOrder: updatedAllKeys,
+      publicSectionsOrder: updatedAllKeys,
+    }
+    setCompany(updatedCompany)
+
+    // Save locally immediately so refreshing the page (F5) NEVER resets positions
+    saveCompanyLocally(updatedCompany)
+    saveCompany(updatedCompany)
+
+    // Save asynchronously to Firestore in background
+    saveCompanyAsync(updatedCompany)
+      .then((res) => {
+        if (res.success && res.company) {
+          setCompany(res.company)
+        }
+      })
+      .catch((err) => {
+        console.error('Erro ao auto-salvar ordem no servidor:', err)
+      })
   }
 
   const handleSaveCardOrder = async () => {
@@ -285,7 +349,11 @@ export const CompanyPanelView: React.FC<CompanyPanelViewProps> = ({
       ...company,
       ...formData,
       cardOrder: finalOrder,
+      publicSectionsOrder: finalOrder,
     }
+
+    saveCompanyLocally(updatedToSave)
+    saveCompany(updatedToSave)
 
     try {
       const res = await saveCompanyAsync(updatedToSave)
@@ -1088,6 +1156,10 @@ export const CompanyPanelView: React.FC<CompanyPanelViewProps> = ({
         {activeTab === 'products' && (
           <ProductsTab
             company={company}
+            onCompanyUpdate={(updated) => {
+              setCompany(updated)
+              setFormData(updated)
+            }}
             onEnableModule={() => setActiveTab('settings')}
             onOpenSettings={() => setActiveTab('settings')}
           />

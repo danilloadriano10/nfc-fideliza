@@ -21,8 +21,16 @@ import {
   ShoppingBag,
   ArrowUpDown,
   Check,
+  MessageCircle,
+  ChevronDown,
+  ChevronUp,
 } from 'lucide-react'
-import { Company, CompanyProduct, ProductVariationOption } from '@/types/platform'
+import {
+  Company,
+  CompanyProduct,
+  ProductVariationOption,
+  ProductCatalogConfig,
+} from '@/types/platform'
 import {
   getCompanyProducts,
   saveCompanyProductOnServerApi,
@@ -30,12 +38,21 @@ import {
   toggleCompanyProductOnServerApi,
   fetchCompanyProductsFromServer,
   saveCompanyLocally,
+  saveCompany,
+  saveCompanyAsync,
+  saveCompanyProductsOrderOnServer,
   DATA_CHANGE_EVENT,
 } from '@/lib/storage'
 import { uploadCompanyImageFromClient, isBase64Image } from '@/lib/storage-client'
+import {
+  buildProductWhatsAppMessage,
+  DEFAULT_PRODUCT_WHATSAPP_TEMPLATE,
+} from '@/lib/product-whatsapp'
+import { OrganizeItemsModal } from './organize-items-modal'
 
 interface ProductsTabProps {
   company: Company
+  onCompanyUpdate?: (updated: Company) => void
   onEnableModule?: () => void
   onOpenSettings?: () => void
 }
@@ -57,6 +74,7 @@ const COMMON_PRODUCT_CATEGORIES = [
 
 export const ProductsTab: React.FC<ProductsTabProps> = ({
   company,
+  onCompanyUpdate,
   onEnableModule,
   onOpenSettings,
 }) => {
@@ -65,8 +83,108 @@ export const ProductsTab: React.FC<ProductsTabProps> = ({
   const [search, setSearch] = useState('')
   const [selectedCategory, setSelectedCategory] = useState<string>('Todas')
 
+  // Configuração: Mensagem do WhatsApp para produtos
+  const initialWhatsAppTemplate =
+    company.productWhatsAppTemplate ||
+    company.productCatalog?.whatsappMessageTemplate ||
+    ''
+  const [whatsappTemplate, setWhatsappTemplate] = useState<string>(initialWhatsAppTemplate)
+  const [isSavingWhatsAppConfig, setIsSavingWhatsAppConfig] = useState(false)
+  const [isWhatsAppConfigOpen, setIsWhatsAppConfigOpen] = useState(false)
+  const textareaRef = React.useRef<HTMLTextAreaElement | null>(null)
+
+  // Sincroniza se a empresa for atualizada externamente
+  useEffect(() => {
+    const current =
+      company.productWhatsAppTemplate ||
+      company.productCatalog?.whatsappMessageTemplate ||
+      ''
+    setWhatsappTemplate(current)
+  }, [company.productWhatsAppTemplate, company.productCatalog?.whatsappMessageTemplate])
+
+  // Exemplo de produto para prévia realista no painel
+  const previewSampleProduct = React.useMemo(() => {
+    const first = products[0]
+    return {
+      name: first?.name || 'Hambúrguer Artesanal Especial',
+      price: first?.promotionalPrice ?? first?.price ?? 38.9,
+      promotionalPrice: first?.promotionalPrice,
+      priceType: first?.priceType || 'fixed',
+      variations:
+        first?.variations && first.variations.length > 0
+          ? first.variations
+          : [{ id: '1', name: 'Tamanho Grande' }],
+    }
+  }, [products])
+
+  const previewMessage = React.useMemo(() => {
+    return buildProductWhatsAppMessage({
+      template: whatsappTemplate.trim() ? whatsappTemplate : DEFAULT_PRODUCT_WHATSAPP_TEMPLATE,
+      product: previewSampleProduct,
+      companyName: company.name || 'Sua Empresa',
+      selectedVariation: previewSampleProduct.variations?.[0]?.name || 'Tamanho Grande',
+    })
+  }, [whatsappTemplate, previewSampleProduct, company.name])
+
+  const handleInsertVariable = (tag: string) => {
+    if (textareaRef.current) {
+      const textarea = textareaRef.current
+      const start = textarea.selectionStart
+      const end = textarea.selectionEnd
+      const text = whatsappTemplate
+      const before = text.substring(0, start)
+      const after = text.substring(end)
+      const newText = `${before}${tag}${after}`
+      setWhatsappTemplate(newText)
+      setTimeout(() => {
+        textarea.focus()
+        textarea.setSelectionRange(start + tag.length, start + tag.length)
+      }, 0)
+    } else {
+      setWhatsappTemplate((prev) => (prev ? `${prev} ${tag}` : tag))
+    }
+  }
+
+  const handleSaveWhatsAppConfig = async () => {
+    setIsSavingWhatsAppConfig(true)
+    const trimmed = whatsappTemplate.trim()
+
+    const updatedCatalog: ProductCatalogConfig = {
+      ...(company.productCatalog || { mode: 'internal' }),
+      mode: company.productCatalog?.mode || 'internal',
+      whatsappMessageTemplate: trimmed,
+    }
+
+    const updatedCompany: Company = {
+      ...company,
+      productCatalog: updatedCatalog,
+      productWhatsAppTemplate: trimmed,
+    }
+
+    try {
+      saveCompanyLocally(updatedCompany)
+      saveCompany(updatedCompany)
+      if (onCompanyUpdate) onCompanyUpdate(updatedCompany)
+
+      const res = await saveCompanyAsync(updatedCompany)
+      if (res.success) {
+        const saved = res.company || updatedCompany
+        if (onCompanyUpdate) onCompanyUpdate(saved)
+        showToast('success', 'Mensagem do WhatsApp para produtos salva com sucesso!')
+      } else {
+        showToast('error', res.error || 'Erro ao salvar configuração no servidor.')
+      }
+    } catch (err) {
+      console.error('Erro ao salvar template do WhatsApp:', err)
+      showToast('error', 'Falha ao salvar configuração.')
+    } finally {
+      setIsSavingWhatsAppConfig(false)
+    }
+  }
+
   // Modal State
   const [isModalOpen, setIsModalOpen] = useState(false)
+  const [isOrganizeModalOpen, setIsOrganizeModalOpen] = useState(false)
   const [editingProduct, setEditingProduct] = useState<CompanyProduct | null>(null)
   const [isSaving, setIsSaving] = useState(false)
   const [toastMessage, setToastMessage] = useState<{ text: string; type: 'success' | 'error' } | null>(null)
@@ -470,14 +588,260 @@ export const ProductsTab: React.FC<ProductsTabProps> = ({
           </p>
         </div>
 
-        <button
-          type="button"
-          onClick={handleOpenCreate}
-          className="px-4 py-2.5 rounded-2xl bg-violet-600 hover:bg-violet-700 active:scale-95 text-white font-bold text-xs flex items-center justify-center gap-2 shadow-sm transition-all cursor-pointer self-start sm:self-auto"
+        <div className="flex items-center gap-2 flex-wrap self-start sm:self-auto">
+          <button
+            type="button"
+            onClick={() => setIsWhatsAppConfigOpen((prev) => !prev)}
+            className={`px-3.5 py-2.5 rounded-2xl font-bold text-xs flex items-center justify-center gap-2 border shadow-2xs transition-all cursor-pointer active:scale-95 ${
+              isWhatsAppConfigOpen
+                ? 'bg-emerald-50 border-emerald-300 text-emerald-800 ring-2 ring-emerald-500/20'
+                : 'bg-white hover:bg-neutral-50 text-neutral-800 border-neutral-200/90 hover:border-emerald-300'
+            }`}
+            title="Configurar mensagem automática do WhatsApp ao clicar em Tenho interesse"
+          >
+            <MessageCircle className="w-4 h-4 text-[#25D366]" />
+            <span>Mensagem do WhatsApp</span>
+            {whatsappTemplate.trim() ? (
+              <span className="w-2 h-2 rounded-full bg-emerald-500" title="Mensagem personalizada ativa" />
+            ) : null}
+          </button>
+
+          {products.length > 1 && (
+            <button
+              type="button"
+              onClick={() => setIsOrganizeModalOpen(true)}
+              className="px-3.5 py-2.5 rounded-2xl bg-white hover:bg-neutral-50 active:scale-95 text-neutral-800 font-bold text-xs flex items-center justify-center gap-2 border border-neutral-200/90 shadow-2xs hover:border-violet-300 transition-all cursor-pointer"
+            >
+              <ArrowUpDown className="w-4 h-4 text-violet-600" />
+              <span>Organizar ordem</span>
+            </button>
+          )}
+
+          <button
+            type="button"
+            onClick={handleOpenCreate}
+            className="px-4 py-2.5 rounded-2xl bg-violet-600 hover:bg-violet-700 active:scale-95 text-white font-bold text-xs flex items-center justify-center gap-2 shadow-sm transition-all cursor-pointer"
+          >
+            <Plus className="w-4 h-4 stroke-[2.5]" />
+            <span>Novo Produto</span>
+          </button>
+        </div>
+      </div>
+
+      {/* ======================================================== */}
+      {/* CONFIGURAÇÃO: MENSAGEM DO WHATSAPP PARA PRODUTOS         */}
+      {/* ======================================================== */}
+      <div className="bg-white rounded-3xl border border-neutral-200/90 shadow-2xs overflow-hidden transition-all">
+        {/* Header do Card (clicável para expandir/recolher) */}
+        <div
+          onClick={() => setIsWhatsAppConfigOpen((prev) => !prev)}
+          className="p-4 sm:p-5 flex items-center justify-between gap-3 cursor-pointer select-none hover:bg-neutral-50/70 transition-colors"
         >
-          <Plus className="w-4 h-4 stroke-[2.5]" />
-          <span>Novo Produto</span>
-        </button>
+          <div className="flex items-center gap-3 min-w-0">
+            <div className="w-10 h-10 rounded-2xl bg-emerald-50 text-emerald-600 border border-emerald-200/80 flex items-center justify-center shrink-0 shadow-2xs">
+              <MessageCircle className="w-5 h-5 text-[#25D366]" />
+            </div>
+            <div className="min-w-0">
+              <div className="flex items-center gap-2 flex-wrap">
+                <h3 className="text-sm sm:text-base font-bold text-neutral-900 leading-tight">
+                  Mensagem do WhatsApp para produtos
+                </h3>
+                {whatsappTemplate.trim() ? (
+                  <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 border border-emerald-200">
+                    Personalizada
+                  </span>
+                ) : (
+                  <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-neutral-100 text-neutral-600 border border-neutral-200">
+                    Padrão do Sistema
+                  </span>
+                )}
+              </div>
+              <p className="text-xs text-neutral-500 mt-0.5 line-clamp-1">
+                Texto enviado automaticamente quando o cliente clica em &quot;Tenho interesse&quot; em um produto na vitrine pública.
+              </p>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2 shrink-0">
+            <button
+              type="button"
+              className="px-3 py-1.5 rounded-xl text-xs font-semibold text-neutral-700 hover:text-neutral-900 bg-neutral-100 hover:bg-neutral-200 flex items-center gap-1.5 transition-colors cursor-pointer"
+            >
+              <span>{isWhatsAppConfigOpen ? 'Recolher' : 'Configurar'}</span>
+              {isWhatsAppConfigOpen ? (
+                <ChevronUp className="w-3.5 h-3.5" />
+              ) : (
+                <ChevronDown className="w-3.5 h-3.5" />
+              )}
+            </button>
+          </div>
+        </div>
+
+        {/* Conteúdo Expandido da Configuração */}
+        {isWhatsAppConfigOpen && (
+          <div className="p-4 sm:p-6 border-t border-neutral-100 bg-neutral-50/40 space-y-5 animate-in fade-in duration-200">
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-5">
+              {/* Lado Esquerdo: Editor da Mensagem e Variáveis (7 cols) */}
+              <div className="lg:col-span-7 space-y-4">
+                <div>
+                  <div className="flex items-center justify-between mb-1.5 flex-wrap gap-2">
+                    <label className="text-xs font-bold text-neutral-800 flex items-center gap-1.5">
+                      <span>Modelo da Mensagem</span>
+                      <span className="text-[11px] font-normal text-neutral-500">
+                        (clique nas tags abaixo para inserir)
+                      </span>
+                    </label>
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setWhatsappTemplate(
+                          'Olá! Tenho interesse no {produto}, no valor de {preco}. Gostaria de mais informações.'
+                        )
+                      }
+                      className="text-[11px] font-semibold text-violet-600 hover:text-violet-800 flex items-center gap-1 cursor-pointer"
+                    >
+                      <Sparkles className="w-3 h-3" />
+                      <span>Inserir exemplo</span>
+                    </button>
+                  </div>
+
+                  {/* Variáveis Disponíveis como Chips Clicáveis */}
+                  <div className="flex items-center gap-1.5 flex-wrap mb-2.5">
+                    <span className="text-[10px] font-bold text-neutral-400 mr-0.5">
+                      Variáveis:
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => handleInsertVariable('{produto}')}
+                      className="px-2.5 py-1 rounded-lg bg-violet-100/90 hover:bg-violet-200 text-violet-800 text-xs font-mono font-bold transition-all border border-violet-200/90 cursor-pointer active:scale-95 flex items-center gap-1"
+                      title="Substitui pelo nome do produto"
+                    >
+                      <span>{'{produto}'}</span>
+                      <span className="text-[10px] opacity-70 font-sans font-normal">= nome</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleInsertVariable('{preco}')}
+                      className="px-2.5 py-1 rounded-lg bg-emerald-100/90 hover:bg-emerald-200 text-emerald-800 text-xs font-mono font-bold transition-all border border-emerald-200/90 cursor-pointer active:scale-95 flex items-center gap-1"
+                      title="Substitui pelo preço do produto ou variação"
+                    >
+                      <span>{'{preco}'}</span>
+                      <span className="text-[10px] opacity-70 font-sans font-normal">= preço</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleInsertVariable('{variacao}')}
+                      className="px-2.5 py-1 rounded-lg bg-blue-100/90 hover:bg-blue-200 text-blue-800 text-xs font-mono font-bold transition-all border border-blue-200/90 cursor-pointer active:scale-95 flex items-center gap-1"
+                      title="Substitui pelo tamanho ou variação selecionada"
+                    >
+                      <span>{'{variacao}'}</span>
+                      <span className="text-[10px] opacity-70 font-sans font-normal">= variação</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleInsertVariable('{empresa}')}
+                      className="px-2.5 py-1 rounded-lg bg-amber-100/90 hover:bg-amber-200 text-amber-800 text-xs font-mono font-bold transition-all border border-amber-200/90 cursor-pointer active:scale-95 flex items-center gap-1"
+                      title="Substitui pelo nome da empresa"
+                    >
+                      <span>{'{empresa}'}</span>
+                      <span className="text-[10px] opacity-70 font-sans font-normal">= empresa</span>
+                    </button>
+                  </div>
+
+                  {/* Textarea */}
+                  <textarea
+                    ref={textareaRef}
+                    value={whatsappTemplate}
+                    onChange={(e) => setWhatsappTemplate(e.target.value)}
+                    rows={4}
+                    placeholder="Olá! Tenho interesse no {produto}, no valor de {preco}. Gostaria de mais informações."
+                    className="w-full p-3.5 rounded-2xl bg-white border border-neutral-300 text-xs text-neutral-900 placeholder-neutral-400 focus:outline-none focus:ring-2 focus:ring-emerald-500 shadow-2xs font-sans leading-relaxed resize-y"
+                  />
+
+                  <div className="flex items-center justify-between text-[11px] text-neutral-500 mt-1">
+                    <span>
+                      {whatsappTemplate.trim()
+                        ? `${whatsappTemplate.length} caracteres digitados`
+                        : 'Vazio: o sistema usará a mensagem padrão'}
+                    </span>
+                    {whatsappTemplate.trim() && (
+                      <button
+                        type="button"
+                        onClick={() => setWhatsappTemplate('')}
+                        className="text-neutral-400 hover:text-red-600 transition-colors cursor-pointer"
+                      >
+                        Limpar (voltar ao padrão)
+                      </button>
+                    )}
+                  </div>
+                </div>
+
+                {/* Botão de Salvar */}
+                <div className="flex items-center gap-2 pt-1">
+                  <button
+                    type="button"
+                    onClick={handleSaveWhatsAppConfig}
+                    disabled={isSavingWhatsAppConfig}
+                    className="px-5 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white font-bold text-xs flex items-center justify-center gap-2 shadow-sm transition-all cursor-pointer disabled:opacity-50"
+                  >
+                    {isSavingWhatsAppConfig ? (
+                      <>
+                        <span className="w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                        <span>Salvando configuração...</span>
+                      </>
+                    ) : (
+                      <>
+                        <Check className="w-4 h-4 stroke-[2.5]" />
+                        <span>Salvar Mensagem do WhatsApp</span>
+                      </>
+                    )}
+                  </button>
+                </div>
+              </div>
+
+              {/* Lado Direito: Prévia Visual Realista do WhatsApp (5 cols) */}
+              <div className="lg:col-span-5 flex flex-col justify-between bg-white p-4 sm:p-4.5 rounded-2xl border border-neutral-200/90 shadow-2xs space-y-3">
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-bold text-neutral-800 flex items-center gap-1.5">
+                      <MessageCircle className="w-4 h-4 text-[#25D366]" />
+                      <span>Prévia da Mensagem</span>
+                    </span>
+                    <span className="text-[10px] font-semibold text-neutral-400 bg-neutral-100 px-2 py-0.5 rounded-md">
+                      Exemplo em tempo real
+                    </span>
+                  </div>
+
+                  {/* Balão de Conversa WhatsApp */}
+                  <div className="bg-[#EFEAE2] p-3.5 rounded-2xl border border-neutral-200/80 space-y-2 min-h-[140px] flex flex-col justify-end">
+                    {/* Cabeçalho do Chat Simulado */}
+                    <div className="flex items-center gap-2 pb-2 border-b border-black/5 text-[11px] text-neutral-600">
+                      <div className="w-5 h-5 rounded-full bg-[#25D366] text-white flex items-center justify-center text-[10px] font-black">
+                        WA
+                      </div>
+                      <span className="font-bold truncate text-neutral-800">
+                        {company.name || 'Sua Empresa'}
+                      </span>
+                    </div>
+
+                    {/* Balão Verde Estilo WhatsApp */}
+                    <div className="bg-[#DCF8C6] text-[#111B21] rounded-2xl rounded-tr-xs p-3 shadow-xs text-xs leading-relaxed border border-emerald-300/40 self-end max-w-[95%]">
+                      <p className="whitespace-pre-wrap break-words">{previewMessage}</p>
+                      <div className="flex items-center justify-end gap-1 text-[9px] text-neutral-500 mt-1 font-mono">
+                        <span>12:45</span>
+                        <span className="text-emerald-700 font-bold">✓✓</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <p className="text-[10px] text-neutral-400 leading-tight">
+                  Ao clicar em &quot;Tenho interesse&quot; na vitrine da Página Pública, o WhatsApp da sua empresa abrirá com essa mensagem pronta.
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Filters Bar */}
@@ -1180,6 +1544,32 @@ export const ProductsTab: React.FC<ProductsTabProps> = ({
           </div>
         </div>
       )}
+
+      {/* Organize Products Order Modal */}
+      <OrganizeItemsModal
+        isOpen={isOrganizeModalOpen}
+        onClose={() => setIsOrganizeModalOpen(false)}
+        title="Organizar Ordem dos Produtos"
+        subtitle="Defina a sequência em que seus produtos aparecem na vitrine da Página Pública."
+        itemTypeLabel="produtos"
+        items={products.map((p) => ({
+          id: p.id,
+          name: p.name,
+          photoUrl: p.photoUrl,
+          category: p.category,
+          subtitle: p.price != null ? `R$ ${p.price.toFixed(2).replace('.', ',')}` : 'Sob consulta',
+        }))}
+        defaultIcon={<Package className="w-5 h-5 text-violet-600" />}
+        accentColorClass="bg-violet-600 hover:bg-violet-700"
+        onSave={async (orderedIds, silent) => {
+          await saveCompanyProductsOrderOnServer(company.id, orderedIds)
+          const updated = getCompanyProducts(company.id)
+          setProducts(updated)
+          if (!silent) {
+            showToast('success', 'Ordem dos produtos salva com sucesso!')
+          }
+        }}
+      />
     </div>
   )
 }

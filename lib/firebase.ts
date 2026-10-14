@@ -47,7 +47,16 @@ export const db: Firestore =
     ? getFirestore(app, firebaseConfig.firestoreDatabaseId)
     : getFirestore(app)
 
-export const auth: Auth = getAuth(app)
+let authInstance: Auth | null = null
+try {
+  if (firebaseConfig.apiKey) {
+    authInstance = getAuth(app)
+  }
+} catch {
+  // Gracefully handle unconfigured apiKey
+}
+
+export const auth: Auth = authInstance as Auth
 
 export { firebaseConfig }
 export default app

@@ -382,8 +382,22 @@ export const PublicCompanyView: React.FC<PublicCompanyViewProps> = ({
 
   // Active menu items
   const activeMenuItemsList = useMemo(() => {
-    return menuItems.filter((i) => i.isActive !== false)
-  }, [menuItems])
+    return menuItems
+      .filter((i) => i.isActive !== false)
+      .sort((a, b) => {
+        if (Array.isArray(company.menuItemsOrder) && company.menuItemsOrder.length > 0) {
+          const idxA = company.menuItemsOrder.indexOf(a.id)
+          const idxB = company.menuItemsOrder.indexOf(b.id)
+          if (idxA !== -1 && idxB !== -1) return idxA - idxB
+          if (idxA !== -1) return -1
+          if (idxB !== -1) return 1
+        }
+        const orderA = typeof a.order === 'number' ? a.order : 0
+        const orderB = typeof b.order === 'number' ? b.order : 0
+        if (orderA !== orderB) return orderA - orderB
+        return (b.createdAt || '').localeCompare(a.createdAt || '')
+      })
+  }, [menuItems, company.menuItemsOrder])
 
   const menuCategories = useMemo(() => {
     const cats = Array.from(
@@ -505,15 +519,41 @@ export const PublicCompanyView: React.FC<PublicCompanyViewProps> = ({
 
   // Active services list
   const activeServicesList = useMemo(() => {
-    return services.filter((s) => s.isActive !== false)
-  }, [services])
+    return services
+      .filter((s) => s.isActive !== false)
+      .sort((a, b) => {
+        if (Array.isArray(company.servicesOrder) && company.servicesOrder.length > 0) {
+          const idxA = company.servicesOrder.indexOf(a.id)
+          const idxB = company.servicesOrder.indexOf(b.id)
+          if (idxA !== -1 && idxB !== -1) return idxA - idxB
+          if (idxA !== -1) return -1
+          if (idxB !== -1) return 1
+        }
+        const orderA = typeof a.order === 'number' ? a.order : 0
+        const orderB = typeof b.order === 'number' ? b.order : 0
+        if (orderA !== orderB) return orderA - orderB
+        return (a.name || '').localeCompare(b.name || '')
+      })
+  }, [services, company.servicesOrder])
 
   // Active products list
   const activeProductsList = useMemo(() => {
     return products
       .filter((p) => p.isActive !== false)
-      .sort((a, b) => (a.order || 0) - (b.order || 0))
-  }, [products])
+      .sort((a, b) => {
+        if (Array.isArray(company.productsOrder) && company.productsOrder.length > 0) {
+          const idxA = company.productsOrder.indexOf(a.id)
+          const idxB = company.productsOrder.indexOf(b.id)
+          if (idxA !== -1 && idxB !== -1) return idxA - idxB
+          if (idxA !== -1) return -1
+          if (idxB !== -1) return 1
+        }
+        const orderA = typeof a.order === 'number' ? a.order : 0
+        const orderB = typeof b.order === 'number' ? b.order : 0
+        if (orderA !== orderB) return orderA - orderB
+        return (b.createdAt || '').localeCompare(a.createdAt || '')
+      })
+  }, [products, company.productsOrder])
 
   // Category filters for the on-page vitrine
   const vitrineCategories = useMemo(() => {
@@ -798,7 +838,6 @@ export const PublicCompanyView: React.FC<PublicCompanyViewProps> = ({
       'loyalty',
       'googleReview',
       'location',
-      'contact',
       'wifi',
       'feedback',
       'instagram',
@@ -955,7 +994,7 @@ export const PublicCompanyView: React.FC<PublicCompanyViewProps> = ({
                     key={card.id}
                     type="button"
                     onClick={card.onClick}
-                    className={`w-full text-center p-2 sm:p-2.5 rounded-2xl border transition-all duration-200 active:scale-95 hover:scale-[1.02] cursor-pointer group flex flex-col items-center justify-between shadow-2xs hover:shadow-md select-none relative overflow-hidden h-[96px] sm:h-[104px] ${
+                    className={`w-full text-center p-1.5 sm:p-2 rounded-2xl border transition-all duration-200 active:scale-95 hover:scale-[1.02] cursor-pointer group flex flex-col items-center justify-center gap-1 sm:gap-1.5 shadow-2xs hover:shadow-md select-none relative overflow-hidden h-[68px] sm:h-[72px] ${
                       isDark
                         ? 'bg-[#141419]/95 hover:bg-[#1a1a22] border-white/[0.08] hover:border-white/20'
                         : 'bg-white/95 hover:bg-neutral-50/90 border-neutral-200/90 hover:border-neutral-300'
@@ -964,13 +1003,13 @@ export const PublicCompanyView: React.FC<PublicCompanyViewProps> = ({
                   >
                     {/* Badge flutuante (ex: Prêmio!) */}
                     {card.badgeText && (
-                      <span className="absolute top-1 right-1 px-1 py-0.2 rounded-full text-[8px] font-black bg-amber-500 text-white shadow-2xs">
+                      <span className="absolute top-1 right-1 px-1 py-0.2 rounded-full text-[7.5px] font-black bg-amber-500 text-white shadow-2xs leading-none">
                         {card.badgeText}
                       </span>
                     )}
 
                     <div
-                      className={`w-8 h-8 sm:w-9 sm:h-9 rounded-xl flex items-center justify-center shrink-0 shadow-2xs transition-transform group-hover:scale-105 ${
+                      className={`w-7 h-7 sm:w-8 sm:h-8 rounded-xl flex items-center justify-center shrink-0 shadow-2xs transition-transform group-hover:scale-105 ${
                         card.iconContainerClass
                       }`}
                       style={card.iconContainerStyle}
@@ -978,22 +1017,13 @@ export const PublicCompanyView: React.FC<PublicCompanyViewProps> = ({
                       {card.icon}
                     </div>
 
-                    <div className="min-w-0 w-full mt-1">
-                      <h3
-                        className={`text-[10px] sm:text-xs font-black tracking-tight truncate leading-tight ${
-                          isDark ? 'text-white' : 'text-neutral-900'
-                        }`}
-                      >
-                        {card.title}
-                      </h3>
-                      <p
-                        className={`text-[8.5px] sm:text-[9.5px] truncate mt-0.5 font-medium leading-tight ${
-                          isDark ? 'text-neutral-400' : 'text-neutral-500'
-                        }`}
-                      >
-                        {card.description}
-                      </p>
-                    </div>
+                    <span
+                      className={`text-[10px] sm:text-xs font-bold tracking-tight truncate w-full text-center leading-tight block px-0.5 ${
+                        isDark ? 'text-white' : 'text-neutral-900'
+                      }`}
+                    >
+                      {card.title}
+                    </span>
                   </button>
                 ))}
               </div>
@@ -1062,26 +1092,6 @@ export const PublicCompanyView: React.FC<PublicCompanyViewProps> = ({
                 <span>Atendimento Ativo</span>
               </div>
             </div>
-
-            {/* Endereço Compacto */}
-            {company.addressText && (
-              <button
-                type="button"
-                onClick={handleOpenLocation}
-                className={`inline-flex items-center justify-center gap-1 text-[11px] transition-colors mt-2 max-w-xs cursor-pointer group px-2 py-0.5 rounded-lg ${
-                  isDark
-                    ? 'text-neutral-400 hover:text-neutral-200 hover:bg-white/[0.05]'
-                    : 'text-neutral-500 hover:text-neutral-900 hover:bg-neutral-100'
-                }`}
-                title="Abrir no Google Maps"
-              >
-                <MapPin
-                  className="w-3.5 h-3.5 shrink-0 group-hover:scale-110 transition-transform"
-                  style={{ color: primaryColor }}
-                />
-                <span className="truncate">{company.addressText}</span>
-              </button>
-            )}
           </div>
         </div>
 
@@ -2293,57 +2303,6 @@ export const PublicCompanyView: React.FC<PublicCompanyViewProps> = ({
           ) : null,
               location: activeModules.location ? (
             <div key="location" className="pt-1">
-              <div
-                onClick={handleOpenLocation}
-                className={`w-full rounded-2xl p-3 flex items-center justify-between gap-3 active:scale-[0.99] transition-all cursor-pointer group ${
-                  isDark
-                    ? 'bg-[#141419] hover:bg-[#1a1a22] border border-white/[0.07] hover:border-white/15'
-                    : 'bg-white border border-neutral-200/80 hover:border-neutral-300 shadow-2xs hover:shadow-xs'
-                }`}
-                style={{ WebkitTapHighlightColor: 'transparent' }}
-              >
-                <div className="flex items-center gap-2.5 min-w-0">
-                  <div
-                    className={`w-8 h-8 rounded-xl flex items-center justify-center shrink-0 border ${
-                      isDark
-                        ? 'bg-rose-950/40 text-rose-400 border-rose-500/20'
-                        : 'bg-rose-50 text-rose-600 border-rose-100'
-                    }`}
-                  >
-                    <MapPin className="w-4 h-4" />
-                  </div>
-                  <div className="min-w-0">
-                    <p
-                      className={`text-xs font-bold truncate ${
-                        isDark ? 'text-white' : 'text-neutral-900'
-                      }`}
-                    >
-                      Localização e Endereço
-                    </p>
-                    <p
-                      className={`text-[11px] truncate mt-0.5 ${
-                        isDark ? 'text-neutral-400' : 'text-neutral-500'
-                      }`}
-                    >
-                      {company.addressText || 'Como chegar ao nosso estabelecimento'}
-                    </p>
-                  </div>
-                </div>
-                <div
-                  className={`shrink-0 px-2.5 py-1 rounded-lg text-[11px] font-bold transition-colors flex items-center gap-1 ${
-                    isDark
-                      ? 'bg-rose-950/40 text-rose-300 border border-rose-500/30 group-hover:bg-rose-900/50'
-                      : 'bg-rose-50 text-rose-700 group-hover:bg-rose-100'
-                  }`}
-                >
-                  <Navigation className="w-3 h-3" />
-                  <span>Como Chegar</span>
-                </div>
-              </div>
-            </div>
-          ) : null,
-              contact: activeModules.location ? (
-            <div key="contact" className="pt-1">
               <div
                 onClick={handleOpenLocation}
                 className={`w-full rounded-2xl p-3 flex items-center justify-between gap-3 active:scale-[0.99] transition-all cursor-pointer group ${

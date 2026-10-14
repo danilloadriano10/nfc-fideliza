@@ -190,9 +190,12 @@ export function getActivePublicSections(company: Company): PublicSectionDef[] {
     isSectionActiveForCompany(sec.id, company)
   )
 
-  const savedOrder = Array.isArray(company.publicSectionsOrder)
-    ? company.publicSectionsOrder
-    : null
+  const savedOrder =
+    Array.isArray(company.publicSectionsOrder) && company.publicSectionsOrder.length > 0
+      ? company.publicSectionsOrder
+      : Array.isArray(company.cardOrder) && company.cardOrder.length > 0
+      ? company.cardOrder
+      : null
 
   if (!savedOrder || savedOrder.length === 0) {
     // Default initial order

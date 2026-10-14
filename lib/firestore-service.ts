@@ -383,34 +383,83 @@ export async function saveFirestoreCompany(
     if (company.onboardingCompleted === undefined && existing.onboardingCompleted !== undefined) {
       finalCompany.onboardingCompleted = existing.onboardingCompleted
     }
-    if (company.cardOrder && Array.isArray(company.cardOrder)) {
-      finalCompany.cardOrder = company.cardOrder
-    } else if (existing.cardOrder && Array.isArray(existing.cardOrder)) {
-      finalCompany.cardOrder = existing.cardOrder
-    }
-    if (company.publicSectionsOrder && Array.isArray(company.publicSectionsOrder)) {
-      finalCompany.publicSectionsOrder = company.publicSectionsOrder
-    } else if (existing.publicSectionsOrder && Array.isArray(existing.publicSectionsOrder)) {
-      finalCompany.publicSectionsOrder = existing.publicSectionsOrder
+    const incomingSectionsOrder =
+      company.publicSectionsOrder && Array.isArray(company.publicSectionsOrder) && company.publicSectionsOrder.length > 0
+        ? company.publicSectionsOrder
+        : company.cardOrder && Array.isArray(company.cardOrder) && company.cardOrder.length > 0
+        ? company.cardOrder
+        : null
+
+    if (incomingSectionsOrder) {
+      finalCompany.publicSectionsOrder = incomingSectionsOrder
+      finalCompany.cardOrder = incomingSectionsOrder
+    } else {
+      if (existing.publicSectionsOrder && Array.isArray(existing.publicSectionsOrder)) {
+        finalCompany.publicSectionsOrder = existing.publicSectionsOrder
+      }
+      if (existing.cardOrder && Array.isArray(existing.cardOrder)) {
+        finalCompany.cardOrder = existing.cardOrder
+      }
     }
     if (company.featuredCards && Array.isArray(company.featuredCards)) {
       finalCompany.featuredCards = company.featuredCards
     } else if (existing.featuredCards && Array.isArray(existing.featuredCards)) {
       finalCompany.featuredCards = existing.featuredCards
     }
+    if (company.productsOrder && Array.isArray(company.productsOrder)) {
+      finalCompany.productsOrder = company.productsOrder
+    } else if (existing.productsOrder && Array.isArray(existing.productsOrder)) {
+      finalCompany.productsOrder = existing.productsOrder
+    }
+    if (company.servicesOrder && Array.isArray(company.servicesOrder)) {
+      finalCompany.servicesOrder = company.servicesOrder
+    } else if (existing.servicesOrder && Array.isArray(existing.servicesOrder)) {
+      finalCompany.servicesOrder = existing.servicesOrder
+    }
+    if (company.menuItemsOrder && Array.isArray(company.menuItemsOrder)) {
+      finalCompany.menuItemsOrder = company.menuItemsOrder
+    } else if (existing.menuItemsOrder && Array.isArray(existing.menuItemsOrder)) {
+      finalCompany.menuItemsOrder = existing.menuItemsOrder
+    }
+    if (company.productWhatsAppTemplate !== undefined) {
+      finalCompany.productWhatsAppTemplate = company.productWhatsAppTemplate
+    } else if (existing.productWhatsAppTemplate !== undefined) {
+      finalCompany.productWhatsAppTemplate = existing.productWhatsAppTemplate
+    }
+    if (company.productCatalog !== undefined) {
+      finalCompany.productCatalog = company.productCatalog
+    } else if (existing.productCatalog !== undefined) {
+      finalCompany.productCatalog = existing.productCatalog
+    }
   } else {
     // New company registration
     finalCompany.createdAt = company.createdAt || new Date().toISOString()
     finalCompany.origin = company.origin || 'admin'
     finalCompany.onboardingCompleted = company.onboardingCompleted ?? false
-    if (company.cardOrder && Array.isArray(company.cardOrder)) {
-      finalCompany.cardOrder = company.cardOrder
+    if (company.productWhatsAppTemplate !== undefined) {
+      finalCompany.productWhatsAppTemplate = company.productWhatsAppTemplate
+    }
+    if (company.productCatalog !== undefined) {
+      finalCompany.productCatalog = company.productCatalog
     }
     if (company.publicSectionsOrder && Array.isArray(company.publicSectionsOrder)) {
       finalCompany.publicSectionsOrder = company.publicSectionsOrder
+      finalCompany.cardOrder = company.cardOrder || company.publicSectionsOrder
+    } else if (company.cardOrder && Array.isArray(company.cardOrder)) {
+      finalCompany.cardOrder = company.cardOrder
+      finalCompany.publicSectionsOrder = company.cardOrder
     }
     if (company.featuredCards && Array.isArray(company.featuredCards)) {
       finalCompany.featuredCards = company.featuredCards
+    }
+    if (company.productsOrder && Array.isArray(company.productsOrder)) {
+      finalCompany.productsOrder = company.productsOrder
+    }
+    if (company.servicesOrder && Array.isArray(company.servicesOrder)) {
+      finalCompany.servicesOrder = company.servicesOrder
+    }
+    if (company.menuItemsOrder && Array.isArray(company.menuItemsOrder)) {
+      finalCompany.menuItemsOrder = company.menuItemsOrder
     }
     if (finalCompany.ownerAuth?.password) {
       const pass = finalCompany.ownerAuth.password.trim()
@@ -1275,7 +1324,26 @@ export async function getFirestoreServices(companyId?: string): Promise<CompanyS
     snap.forEach((d) => {
       list.push(d.data() as CompanyService)
     })
-    return list.sort((a, b) => (a.name || '').localeCompare(b.name || ''))
+    let servicesOrder: string[] | undefined
+    if (companyId) {
+      const comp = await getFirestoreCompanyById(companyId)
+      if (comp?.servicesOrder && Array.isArray(comp.servicesOrder)) {
+        servicesOrder = comp.servicesOrder
+      }
+    }
+    return list.sort((a, b) => {
+      if (Array.isArray(servicesOrder) && servicesOrder.length > 0) {
+        const idxA = servicesOrder.indexOf(a.id)
+        const idxB = servicesOrder.indexOf(b.id)
+        if (idxA !== -1 && idxB !== -1) return idxA - idxB
+        if (idxA !== -1) return -1
+        if (idxB !== -1) return 1
+      }
+      const orderA = typeof a.order === 'number' ? a.order : 0
+      const orderB = typeof b.order === 'number' ? b.order : 0
+      if (orderA !== orderB) return orderA - orderB
+      return (a.name || '').localeCompare(b.name || '')
+    })
   } catch (err) {
     console.warn('Could not read services from Firestore (returning empty list):', err)
     return []
@@ -1340,6 +1408,10 @@ export async function saveFirestoreService(
     isActive: service.isActive !== false,
     updatedAt: now,
     createdAt: service.createdAt || now,
+  }
+
+  if (typeof service.order === 'number' && !isNaN(service.order)) {
+    serviceToSave.order = service.order
   }
 
   serviceToSave.photoUrl = finalPhoto || ''
@@ -1617,7 +1689,21 @@ export async function getFirestoreProducts(companyId?: string): Promise<CompanyP
     snap.forEach((d) => {
       list.push(d.data() as CompanyProduct)
     })
+    let productsOrder: string[] | undefined
+    if (companyId) {
+      const comp = await getFirestoreCompanyById(companyId)
+      if (comp?.productsOrder && Array.isArray(comp.productsOrder)) {
+        productsOrder = comp.productsOrder
+      }
+    }
     return list.sort((a, b) => {
+      if (Array.isArray(productsOrder) && productsOrder.length > 0) {
+        const idxA = productsOrder.indexOf(a.id)
+        const idxB = productsOrder.indexOf(b.id)
+        if (idxA !== -1 && idxB !== -1) return idxA - idxB
+        if (idxA !== -1) return -1
+        if (idxB !== -1) return 1
+      }
       const orderA = typeof a.order === 'number' ? a.order : 0
       const orderB = typeof b.order === 'number' ? b.order : 0
       if (orderA !== orderB) return orderA - orderB
@@ -1934,3 +2020,101 @@ export async function toggleFirestoreMenuItemStatus(
     handleFirestoreError(err, OperationType.WRITE, `${MENU_ITEMS_COLLECTION}/${itemId}`)
   }
 }
+
+// ==========================================
+// 10. REORDERING FUNCTIONS (PRODUCTS, SERVICES, MENU ITEMS)
+// ==========================================
+
+export async function saveFirestoreProductsOrder(
+  companyId: string,
+  orderedIds: string[]
+): Promise<boolean> {
+  if (!companyId || !Array.isArray(orderedIds)) return false
+  try {
+    await ensureFirestoreInitialized()
+    const compRef = doc(db, COMPANIES_COLLECTION, companyId)
+    await updateDoc(compRef, {
+      productsOrder: orderedIds,
+      updatedAt: new Date().toISOString(),
+    }).catch(async () => {
+      await setDoc(compRef, { productsOrder: orderedIds, updatedAt: new Date().toISOString() }, { merge: true })
+    })
+
+    await Promise.all(
+      orderedIds.map((id, index) => {
+        const prodRef = doc(db, PRODUCTS_COLLECTION, id)
+        return updateDoc(prodRef, {
+          order: index,
+          updatedAt: new Date().toISOString(),
+        }).catch(() => null)
+      })
+    )
+    return true
+  } catch (err) {
+    console.error('Error saving products order to Firestore:', err)
+    return false
+  }
+}
+
+export async function saveFirestoreServicesOrder(
+  companyId: string,
+  orderedIds: string[]
+): Promise<boolean> {
+  if (!companyId || !Array.isArray(orderedIds)) return false
+  try {
+    await ensureFirestoreInitialized()
+    const compRef = doc(db, COMPANIES_COLLECTION, companyId)
+    await updateDoc(compRef, {
+      servicesOrder: orderedIds,
+      updatedAt: new Date().toISOString(),
+    }).catch(async () => {
+      await setDoc(compRef, { servicesOrder: orderedIds, updatedAt: new Date().toISOString() }, { merge: true })
+    })
+
+    await Promise.all(
+      orderedIds.map((id, index) => {
+        const srvRef = doc(db, SERVICES_COLLECTION, id)
+        return updateDoc(srvRef, {
+          order: index,
+          updatedAt: new Date().toISOString(),
+        }).catch(() => null)
+      })
+    )
+    return true
+  } catch (err) {
+    console.error('Error saving services order to Firestore:', err)
+    return false
+  }
+}
+
+export async function saveFirestoreMenuItemsOrder(
+  companyId: string,
+  orderedIds: string[]
+): Promise<boolean> {
+  if (!companyId || !Array.isArray(orderedIds)) return false
+  try {
+    await ensureFirestoreInitialized()
+    const compRef = doc(db, COMPANIES_COLLECTION, companyId)
+    await updateDoc(compRef, {
+      menuItemsOrder: orderedIds,
+      updatedAt: new Date().toISOString(),
+    }).catch(async () => {
+      await setDoc(compRef, { menuItemsOrder: orderedIds, updatedAt: new Date().toISOString() }, { merge: true })
+    })
+
+    await Promise.all(
+      orderedIds.map((id, index) => {
+        const itemRef = doc(db, MENU_ITEMS_COLLECTION, id)
+        return updateDoc(itemRef, {
+          order: index,
+          updatedAt: new Date().toISOString(),
+        }).catch(() => null)
+      })
+    )
+    return true
+  } catch (err) {
+    console.error('Error saving menu items order to Firestore:', err)
+    return false
+  }
+}
+

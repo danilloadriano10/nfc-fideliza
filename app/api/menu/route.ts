@@ -8,6 +8,7 @@ import {
   getServerCompanyById,
   getServerCompanyBySlug,
   saveServerCompany,
+  saveServerMenuItemsOrder,
 } from '@/lib/server-storage'
 import { MenuItem } from '@/types/platform'
 import { uploadCompanyFileServer, isBase64Image } from '@/lib/storage-service'
@@ -333,7 +334,13 @@ export async function PUT(req: NextRequest) {
 export async function PATCH(req: NextRequest) {
   try {
     const body = await req.json()
-    const { id, companyId } = body || {}
+    const { id, companyId, reorder } = body || {}
+
+    // Batch reorder path
+    if (reorder && Array.isArray(reorder) && companyId) {
+      const ok = await saveServerMenuItemsOrder(companyId, reorder)
+      return NextResponse.json({ success: ok }, { status: ok ? 200 : 500 })
+    }
 
     if (!id || !companyId) {
       return NextResponse.json(
