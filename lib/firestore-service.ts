@@ -1512,31 +1512,34 @@ export async function createFirestoreAppointment(
     await ensureFirestoreInitialized()
     const colRef = collection(db, APPOINTMENTS_COLLECTION)
 
-    // BACKEND CONFLICT CHECK (Never allow double-booking on same professional/date/time or company/date/time)
-    const existingSnap = await getDocs(
-      query(colRef, where('companyId', '==', data.companyId), where('date', '==', data.date))
-    )
+    // BACKEND CONFLICT CHECK (Never allow double-booking on public booking)
+    // Para agendamentos cadastrados manualmente pela empresa (origin === 'manual'), NÃO bloquear horários repetidos.
+    if (data.origin !== 'manual') {
+      const existingSnap = await getDocs(
+        query(colRef, where('companyId', '==', data.companyId), where('date', '==', data.date))
+      )
 
-    const existingAppointments: Appointment[] = []
-    existingSnap.forEach((d) => existingAppointments.push(d.data() as Appointment))
+      const existingAppointments: Appointment[] = []
+      existingSnap.forEach((d) => existingAppointments.push(d.data() as Appointment))
 
-    const activeConflicting = existingAppointments.filter((app) => {
-      if (app.status === 'cancelled') return false
-      if (app.time !== data.time) return false
+      const activeConflicting = existingAppointments.filter((app) => {
+        if (app.status === 'cancelled') return false
+        if (app.time !== data.time) return false
 
-      if (data.professionalId) {
-        return app.professionalId === data.professionalId
-      } else {
-        return !app.professionalId
-      }
-    })
+        if (data.professionalId) {
+          return app.professionalId === data.professionalId
+        } else {
+          return !app.professionalId
+        }
+      })
 
-    if (activeConflicting.length > 0) {
-      return {
-        success: false,
-        error: data.professionalId
-          ? 'Este profissional já possui um agendamento neste horário. Por favor, escolha outro horário.'
-          : 'Este horário já está reservado. Por favor, escolha outro horário disponível.',
+      if (activeConflicting.length > 0) {
+        return {
+          success: false,
+          error: data.professionalId
+            ? 'Este profissional já possui um agendamento neste horário. Por favor, escolha outro horário.'
+            : 'Este horário já está reservado. Por favor, escolha outro horário disponível.',
+        }
       }
     }
 
@@ -1553,6 +1556,7 @@ export async function createFirestoreAppointment(
       customerName: data.customerName.trim(),
       customerPhone: normalizePhone(data.customerPhone),
       status: data.status || 'pending',
+      origin: data.origin || 'public',
       createdAt: data.createdAt || now,
       updatedAt: now,
     }

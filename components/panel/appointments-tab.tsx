@@ -26,6 +26,11 @@ import {
   Layers,
   ChevronRight,
   UserPlus,
+  Settings,
+  CalendarPlus,
+  RotateCcw,
+  Info,
+  Send,
 } from 'lucide-react'
 import {
   Company,
@@ -33,6 +38,7 @@ import {
   AppointmentStatus,
   CompanyProfessional,
   BookingSettings,
+  BookingMode,
   DaySchedule,
   CompanyService,
 } from '@/types/platform'
@@ -40,6 +46,7 @@ import {
   getCompanyAppointments,
   fetchCompanyAppointmentsFromServer,
   updateAppointmentStatusOnServerApi,
+  createAppointmentOnServerApi,
   getCompanyProfessionals,
   fetchCompanyProfessionalsFromServer,
   saveCompanyProfessionalOnServerApi,
@@ -54,6 +61,12 @@ interface AppointmentsTabProps {
   company: Company
   onUpdateCompany: (updated: Company) => void
 }
+
+const DEFAULT_WHATSAPP_BOOKING_TEMPLATE =
+  'Olá! Gostaria de agendar um horário na {empresa}. Poderia me informar os horários disponíveis?'
+
+const DEFAULT_CONFIRMATION_TEMPLATE =
+  'Olá {cliente}! Confirmamos o seu agendamento de {servico} na {empresa} para {data} às {horario}. Aguardamos você!'
 
 const WEEKDAYS = [
   { index: 0, label: 'Domingo', short: 'Dom' },
@@ -75,11 +88,13 @@ const DEFAULT_DAYS: DaySchedule[] = [
   { dayOfWeek: 6, isOpen: true, openTime: '08:00', closeTime: '17:00' },
 ]
 
+type SubTabType = 'list' | 'settings' | 'hours' | 'professionals'
+
 export const AppointmentsTab: React.FC<AppointmentsTabProps> = ({
   company,
   onUpdateCompany,
 }) => {
-  const [activeSubTab, setActiveSubTab] = useState<'list' | 'hours' | 'professionals'>('list')
+  const [activeSubTab, setActiveSubTab] = useState<SubTabType>('list')
   const [appointments, setAppointments] = useState<Appointment[]>(() =>
     getCompanyAppointments(company.id)
   )
@@ -98,6 +113,9 @@ export const AppointmentsTab: React.FC<AppointmentsTabProps> = ({
   const [settings, setSettings] = useState<BookingSettings>(() => {
     return (
       company.bookingSettings || {
+        mode: 'diretolink',
+        whatsappMessageTemplate: DEFAULT_WHATSAPP_BOOKING_TEMPLATE,
+        confirmationWhatsAppTemplate: DEFAULT_CONFIRMATION_TEMPLATE,
         slotDurationMinutes: 30,
         days: DEFAULT_DAYS,
         blockedDates: [],
@@ -114,6 +132,21 @@ export const AppointmentsTab: React.FC<AppointmentsTabProps> = ({
   const [profRole, setProfRole] = useState('')
   const [profServices, setProfServices] = useState<string[]>([])
   const [isSavingProf, setIsSavingProf] = useState(false)
+
+  // Manual appointment modal state (Requirement 2)
+  const [isManualModalOpen, setIsManualModalOpen] = useState(false)
+  const [manualCustomerName, setManualCustomerName] = useState('')
+  const [manualCustomerPhone, setManualCustomerPhone] = useState('')
+  const [manualServiceSelection, setManualServiceSelection] = useState<string>('')
+  const [manualCustomServiceName, setManualCustomServiceName] = useState('')
+  const [manualCustomServicePrice, setManualCustomServicePrice] = useState<string>('')
+  const [manualCustomDuration, setManualCustomDuration] = useState<string>('30')
+  const [manualDate, setManualDate] = useState(() => new Date().toISOString().split('T')[0])
+  const [manualTime, setManualTime] = useState('09:00')
+  const [manualProfessionalId, setManualProfessionalId] = useState('')
+  const [manualNotes, setManualNotes] = useState('')
+  const [manualStatus, setManualStatus] = useState<AppointmentStatus>('confirmed')
+  const [isSavingManual, setIsSavingManual] = useState(false)
 
   const showToast = (type: 'success' | 'error', text: string) => {
     setToastMessage({ type, text })
@@ -181,6 +214,159 @@ export const AppointmentsTab: React.FC<AppointmentsTabProps> = ({
     const phoneWithDDI = clean.startsWith('55') ? clean : `55${clean}`
     const url = `https://wa.me/${phoneWithDDI}?text=${encodeURIComponent(message)}`
     window.open(url, '_blank', 'noopener,noreferrer')
+  }
+
+  // Confirm Appointment with Customer on WhatsApp (Requirement 3)
+  const handleConfirmWhatsApp = async (appt: Appointment) => {
+    const raw = appt.customerPhone || ''
+    const clean = normalizePhone(raw)
+    if (!clean) {
+      showToast('error', 'Telefone do cliente inválido.')
+      return
+    }
+
+    const [year, month, day] = appt.date.split('-')
+    const formattedDate = `${day}/${month}/${year}`
+
+    const template =
+      company.bookingSettings?.confirmationWhatsAppTemplate?.trim() ||
+      settings.confirmationWhatsAppTemplate?.trim() ||
+      DEFAULT_CONFIRMATION_TEMPLATE
+
+    const message = template
+      .replace(/{cliente}/gi, appt.customerName)
+      .replace(/{servico}/gi, appt.serviceName)
+      .replace(/{data}/gi, formattedDate)
+      .replace(/{horario}/gi, appt.time)
+      .replace(/{empresa}/gi, company.name)
+
+    const phoneWithDDI = clean.startsWith('55') ? clean : `55${clean}`
+    const url = `https://wa.me/${phoneWithDDI}?text=${encodeURIComponent(message)}`
+    window.open(url, '_blank', 'noopener,noreferrer')
+
+    // Se estiver pendente, confirma automaticamente o agendamento
+    if (appt.status === 'pending') {
+      await handleUpdateStatus(appt.id, 'confirmed')
+      showToast('success', 'Mensagem enviada e agendamento confirmado!')
+    } else {
+      showToast('success', 'WhatsApp aberto com mensagem de confirmação!')
+    }
+  }
+
+  // Create Manual Appointment (Requirement 2: Não bloquear horários repetidos)
+  const handleCreateManualAppointment = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!manualCustomerName.trim()) {
+      showToast('error', 'Nome do cliente é obrigatório.')
+      return
+    }
+    const cleanPhone = normalizePhone(manualCustomerPhone)
+    if (!cleanPhone || cleanPhone.length < 10) {
+      showToast('error', 'Informe um telefone válido com DDD.')
+      return
+    }
+    if (!manualDate || !manualTime) {
+      showToast('error', 'Data e horário são obrigatórios.')
+      return
+    }
+
+    let serviceId = ''
+    let serviceName = ''
+    let servicePrice: number | null = null
+    let serviceDuration: number | null = null
+
+    if (manualServiceSelection === 'custom' || services.length === 0) {
+      if (!manualCustomServiceName.trim()) {
+        showToast('error', 'Nome do serviço é obrigatório.')
+        return
+      }
+      serviceId = `srv_custom_${Date.now()}`
+      serviceName = manualCustomServiceName.trim()
+      servicePrice = manualCustomServicePrice ? parseFloat(manualCustomServicePrice) : null
+      serviceDuration = manualCustomDuration ? parseInt(manualCustomDuration, 10) : 30
+    } else {
+      const selected = services.find((s) => s.id === manualServiceSelection)
+      if (!selected) {
+        showToast('error', 'Por favor, selecione um serviço.')
+        return
+      }
+      serviceId = selected.id
+      serviceName = selected.name
+      servicePrice = selected.price ?? null
+      serviceDuration = selected.durationMinutes ?? 30
+    }
+
+    let resolvedProfName: string | undefined = undefined
+    if (manualProfessionalId) {
+      const prof = professionals.find((p) => p.id === manualProfessionalId)
+      if (prof) resolvedProfName = prof.name
+    }
+
+    setIsSavingManual(true)
+    const newAppt: Appointment = {
+      id: `apt_man_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
+      companyId: company.id,
+      serviceId,
+      serviceName,
+      servicePrice,
+      serviceDurationMinutes: serviceDuration,
+      professionalId: manualProfessionalId || undefined,
+      professionalName: resolvedProfName,
+      date: manualDate,
+      time: manualTime,
+      customerName: manualCustomerName.trim(),
+      customerPhone: cleanPhone,
+      status: manualStatus,
+      notes: manualNotes.trim() || undefined,
+      origin: 'manual', // Backend skips conflict check for manual appointments
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    }
+
+    const res = await createAppointmentOnServerApi(newAppt)
+    setIsSavingManual(false)
+
+    if (res.success) {
+      showToast('success', 'Agendamento cadastrado com sucesso!')
+      setIsManualModalOpen(false)
+      // Reset form
+      setManualCustomerName('')
+      setManualCustomerPhone('')
+      setManualCustomServiceName('')
+      setManualCustomServicePrice('')
+      setManualNotes('')
+      setManualProfessionalId('')
+      setManualStatus('confirmed')
+      loadData()
+    } else {
+      showToast('error', res.error || 'Erro ao salvar agendamento manual.')
+    }
+  }
+
+  // Save Booking Settings (Mode & Custom WhatsApp Templates)
+  const handleSaveBookingConfig = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setIsSavingSettings(true)
+    const updatedCompany: Company = {
+      ...company,
+      bookingSettings: settings,
+    }
+    await saveCompany(updatedCompany)
+    try {
+      await fetch('/api/appointments', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          companyId: company.id,
+          bookingSettings: settings,
+        }),
+      })
+    } catch (err) {
+      console.error('Error syncing booking settings to server:', err)
+    }
+    onUpdateCompany(updatedCompany)
+    setIsSavingSettings(false)
+    showToast('success', 'Configurações de agendamento salvas com sucesso!')
   }
 
   // Save Schedule Settings
@@ -360,6 +546,28 @@ export const AppointmentsTab: React.FC<AppointmentsTabProps> = ({
 
           <button
             type="button"
+            onClick={() => setActiveSubTab('settings')}
+            className={`px-3.5 py-2 rounded-xl text-xs font-semibold flex items-center gap-2 whitespace-nowrap transition-colors cursor-pointer ${
+              activeSubTab === 'settings'
+                ? 'bg-neutral-900 text-white shadow-xs'
+                : 'bg-neutral-50 text-neutral-600 hover:bg-neutral-100'
+            }`}
+          >
+            <Settings className="w-3.5 h-3.5" />
+            <span>Modo & WhatsApp</span>
+            <span
+              className={`text-[9px] font-black px-1.5 py-0.2 rounded-full uppercase ${
+                settings.mode === 'whatsapp'
+                  ? 'bg-emerald-500 text-white'
+                  : 'bg-violet-100 text-violet-700'
+              }`}
+            >
+              {settings.mode === 'whatsapp' ? 'WhatsApp' : 'DiretoLink'}
+            </span>
+          </button>
+
+          <button
+            type="button"
             onClick={() => setActiveSubTab('hours')}
             className={`px-3.5 py-2 rounded-xl text-xs font-semibold flex items-center gap-2 whitespace-nowrap transition-colors cursor-pointer ${
               activeSubTab === 'hours'
@@ -417,7 +625,7 @@ export const AppointmentsTab: React.FC<AppointmentsTabProps> = ({
               ))}
             </div>
 
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 flex-wrap">
               <input
                 type="date"
                 value={dateFilter || ''}
@@ -434,6 +642,28 @@ export const AppointmentsTab: React.FC<AppointmentsTabProps> = ({
                   <X className="w-3.5 h-3.5" />
                 </button>
               )}
+
+              <button
+                type="button"
+                onClick={() => {
+                  setManualDate(new Date().toISOString().split('T')[0])
+                  setManualTime('09:00')
+                  setManualCustomerName('')
+                  setManualCustomerPhone('')
+                  setManualServiceSelection(services[0]?.id || 'custom')
+                  setManualCustomServiceName('')
+                  setManualCustomServicePrice('')
+                  setManualCustomDuration('30')
+                  setManualNotes('')
+                  setManualProfessionalId('')
+                  setManualStatus('confirmed')
+                  setIsManualModalOpen(true)
+                }}
+                className="px-3.5 py-1.5 rounded-xl bg-violet-600 hover:bg-violet-700 active:scale-95 text-white font-bold text-xs shadow-xs flex items-center gap-1.5 transition-all cursor-pointer whitespace-nowrap"
+              >
+                <Plus className="w-3.5 h-3.5" />
+                <span>Novo Agendamento</span>
+              </button>
             </div>
           </div>
 
@@ -480,11 +710,16 @@ export const AppointmentsTab: React.FC<AppointmentsTabProps> = ({
                     {/* Top row: Customer and Status */}
                     <div className="flex items-start justify-between gap-3">
                       <div>
-                        <div className="flex items-center gap-1.5">
+                        <div className="flex items-center gap-1.5 flex-wrap">
                           <User className="w-3.5 h-3.5 text-neutral-400" />
                           <h4 className="font-bold text-neutral-900 text-sm leading-snug">
                             {appt.customerName}
                           </h4>
+                          {appt.origin === 'manual' && (
+                            <span className="text-[9px] font-bold uppercase tracking-wider px-1.5 py-0.2 rounded-md bg-purple-50 text-purple-700 border border-purple-200">
+                              Manual
+                            </span>
+                          )}
                         </div>
                         <p className="text-xs font-mono text-neutral-500 mt-0.5">
                           {formatPhone(appt.customerPhone)}
@@ -540,15 +775,28 @@ export const AppointmentsTab: React.FC<AppointmentsTabProps> = ({
 
                     {/* Bottom Actions Bar */}
                     <div className="pt-2 border-t border-neutral-100 flex flex-wrap items-center justify-between gap-2">
-                      {/* WhatsApp Contact Button */}
-                      <button
-                        type="button"
-                        onClick={() => handleContactWhatsApp(appt)}
-                        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-semibold text-xs shadow-2xs transition-colors cursor-pointer"
-                      >
-                        <MessageCircle className="w-3.5 h-3.5" />
-                        <span>Falar no WhatsApp</span>
-                      </button>
+                      <div className="flex items-center gap-1.5 flex-wrap">
+                        {/* WhatsApp Confirm Button (Requirement 3) */}
+                        <button
+                          type="button"
+                          onClick={() => handleConfirmWhatsApp(appt)}
+                          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs shadow-2xs transition-colors cursor-pointer"
+                          title="Abrir WhatsApp com mensagem pronta de confirmação"
+                        >
+                          <MessageCircle className="w-3.5 h-3.5" />
+                          <span>Confirmar pelo WhatsApp</span>
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={() => handleContactWhatsApp(appt)}
+                          className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-xl bg-neutral-100 hover:bg-neutral-200 text-neutral-700 font-medium text-xs transition-colors cursor-pointer"
+                          title="Falar no WhatsApp sem mensagem de confirmação"
+                        >
+                          <Send className="w-3 h-3 text-neutral-500" />
+                          <span>Falar</span>
+                        </button>
+                      </div>
 
                       {/* Status Buttons */}
                       <div className="flex items-center gap-1.5 flex-wrap">
@@ -600,6 +848,273 @@ export const AppointmentsTab: React.FC<AppointmentsTabProps> = ({
             </div>
           )}
         </div>
+      )}
+
+      {/* SUBTAB: MODO DE AGENDAMENTO & WHATSAPP (Requirement 1 & 3) */}
+      {activeSubTab === 'settings' && (
+        <form onSubmit={handleSaveBookingConfig} className="space-y-6">
+          {/* Card 1: Seleção de Modo */}
+          <div className="bg-white rounded-3xl border border-neutral-200/80 shadow-xs p-5 sm:p-6 space-y-4">
+            <div>
+              <div className="flex items-center gap-2">
+                <Settings className="w-4 h-4 text-violet-600" />
+                <h3 className="font-bold text-neutral-900 text-sm">
+                  Modo de Agendamento
+                </h3>
+              </div>
+              <p className="text-xs text-neutral-500 mt-0.5">
+                Escolha como os clientes vão interagir com o botão &quot;Agendar Horário&quot; na sua Página Pública.
+              </p>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5 pt-2">
+              {/* Option 1: Agendamento pela DiretoLink */}
+              <label
+                className={`p-4 rounded-2xl border-2 transition-all cursor-pointer flex flex-col justify-between space-y-3 relative ${
+                  (settings.mode || 'diretolink') === 'diretolink'
+                    ? 'bg-violet-50/40 border-violet-600 shadow-xs'
+                    : 'bg-white border-neutral-200 hover:border-neutral-300'
+                }`}
+              >
+                <div className="flex items-start justify-between gap-3">
+                  <div className="flex items-center gap-2.5">
+                    <div className="w-8 h-8 rounded-xl bg-violet-600 text-white flex items-center justify-center shrink-0">
+                      <CalendarCheck className="w-4 h-4" />
+                    </div>
+                    <div>
+                      <h4 className="font-bold text-xs text-neutral-900">
+                        Agendamento pela DiretoLink
+                      </h4>
+                      <span className="text-[10px] font-semibold text-violet-700 bg-violet-100 px-2 py-0.2 rounded-full inline-block mt-0.5">
+                        Página Pública Completa
+                      </span>
+                    </div>
+                  </div>
+                  <input
+                    type="radio"
+                    name="bookingMode"
+                    value="diretolink"
+                    checked={(settings.mode || 'diretolink') === 'diretolink'}
+                    onChange={() => setSettings({ ...settings, mode: 'diretolink' })}
+                    className="w-4 h-4 accent-violet-600 cursor-pointer mt-1"
+                  />
+                </div>
+                <p className="text-xs text-neutral-600 leading-relaxed">
+                  O cliente escolhe o serviço, profissional (opcional), data e horário disponível direto na sua página pública com validação de horários em tempo real.
+                </p>
+                <div className="text-[11px] font-semibold text-violet-800 bg-violet-100/70 p-2.5 rounded-xl">
+                  ✓ Mantém exatamente o agendamento atual da DiretoLink
+                </div>
+              </label>
+
+              {/* Option 2: Agendamento pelo WhatsApp */}
+              <label
+                className={`p-4 rounded-2xl border-2 transition-all cursor-pointer flex flex-col justify-between space-y-3 relative ${
+                  settings.mode === 'whatsapp'
+                    ? 'bg-emerald-50/40 border-emerald-600 shadow-xs'
+                    : 'bg-white border-neutral-200 hover:border-neutral-300'
+                }`}
+              >
+                <div className="flex items-start justify-between gap-3">
+                  <div className="flex items-center gap-2.5">
+                    <div className="w-8 h-8 rounded-xl bg-emerald-600 text-white flex items-center justify-center shrink-0">
+                      <MessageCircle className="w-4 h-4" />
+                    </div>
+                    <div>
+                      <h4 className="font-bold text-xs text-neutral-900">
+                        Agendamento pelo WhatsApp
+                      </h4>
+                      <span className="text-[10px] font-semibold text-emerald-700 bg-emerald-100 px-2 py-0.2 rounded-full inline-block mt-0.5">
+                        Contato Direto
+                      </span>
+                    </div>
+                  </div>
+                  <input
+                    type="radio"
+                    name="bookingMode"
+                    value="whatsapp"
+                    checked={settings.mode === 'whatsapp'}
+                    onChange={() => setSettings({ ...settings, mode: 'whatsapp' })}
+                    className="w-4 h-4 accent-emerald-600 cursor-pointer mt-1"
+                  />
+                </div>
+                <p className="text-xs text-neutral-600 leading-relaxed">
+                  O botão &quot;Agendar Horário&quot; da Página Pública abre diretamente o WhatsApp da empresa. Não solicita profissional, data ou horário na página pública.
+                </p>
+                <div className="text-[11px] font-semibold text-emerald-800 bg-emerald-100/70 p-2.5 rounded-xl">
+                  ✓ O cliente envia uma mensagem personalizada direto no seu WhatsApp
+                </div>
+              </label>
+            </div>
+          </div>
+
+          {/* Card 2: Mensagem para o cliente agendar pelo WhatsApp */}
+          <div className="bg-white rounded-3xl border border-neutral-200/80 shadow-xs p-5 sm:p-6 space-y-4">
+            <div>
+              <div className="flex items-center gap-2">
+                <MessageCircle className="w-4 h-4 text-emerald-600" />
+                <h3 className="font-bold text-neutral-900 text-sm">
+                  Mensagem de Agendamento pelo WhatsApp
+                </h3>
+              </div>
+              <p className="text-xs text-neutral-500 mt-0.5">
+                Configure a mensagem que será enviada pelo cliente ao clicar em &quot;Agendar Horário&quot; na Página Pública (usada quando o modo WhatsApp estiver ativo).
+              </p>
+            </div>
+
+            <div className="space-y-2">
+              <label className="block text-xs font-semibold text-neutral-700">
+                Texto da mensagem
+              </label>
+              <textarea
+                rows={3}
+                value={settings.whatsappMessageTemplate ?? DEFAULT_WHATSAPP_BOOKING_TEMPLATE}
+                onChange={(e) =>
+                  setSettings({ ...settings, whatsappMessageTemplate: e.target.value })
+                }
+                className="w-full px-3.5 py-2.5 rounded-xl border border-neutral-300 text-xs text-neutral-900 focus:outline-none focus:border-violet-600 font-mono"
+                placeholder={DEFAULT_WHATSAPP_BOOKING_TEMPLATE}
+              />
+              <div className="flex flex-wrap items-center gap-1.5 pt-1">
+                <span className="text-[11px] text-neutral-400 font-medium">Inserir variável:</span>
+                <button
+                  type="button"
+                  onClick={() => {
+                    const current = settings.whatsappMessageTemplate ?? DEFAULT_WHATSAPP_BOOKING_TEMPLATE
+                    setSettings({ ...settings, whatsappMessageTemplate: `${current} {empresa}` })
+                  }}
+                  className="px-2 py-0.5 bg-neutral-100 hover:bg-neutral-200 text-neutral-700 rounded-md text-[10px] font-mono cursor-pointer"
+                >
+                  {'{empresa}'}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    const current = settings.whatsappMessageTemplate ?? DEFAULT_WHATSAPP_BOOKING_TEMPLATE
+                    setSettings({ ...settings, whatsappMessageTemplate: `${current} {servico}` })
+                  }}
+                  className="px-2 py-0.5 bg-neutral-100 hover:bg-neutral-200 text-neutral-700 rounded-md text-[10px] font-mono cursor-pointer"
+                >
+                  {'{servico}'}
+                </button>
+              </div>
+
+              {/* Prévia */}
+              <div className="bg-neutral-50 rounded-xl p-3 border border-neutral-200/70 text-xs space-y-1">
+                <span className="text-[10px] uppercase font-bold text-neutral-400 block tracking-wider">
+                  Exemplo de mensagem que o cliente enviará:
+                </span>
+                <p className="text-neutral-800 italic">
+                  &ldquo;
+                  {(settings.whatsappMessageTemplate || DEFAULT_WHATSAPP_BOOKING_TEMPLATE)
+                    .replace(/{empresa}/gi, company.name)
+                    .replace(/{servico}/gi, services[0]?.name || 'Corte e Barba')}
+                  &rdquo;
+                </p>
+              </div>
+            </div>
+          </div>
+
+          {/* Card 3: Mensagem de "Confirmar pelo WhatsApp" (Requirement 3) */}
+          <div className="bg-white rounded-3xl border border-neutral-200/80 shadow-xs p-5 sm:p-6 space-y-4">
+            <div>
+              <div className="flex items-center gap-2">
+                <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+                <h3 className="font-bold text-neutral-900 text-sm">
+                  Mensagem de Confirmação pelo WhatsApp
+                </h3>
+              </div>
+              <p className="text-xs text-neutral-500 mt-0.5">
+                Mensagem que sua empresa envia para o cliente ao clicar em &quot;Confirmar pelo WhatsApp&quot; na lista de agendamentos do painel.
+              </p>
+            </div>
+
+            <div className="space-y-2">
+              <label className="block text-xs font-semibold text-neutral-700">
+                Texto da mensagem de confirmação
+              </label>
+              <textarea
+                rows={3}
+                value={settings.confirmationWhatsAppTemplate ?? DEFAULT_CONFIRMATION_TEMPLATE}
+                onChange={(e) =>
+                  setSettings({ ...settings, confirmationWhatsAppTemplate: e.target.value })
+                }
+                className="w-full px-3.5 py-2.5 rounded-xl border border-neutral-300 text-xs text-neutral-900 focus:outline-none focus:border-violet-600 font-mono"
+                placeholder={DEFAULT_CONFIRMATION_TEMPLATE}
+              />
+              <div className="flex flex-wrap items-center gap-1.5 pt-1">
+                <span className="text-[11px] text-neutral-400 font-medium">Inserir variável:</span>
+                {[
+                  { tag: '{cliente}', label: 'Nome do cliente' },
+                  { tag: '{servico}', label: 'Serviço' },
+                  { tag: '{data}', label: 'Data' },
+                  { tag: '{horario}', label: 'Horário' },
+                  { tag: '{empresa}', label: 'Nome da empresa' },
+                ].map((item) => (
+                  <button
+                    key={item.tag}
+                    type="button"
+                    onClick={() => {
+                      const current = settings.confirmationWhatsAppTemplate ?? DEFAULT_CONFIRMATION_TEMPLATE
+                      setSettings({ ...settings, confirmationWhatsAppTemplate: `${current} ${item.tag}` })
+                    }}
+                    className="px-2 py-0.5 bg-neutral-100 hover:bg-neutral-200 text-neutral-700 rounded-md text-[10px] font-mono cursor-pointer"
+                    title={item.label}
+                  >
+                    {item.tag}
+                  </button>
+                ))}
+              </div>
+
+              {/* Prévia */}
+              <div className="bg-neutral-50 rounded-xl p-3 border border-neutral-200/70 text-xs space-y-1">
+                <span className="text-[10px] uppercase font-bold text-neutral-400 block tracking-wider">
+                  Exemplo de mensagem de confirmação que o cliente receberá:
+                </span>
+                <p className="text-neutral-800 italic">
+                  &ldquo;
+                  {(settings.confirmationWhatsAppTemplate || DEFAULT_CONFIRMATION_TEMPLATE)
+                    .replace(/{cliente}/gi, 'Mariana Silva')
+                    .replace(/{servico}/gi, services[0]?.name || 'Pé e Mão')
+                    .replace(/{data}/gi, '15/10/2026')
+                    .replace(/{horario}/gi, '09:00')
+                    .replace(/{empresa}/gi, company.name)}
+                  &rdquo;
+                </p>
+              </div>
+            </div>
+
+            <div className="pt-2 flex items-center justify-between border-t border-neutral-100">
+              <button
+                type="button"
+                onClick={() => {
+                  setSettings({
+                    ...settings,
+                    whatsappMessageTemplate: DEFAULT_WHATSAPP_BOOKING_TEMPLATE,
+                    confirmationWhatsAppTemplate: DEFAULT_CONFIRMATION_TEMPLATE,
+                  })
+                  showToast('success', 'Mensagens redefinidas para o padrão.')
+                }}
+                className="text-xs text-neutral-500 hover:text-neutral-800 font-medium flex items-center gap-1.5 cursor-pointer"
+              >
+                <RotateCcw className="w-3.5 h-3.5" />
+                <span>Restaurar Mensagens Padrão</span>
+              </button>
+            </div>
+          </div>
+
+          {/* Action Button */}
+          <div className="flex items-center justify-end">
+            <button
+              type="submit"
+              disabled={isSavingSettings}
+              className="px-6 py-2.5 rounded-xl bg-violet-600 hover:bg-violet-700 text-white text-xs font-semibold shadow-xs flex items-center gap-2 transition-all cursor-pointer disabled:opacity-50"
+            >
+              <Save className="w-4 h-4" />
+              <span>{isSavingSettings ? 'Salvando...' : 'Salvar Configurações de Agendamento'}</span>
+            </button>
+          </div>
+        </form>
       )}
 
       {/* SUBTAB 2: HORÁRIOS & DIAS DE ATENDIMENTO */}
@@ -1010,6 +1525,269 @@ export const AppointmentsTab: React.FC<AppointmentsTabProps> = ({
                 >
                   <Check className="w-3.5 h-3.5" />
                   <span>{isSavingProf ? 'Salvando...' : 'Salvar Profissional'}</span>
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* MANUAL APPOINTMENT MODAL (Requirement 2) */}
+      {isManualModalOpen && (
+        <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4 overflow-y-auto animate-fade-in">
+          <div className="bg-white rounded-3xl border border-neutral-200/90 shadow-2xl max-w-lg w-full overflow-hidden my-6">
+            <div className="px-6 py-4 border-b border-neutral-100 flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <CalendarPlus className="w-4 h-4 text-violet-600" />
+                <h3 className="font-bold text-neutral-900 text-sm">
+                  Novo Agendamento Manual
+                </h3>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsManualModalOpen(false)}
+                className="w-7 h-7 rounded-lg text-neutral-400 hover:text-neutral-700 hover:bg-neutral-100 flex items-center justify-center transition-colors cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <form onSubmit={handleCreateManualAppointment} className="p-6 space-y-4">
+              {/* Info banner about repeated hours */}
+              <div className="bg-violet-50/70 border border-violet-200/80 rounded-2xl p-3 flex items-start gap-2.5 text-xs text-violet-900">
+                <Info className="w-4 h-4 text-violet-600 shrink-0 mt-0.5" />
+                <div className="leading-relaxed">
+                  <span className="font-bold">Horários repetidos permitidos:</span> Você pode cadastrar quantos atendimentos precisar no mesmo horário (ex: 09:00 - Cliente 1, 09:00 - Cliente 2, 09:00 - Cliente 3). Não há bloqueio no cadastro manual.
+                </div>
+              </div>
+
+              {/* Cliente */}
+              <div>
+                <label className="block text-xs font-semibold text-neutral-700 mb-1">
+                  Cliente <span className="text-red-500">*</span>
+                </label>
+                <input
+                  type="text"
+                  required
+                  placeholder="Nome completo do cliente"
+                  value={manualCustomerName}
+                  onChange={(e) => setManualCustomerName(e.target.value)}
+                  className="w-full px-3.5 py-2.5 rounded-xl border border-neutral-300 text-xs text-neutral-900 focus:outline-none focus:border-violet-600"
+                />
+              </div>
+
+              {/* Telefone */}
+              <div>
+                <label className="block text-xs font-semibold text-neutral-700 mb-1">
+                  Telefone / WhatsApp <span className="text-red-500">*</span>
+                </label>
+                <input
+                  type="tel"
+                  required
+                  placeholder="(62) 99999-9999"
+                  value={manualCustomerPhone}
+                  onChange={(e) => setManualCustomerPhone(formatPhone(e.target.value))}
+                  className="w-full px-3.5 py-2.5 rounded-xl border border-neutral-300 text-xs text-neutral-900 focus:outline-none focus:border-violet-600 font-mono"
+                />
+              </div>
+
+              {/* Serviço */}
+              <div>
+                <label className="block text-xs font-semibold text-neutral-700 mb-1">
+                  Serviço <span className="text-red-500">*</span>
+                </label>
+                {services.length > 0 ? (
+                  <select
+                    value={manualServiceSelection}
+                    onChange={(e) => setManualServiceSelection(e.target.value)}
+                    className="w-full px-3.5 py-2.5 rounded-xl border border-neutral-300 text-xs text-neutral-900 focus:outline-none focus:border-violet-600 cursor-pointer bg-white"
+                  >
+                    {services.map((srv) => (
+                      <option key={srv.id} value={srv.id}>
+                        {srv.name} {srv.price != null ? `(R$ ${srv.price.toFixed(2).replace('.', ',')})` : ''}
+                      </option>
+                    ))}
+                    <option value="custom">+ Outro serviço (personalizado)</option>
+                  </select>
+                ) : null}
+
+                {(services.length === 0 || manualServiceSelection === 'custom') && (
+                  <div className="mt-2 space-y-2 p-3 bg-neutral-50 rounded-xl border border-neutral-200">
+                    <div>
+                      <label className="block text-[11px] font-semibold text-neutral-600 mb-1">
+                        Nome do Serviço Personalizado <span className="text-red-500">*</span>
+                      </label>
+                      <input
+                        type="text"
+                        required={manualServiceSelection === 'custom' || services.length === 0}
+                        placeholder="Ex: Pé e Mão, Corte e Escova..."
+                        value={manualCustomServiceName}
+                        onChange={(e) => setManualCustomServiceName(e.target.value)}
+                        className="w-full px-3 py-2 rounded-lg border border-neutral-300 text-xs text-neutral-900 bg-white focus:outline-none focus:border-violet-600"
+                      />
+                    </div>
+                    <div className="grid grid-cols-2 gap-2">
+                      <div>
+                        <label className="block text-[11px] font-semibold text-neutral-600 mb-1">
+                          Valor (R$)
+                        </label>
+                        <input
+                          type="number"
+                          step="0.01"
+                          placeholder="0,00"
+                          value={manualCustomServicePrice}
+                          onChange={(e) => setManualCustomServicePrice(e.target.value)}
+                          className="w-full px-3 py-2 rounded-lg border border-neutral-300 text-xs text-neutral-900 bg-white focus:outline-none focus:border-violet-600 font-mono"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-[11px] font-semibold text-neutral-600 mb-1">
+                          Duração (minutos)
+                        </label>
+                        <input
+                          type="number"
+                          placeholder="30"
+                          value={manualCustomDuration}
+                          onChange={(e) => setManualCustomDuration(e.target.value)}
+                          className="w-full px-3 py-2 rounded-lg border border-neutral-300 text-xs text-neutral-900 bg-white focus:outline-none focus:border-violet-600 font-mono"
+                        />
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Data e Horário */}
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-semibold text-neutral-700 mb-1">
+                    Data <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    type="date"
+                    required
+                    value={manualDate}
+                    onChange={(e) => setManualDate(e.target.value)}
+                    className="w-full px-3.5 py-2.5 rounded-xl border border-neutral-300 text-xs text-neutral-900 focus:outline-none focus:border-violet-600 cursor-pointer bg-white"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-neutral-700 mb-1">
+                    Horário <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    type="time"
+                    required
+                    value={manualTime}
+                    onChange={(e) => setManualTime(e.target.value)}
+                    className="w-full px-3.5 py-2.5 rounded-xl border border-neutral-300 text-xs text-neutral-900 focus:outline-none focus:border-violet-600 font-mono bg-white"
+                  />
+                </div>
+              </div>
+
+              {/* Horários rápidos sugestões */}
+              <div>
+                <span className="text-[10px] font-semibold text-neutral-400 block mb-1">
+                  Horários rápidos:
+                </span>
+                <div className="flex flex-wrap gap-1.5">
+                  {['08:00', '08:30', '09:00', '09:30', '10:00', '10:30', '11:00', '13:00', '14:00', '14:30', '15:00', '16:00', '17:00'].map((h) => (
+                    <button
+                      key={h}
+                      type="button"
+                      onClick={() => setManualTime(h)}
+                      className={`px-2 py-1 rounded-lg text-[11px] font-mono cursor-pointer transition-colors ${
+                        manualTime === h
+                          ? 'bg-violet-600 text-white font-bold'
+                          : 'bg-neutral-100 hover:bg-neutral-200 text-neutral-700'
+                      }`}
+                    >
+                      {h}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Profissional (opcional) */}
+              <div>
+                <label className="block text-xs font-semibold text-neutral-700 mb-1">
+                  Profissional <span className="text-neutral-400 font-normal">(opcional)</span>
+                </label>
+                <select
+                  value={manualProfessionalId}
+                  onChange={(e) => setManualProfessionalId(e.target.value)}
+                  className="w-full px-3.5 py-2.5 rounded-xl border border-neutral-300 text-xs text-neutral-900 focus:outline-none focus:border-violet-600 cursor-pointer bg-white"
+                >
+                  <option value="">Sem profissional específico / Nenhum</option>
+                  {professionals.map((p) => (
+                    <option key={p.id} value={p.id}>
+                      {p.name} {p.role ? `(${p.role})` : ''}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Observação (opcional) */}
+              <div>
+                <label className="block text-xs font-semibold text-neutral-700 mb-1">
+                  Observação <span className="text-neutral-400 font-normal">(opcional)</span>
+                </label>
+                <textarea
+                  rows={2}
+                  placeholder="Ex: Primeira visita, preferência por esmalte vermelho..."
+                  value={manualNotes}
+                  onChange={(e) => setManualNotes(e.target.value)}
+                  className="w-full px-3.5 py-2.5 rounded-xl border border-neutral-300 text-xs text-neutral-900 focus:outline-none focus:border-violet-600"
+                />
+              </div>
+
+              {/* Status inicial */}
+              <div>
+                <label className="block text-xs font-semibold text-neutral-700 mb-1">
+                  Status Inicial
+                </label>
+                <div className="flex items-center gap-4">
+                  <label className="flex items-center gap-1.5 text-xs text-neutral-800 cursor-pointer">
+                    <input
+                      type="radio"
+                      name="manualStatus"
+                      value="confirmed"
+                      checked={manualStatus === 'confirmed'}
+                      onChange={() => setManualStatus('confirmed')}
+                      className="accent-emerald-600"
+                    />
+                    <span>Confirmado</span>
+                  </label>
+                  <label className="flex items-center gap-1.5 text-xs text-neutral-800 cursor-pointer">
+                    <input
+                      type="radio"
+                      name="manualStatus"
+                      value="pending"
+                      checked={manualStatus === 'pending'}
+                      onChange={() => setManualStatus('pending')}
+                      className="accent-amber-600"
+                    />
+                    <span>Pendente</span>
+                  </label>
+                </div>
+              </div>
+
+              {/* Buttons */}
+              <div className="pt-3 border-t border-neutral-100 flex items-center justify-end gap-2">
+                <button
+                  type="button"
+                  onClick={() => setIsManualModalOpen(false)}
+                  className="px-4 py-2 rounded-xl text-neutral-600 hover:bg-neutral-100 text-xs font-medium transition-colors cursor-pointer"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  disabled={isSavingManual}
+                  className="px-5 py-2 rounded-xl bg-violet-600 hover:bg-violet-700 text-white text-xs font-semibold shadow-xs flex items-center gap-1.5 transition-all cursor-pointer disabled:opacity-50"
+                >
+                  <Check className="w-3.5 h-3.5" />
+                  <span>{isSavingManual ? 'Cadastrando...' : 'Cadastrar Agendamento'}</span>
                 </button>
               </div>
             </form>

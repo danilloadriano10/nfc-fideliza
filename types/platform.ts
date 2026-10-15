@@ -29,7 +29,12 @@ export interface DaySchedule {
   breakEnd?: string // e.g. "13:00"
 }
 
+export type BookingMode = 'diretolink' | 'whatsapp'
+
 export interface BookingSettings {
+  mode?: BookingMode
+  whatsappMessageTemplate?: string
+  confirmationWhatsAppTemplate?: string
   slotDurationMinutes: number
   days: DaySchedule[]
   blockedDates?: string[] // "YYYY-MM-DD"
@@ -63,6 +68,7 @@ export interface Appointment {
   customerPhone: string
   status: AppointmentStatus
   notes?: string
+  origin?: 'public' | 'manual'
   createdAt: string
   updatedAt?: string
 }

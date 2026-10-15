@@ -96,6 +96,22 @@ export const INITIAL_COMPANIES: Company[] = [
       goalPoints: 8,
       rewardDescription: '1 Corte de Cabelo Grátis ou Hidratação Barba',
     },
+    bookingSettings: {
+      mode: 'diretolink',
+      slotDurationMinutes: 30,
+      whatsappMessageTemplate: 'Olá! Gostaria de agendar um horário na {empresa}. Poderia me informar os horários disponíveis?',
+      confirmationWhatsAppTemplate: 'Olá {cliente}! Confirmamos o seu agendamento de {servico} na {empresa} para {data} às {horario}. Aguardamos você!',
+      days: [
+        { dayOfWeek: 0, isOpen: false, openTime: '09:00', closeTime: '13:00' },
+        { dayOfWeek: 1, isOpen: true, openTime: '08:00', closeTime: '18:00', breakStart: '12:00', breakEnd: '13:00' },
+        { dayOfWeek: 2, isOpen: true, openTime: '08:00', closeTime: '18:00', breakStart: '12:00', breakEnd: '13:00' },
+        { dayOfWeek: 3, isOpen: true, openTime: '08:00', closeTime: '18:00', breakStart: '12:00', breakEnd: '13:00' },
+        { dayOfWeek: 4, isOpen: true, openTime: '08:00', closeTime: '18:00', breakStart: '12:00', breakEnd: '13:00' },
+        { dayOfWeek: 5, isOpen: true, openTime: '08:00', closeTime: '18:00', breakStart: '12:00', breakEnd: '13:00' },
+        { dayOfWeek: 6, isOpen: true, openTime: '08:00', closeTime: '17:00' },
+      ],
+      blockedDates: [],
+    },
     ownerAuth: {
       username: 'barbeariajunior',
       password: 'barber123',

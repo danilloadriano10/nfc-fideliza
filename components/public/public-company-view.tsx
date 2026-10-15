@@ -334,6 +334,52 @@ export const PublicCompanyView: React.FC<PublicCompanyViewProps> = ({
     }
   }, [company.productCatalog])
 
+  // Handler para iniciar o agendamento (DiretoLink ou WhatsApp)
+  const handleInitiateBooking = useCallback(
+    (service?: CompanyService | null) => {
+      const isWhatsAppMode = company.bookingSettings?.mode === 'whatsapp'
+
+      if (isWhatsAppMode) {
+        const rawPhone = company.whatsapp || ''
+        const cleanPhone = rawPhone.replace(/\D/g, '')
+        if (cleanPhone) {
+          const phoneWithDdi = cleanPhone.startsWith('55') ? cleanPhone : `55${cleanPhone}`
+          let template = company.bookingSettings?.whatsappMessageTemplate?.trim()
+          if (!template) {
+            if (service?.name) {
+              template =
+                'Olá! Gostaria de agendar um horário para {servico} na {empresa}. Poderia me informar os horários disponíveis?'
+            } else {
+              template =
+                'Olá! Gostaria de agendar um horário na {empresa}. Poderia me informar os horários disponíveis?'
+            }
+          }
+
+          const message = template
+            .replace(/{empresa}/gi, company.name)
+            .replace(/{servico}/gi, service?.name || 'um serviço')
+
+          window.open(
+            `https://wa.me/${phoneWithDdi}?text=${encodeURIComponent(message)}`,
+            '_blank',
+            'noopener,noreferrer'
+          )
+          return
+        }
+      }
+
+      // Modo DiretoLink padrão
+      setBookingService(service || null)
+      setIsBookingOpen(true)
+    },
+    [
+      company.bookingSettings?.mode,
+      company.bookingSettings?.whatsappMessageTemplate,
+      company.whatsapp,
+      company.name,
+    ]
+  )
+
   // Share Page Link
   const handleShare = useCallback(() => {
     if (typeof window !== 'undefined') {
@@ -587,15 +633,16 @@ export const PublicCompanyView: React.FC<PublicCompanyViewProps> = ({
       appointments: {
         id: 'appointments',
         title: 'Agendamento',
-        description: 'Reserve seu horário online',
+        description: company.bookingSettings?.mode === 'whatsapp'
+          ? 'Agende pelo WhatsApp'
+          : 'Reserve seu horário online',
         icon: <Calendar className="w-5 h-5 text-indigo-400" />,
         iconContainerClass: isDark
           ? 'bg-indigo-500/15 border border-indigo-500/25'
           : 'bg-indigo-50 border border-indigo-200/80',
         iconContainerStyle: { color: '#6366F1' },
         onClick: () => {
-          setBookingService(null)
-          setIsBookingOpen(true)
+          handleInitiateBooking(null)
         },
         isActive: Boolean(activeModules.appointments),
       },
@@ -744,6 +791,7 @@ export const PublicCompanyView: React.FC<PublicCompanyViewProps> = ({
     handleOpenLocation,
     handleOpenWifi,
     handleOpenInstagram,
+    handleInitiateBooking,
   ])
 
   // Resolve os 4 cards de destaque em layout 2x2 no celular
@@ -1171,8 +1219,7 @@ export const PublicCompanyView: React.FC<PublicCompanyViewProps> = ({
                       }}
                       onClick={() => {
                         if (activeModules.appointments) {
-                          setBookingService(srv)
-                          setIsBookingOpen(true)
+                          handleInitiateBooking(srv)
                         } else {
                           setIsServicesOpen(true)
                         }
@@ -1282,8 +1329,7 @@ export const PublicCompanyView: React.FC<PublicCompanyViewProps> = ({
                                 type="button"
                                 onClick={(e) => {
                                   e.stopPropagation()
-                                  setBookingService(srv)
-                                  setIsBookingOpen(true)
+                                  handleInitiateBooking(srv)
                                 }}
                                 className="px-3.5 py-1.5 rounded-xl text-xs font-extrabold text-white shadow-xs hover:opacity-90 active:scale-95 transition-all flex items-center gap-1.5 cursor-pointer"
                                 style={{
@@ -1359,7 +1405,7 @@ export const PublicCompanyView: React.FC<PublicCompanyViewProps> = ({
                 type="button"
                 onClick={() => {
                   if (activeModules.appointments) {
-                    setIsBookingOpen(true)
+                    handleInitiateBooking(null)
                   } else {
                     handleOpenWhatsApp()
                   }
@@ -1743,7 +1789,9 @@ export const PublicCompanyView: React.FC<PublicCompanyViewProps> = ({
                             isDark ? 'text-neutral-400' : 'text-neutral-500'
                           }`}
                         >
-                          Escolha um serviço e reserve seu horário em poucos toques
+                          {company.bookingSettings?.mode === 'whatsapp'
+                            ? 'Agende seu horário diretamente pelo WhatsApp da empresa'
+                            : 'Escolha um serviço e reserve seu horário em poucos toques'}
                         </p>
                       </div>
                     </div>
@@ -1752,14 +1800,17 @@ export const PublicCompanyView: React.FC<PublicCompanyViewProps> = ({
                   <button
                     type="button"
                     onClick={() => {
-                      setBookingService(null)
-                      setIsBookingOpen(true)
+                      handleInitiateBooking(null)
                     }}
                     className="w-full py-2.5 px-4 rounded-xl font-bold text-xs text-white shadow-xs flex items-center justify-center gap-2 cursor-pointer transition-all active:scale-[0.99] hover:opacity-90"
                     style={{ backgroundColor: primaryColor }}
                   >
                     <Calendar className="w-4 h-4" />
-                    <span>Agendar Horário Agora</span>
+                    <span>
+                      {company.bookingSettings?.mode === 'whatsapp'
+                        ? 'Agendar Horário pelo WhatsApp'
+                        : 'Agendar Horário Agora'}
+                    </span>
                   </button>
                 </div>
               )),
@@ -2585,8 +2636,7 @@ export const PublicCompanyView: React.FC<PublicCompanyViewProps> = ({
             <button
               type="button"
               onClick={() => {
-                setBookingService(null)
-                setIsBookingOpen(true)
+                handleInitiateBooking(null)
               }}
               className="flex-1 py-2.5 px-4 rounded-xl font-extrabold text-xs shadow-md hover:opacity-95 active:scale-95 transition-all flex items-center justify-center gap-1.5 cursor-pointer truncate"
               style={{
@@ -2670,8 +2720,7 @@ export const PublicCompanyView: React.FC<PublicCompanyViewProps> = ({
           company={company}
           onBookService={(srv) => {
             setIsServicesOpen(false)
-            setBookingService(srv)
-            setIsBookingOpen(true)
+            handleInitiateBooking(srv)
           }}
         />
 

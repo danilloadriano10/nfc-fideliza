@@ -188,6 +188,8 @@ export async function POST(req: NextRequest) {
       customerName,
       customerPhone,
       notes,
+      origin,
+      status,
     } = body || {}
 
     if (!companyId || !serviceId || !date || !time || !customerName || !customerPhone) {
@@ -229,8 +231,9 @@ export async function POST(req: NextRequest) {
       time,
       customerName: customerName.trim(),
       customerPhone: customerPhone.trim(),
-      status: 'pending',
+      status: status && ['pending', 'confirmed', 'completed', 'cancelled'].includes(status) ? status : 'pending',
       notes: notes && typeof notes === 'string' ? notes.trim() : undefined,
+      origin: origin === 'manual' ? 'manual' : 'public',
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
     }
