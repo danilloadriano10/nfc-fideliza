@@ -833,10 +833,13 @@ export const MenuTab: React.FC<MenuTabProps> = ({ company, onCompanyUpdate }) =>
                     <div>
                       <div className="relative h-44 w-full bg-neutral-100 overflow-hidden">
                         {item.photoUrl ? (
+                          /* eslint-disable-next-line @next/next/no-img-element */
                           <img
                             src={item.photoUrl}
                             alt={item.name}
                             className="w-full h-full object-cover"
+                            loading="lazy"
+                            referrerPolicy="no-referrer"
                             onError={(e) => {
                               // Fallback if image fails
                               ;(e.target as HTMLElement).style.display = 'none'
@@ -1240,6 +1243,7 @@ export const MenuTab: React.FC<MenuTabProps> = ({ company, onCompanyUpdate }) =>
                       </label>
                       {photoPreview && (
                         <div className="w-20 h-20 rounded-xl overflow-hidden border border-neutral-200 shrink-0 relative">
+                          {/* eslint-disable-next-line @next/next/no-img-element */}
                           <img
                             src={photoPreview}
                             alt="Preview"
@@ -1262,6 +1266,7 @@ export const MenuTab: React.FC<MenuTabProps> = ({ company, onCompanyUpdate }) =>
                       />
                       {photoPreview && (
                         <div className="w-20 h-20 rounded-xl overflow-hidden border border-neutral-200">
+                          {/* eslint-disable-next-line @next/next/no-img-element */}
                           <img
                             src={photoPreview}
                             alt="Preview"
@@ -1298,9 +1303,10 @@ export const MenuTab: React.FC<MenuTabProps> = ({ company, onCompanyUpdate }) =>
                         onChange={(e) => {
                           setHasSizes(e.target.checked)
                           if (e.target.checked && sizes.length === 0) {
+                            const parsed = parseFloat(price) || 0
                             setSizes([
-                              { id: 'sz_1', name: 'Individual', price: 0 },
-                              { id: 'sz_2', name: 'Grande', price: 10 },
+                              { id: 'sz_1', name: 'Individual', price: parsed > 0 ? parsed : 29.9 },
+                              { id: 'sz_2', name: 'Grande', price: parsed > 0 ? parsed + 15 : 44.9 },
                             ])
                           }
                         }}
@@ -1326,7 +1332,7 @@ export const MenuTab: React.FC<MenuTabProps> = ({ company, onCompanyUpdate }) =>
                             className="flex-1 px-3 py-1.5 rounded-xl border border-neutral-300 text-xs bg-white"
                           />
                           <div className="w-32 flex items-center gap-1">
-                            <span className="text-[11px] text-neutral-400">+R$</span>
+                            <span className="text-[11px] text-neutral-400 font-semibold">R$</span>
                             <input
                               type="number"
                               step="0.5"

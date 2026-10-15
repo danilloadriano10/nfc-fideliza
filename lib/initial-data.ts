@@ -374,8 +374,8 @@ export const INITIAL_MENU_ITEMS: MenuItem[] = [
     isFeatured: true,
     order: 1,
     sizes: [
-      { id: 'sz_ind', name: 'Individual (180g)', price: 0 },
-      { id: 'sz_dup', name: 'Duplo (360g)', price: 12.0 },
+      { id: 'sz_ind', name: 'Individual (180g)', price: 29.9 },
+      { id: 'sz_dup', name: 'Duplo (360g)', price: 41.9 },
     ],
     extras: [
       { id: 'ext_bacon', name: 'Bacon crocante', price: 4.5 },
@@ -462,8 +462,8 @@ export const INITIAL_MENU_ITEMS: MenuItem[] = [
     isFeatured: false,
     order: 3,
     sizes: [
-      { id: 'sz_med', name: 'Médio (240ml)', price: 0 },
-      { id: 'sz_grd', name: 'Grande (360ml)', price: 4.5 },
+      { id: 'sz_med', name: 'Médio (240ml)', price: 16.5 },
+      { id: 'sz_grd', name: 'Grande (360ml)', price: 21.0 },
     ],
     extras: [
       { id: 'ext_chantilly', name: 'Chantilly artesanal', price: 3.0 },
@@ -487,9 +487,9 @@ export const INITIAL_MENU_ITEMS: MenuItem[] = [
     isFeatured: true,
     order: 1,
     sizes: [
-      { id: 'pz_med', name: 'Média (6 fatias)', price: 0 },
-      { id: 'pz_grd', name: 'Grande (8 fatias)', price: 10.0 },
-      { id: 'pz_fam', name: 'Família (12 fatias)', price: 20.0 },
+      { id: 'pz_med', name: 'Média (6 fatias)', price: 49.9 },
+      { id: 'pz_grd', name: 'Grande (8 fatias)', price: 59.9 },
+      { id: 'pz_fam', name: 'Família (12 fatias)', price: 69.9 },
     ],
     flavorsMax: 2,
     flavors: [

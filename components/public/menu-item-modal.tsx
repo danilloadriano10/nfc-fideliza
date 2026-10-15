@@ -76,21 +76,22 @@ export const MenuItemModal: React.FC<MenuItemModalProps> = ({
   // Calculate unit price dynamically
   const unitPrice = useMemo(() => {
     let base = 0
-    if (item.promotionalPrice != null && item.promotionalPrice > 0) {
+
+    // Size handling: Se houver tamanho com preço próprio cadastrado, o preço do tamanho SUBSTITUI o preço base.
+    const chosenSize =
+      item.sizes && item.sizes.length > 0 && selectedSizeId
+        ? item.sizes.find((s) => s.id === selectedSizeId)
+        : undefined
+
+    if (chosenSize && typeof chosenSize.price === 'number' && chosenSize.price > 0) {
+      base = chosenSize.price
+    } else if (item.promotionalPrice != null && item.promotionalPrice > 0) {
       base = item.promotionalPrice
     } else if (item.price != null && item.price > 0) {
       base = item.price
     }
 
-    // Size adjustment
-    if (item.sizes && item.sizes.length > 0 && selectedSizeId) {
-      const foundSize = item.sizes.find((s) => s.id === selectedSizeId)
-      if (foundSize && typeof foundSize.price === 'number') {
-        base += foundSize.price
-      }
-    }
-
-    // Extras
+    // Extras (somente adicionais extras devem ser somados ao preço do tamanho)
     if (item.extras && item.extras.length > 0 && selectedExtras.length > 0) {
       selectedExtras.forEach((extId) => {
         const found = item.extras?.find((e) => e.id === extId)
@@ -166,6 +167,12 @@ export const MenuItemModal: React.FC<MenuItemModalProps> = ({
   // Build CartItem payload
   const buildCartItem = (): CartItem => {
     const chosenSize = item.sizes?.find((s) => s.id === selectedSizeId)
+    const effectiveSizePrice =
+      chosenSize && typeof chosenSize.price === 'number' && chosenSize.price > 0
+        ? chosenSize.price
+        : item.promotionalPrice != null && item.promotionalPrice > 0
+        ? item.promotionalPrice
+        : item.price || 0
     const chosenExtras = (item.extras || [])
       .filter((e) => selectedExtras.includes(e.id))
       .map((e) => ({ name: e.name, price: e.price }))
@@ -182,7 +189,7 @@ export const MenuItemModal: React.FC<MenuItemModalProps> = ({
     })
 
     const opt: CartItemOption = {
-      size: chosenSize ? { name: chosenSize.name, price: chosenSize.price || 0 } : undefined,
+      size: chosenSize ? { name: chosenSize.name, price: effectiveSizePrice } : undefined,
       flavors: selectedFlavors.length > 0 ? selectedFlavors : undefined,
       extras: chosenExtras.length > 0 ? chosenExtras : undefined,
       removals: selectedRemovals.length > 0 ? selectedRemovals : undefined,
@@ -223,10 +230,13 @@ export const MenuItemModal: React.FC<MenuItemModalProps> = ({
         <div className="relative shrink-0">
           {item.photoUrl ? (
             <div className="relative h-48 sm:h-56 w-full bg-neutral-950 overflow-hidden">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
                 src={item.photoUrl}
                 alt={item.name}
                 className="w-full h-full object-cover"
+                loading="lazy"
+                referrerPolicy="no-referrer"
                 onError={(e) => {
                   ;(e.target as HTMLElement).style.display = 'none'
                 }}
@@ -476,11 +486,19 @@ export const MenuItemModal: React.FC<MenuItemModalProps> = ({
                         </div>
                         <span className="text-xs font-semibold">{sz.name}</span>
                       </div>
-                      {sz.price != null && sz.price > 0 && (
+                      {sz.price != null && sz.price > 0 ? (
                         <span className="text-xs font-bold text-emerald-500">
-                          +{formatMoney(sz.price)}
+                          {formatMoney(sz.price)}
                         </span>
-                      )}
+                      ) : item.price != null && item.price > 0 ? (
+                        <span className="text-xs font-bold text-emerald-500">
+                          {formatMoney(
+                            item.promotionalPrice && item.promotionalPrice > 0
+                              ? item.promotionalPrice
+                              : item.price
+                          )}
+                        </span>
+                      ) : null}
                     </div>
                   )
                 })}

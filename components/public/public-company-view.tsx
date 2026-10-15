@@ -82,6 +82,27 @@ interface FeatureItem {
   onClick: () => void
 }
 
+const GoogleColoredIcon: React.FC<{ className?: string }> = ({ className = 'w-5 h-5' }) => (
+  <svg viewBox="0 0 24 24" className={className} aria-hidden="true" focusable="false">
+    <path
+      fill="#4285F4"
+      d="M23.745 12.27c0-.7-.06-1.4-.19-2.07H12v4.51h6.6c-.29 1.52-1.14 2.82-2.4 3.68v3.05h3.88c2.27-2.09 3.66-5.17 3.66-9.17z"
+    />
+    <path
+      fill="#34A853"
+      d="M12 24c3.24 0 5.95-1.08 7.93-2.91l-3.88-3.05c-1.08.72-2.45 1.16-4.05 1.16-3.12 0-5.77-2.1-6.72-4.93H1.25v3.15C3.26 21.36 7.33 24 12 24z"
+    />
+    <path
+      fill="#FBBC05"
+      d="M5.28 14.27c-.25-.72-.38-1.49-.38-2.27s.13-1.55.38-2.27V6.58H1.25C.45 8.18 0 9.99 0 12s.45 3.82 1.25 5.42l4.03-3.15z"
+    />
+    <path
+      fill="#EA4335"
+      d="M12 4.75c1.77 0 3.35.61 4.6 1.8l3.42-3.42C17.95 1.19 15.24 0 12 0 7.33 0 3.26 2.64 1.25 6.58l4.03 3.15c.95-2.83 3.6-4.98 6.72-4.98z"
+    />
+  </svg>
+)
+
 export const PublicCompanyView: React.FC<PublicCompanyViewProps> = ({
   company,
   initialProducts = [],
@@ -125,6 +146,7 @@ export const PublicCompanyView: React.FC<PublicCompanyViewProps> = ({
   const [selectedMenuItemDetail, setSelectedMenuItemDetail] = useState<MenuItem | null>(null)
   const [cart, setCart] = useState<CartItem[]>([])
   const [isCartOpen, setIsCartOpen] = useState(false)
+  const [cartInitialStep, setCartInitialStep] = useState<'items' | 'delivery'>('items')
   const [coverError, setCoverError] = useState(false)
   const [logoError, setLogoError] = useState(false)
   const [copiedLink, setCopiedLink] = useState(false)
@@ -417,6 +439,7 @@ export const PublicCompanyView: React.FC<PublicCompanyViewProps> = ({
   const handleAddToCart = useCallback((item: CartItem) => {
     setCart((prev) => [...prev, item])
     setSelectedMenuItemDetail(null)
+    setCartInitialStep('items')
     setIsCartOpen(true)
   }, [])
 
@@ -424,59 +447,10 @@ export const PublicCompanyView: React.FC<PublicCompanyViewProps> = ({
     (item: CartItem) => {
       setCart((prev) => [...prev, item])
       setSelectedMenuItemDetail(null)
-
-      const phoneRaw = company.whatsapp || ''
-      const phoneClean = phoneRaw.replace(/\D/g, '')
-      const phoneWithDdi = phoneClean.startsWith('55') ? phoneClean : `55${phoneClean}`
-
-      const formatItemMoney = (val: number) => {
-        return new Intl.NumberFormat('pt-BR', {
-          style: 'currency',
-          currency: 'BRL',
-        }).format(val)
-      }
-
-      let message = `👋 Olá! Gostaria de pedir pelo cardápio da *${company.name}*:\n\n`
-      message += `1x *${item.menuItem.name}* — ${formatItemMoney(item.totalPrice)}\n`
-      if (item.options.size) {
-        message += `   • Tamanho: ${item.options.size.name}${
-          item.options.size.price > 0 ? ` (+${formatItemMoney(item.options.size.price)})` : ''
-        }\n`
-      }
-      if (item.options.flavors && item.options.flavors.length > 0) {
-        message += `   • Sabores: ${item.options.flavors.join(', ')}\n`
-      }
-      if (item.options.customSteps && item.options.customSteps.length > 0) {
-        item.options.customSteps.forEach((st) => {
-          if (st.selected && st.selected.length > 0) {
-            const opts = st.selected
-              .map((o) => `${o.name}${o.price > 0 ? ` (+${formatItemMoney(o.price)})` : ''}`)
-              .join(', ')
-            message += `   • ${st.stepTitle}: ${opts}\n`
-          }
-        })
-      }
-      if (item.options.extras && item.options.extras.length > 0) {
-        const ext = item.options.extras
-          .map((e) => `${e.name} (+${formatItemMoney(e.price)})`)
-          .join(', ')
-        message += `   • Adicionais: ${ext}\n`
-      }
-      if (item.options.removals && item.options.removals.length > 0) {
-        message += `   • Retirar: ${item.options.removals.join(', ')}\n`
-      }
-      if (item.options.notes) {
-        message += `   • Obs: "${item.options.notes}"\n`
-      }
-      message += `\n--------------------------------\n`
-      message += `💰 *Total do Pedido: ${formatItemMoney(item.totalPrice)}*\n`
-      message += `--------------------------------\n\n`
-      message += `Por favor, confirme o recebimento do pedido!`
-
-      const url = `https://wa.me/${phoneWithDdi}?text=${encodeURIComponent(message)}`
-      window.open(url, '_blank', 'noopener,noreferrer')
+      setCartInitialStep('delivery')
+      setIsCartOpen(true)
     },
-    [company]
+    []
   )
 
   const handleUpdateCartQty = useCallback((cartItemId: string, newQty: number) => {
@@ -629,11 +603,10 @@ export const PublicCompanyView: React.FC<PublicCompanyViewProps> = ({
         id: 'googleReview',
         title: 'Avaliações do Google',
         description: `${company.rating ? company.rating.toFixed(1) : '5.0'}★ no Google`,
-        icon: <Star className="w-5 h-5 fill-amber-400 text-amber-400" />,
+        icon: <GoogleColoredIcon className="w-4.5 h-4.5 sm:w-5 sm:h-5 shrink-0" />,
         iconContainerClass: isDark
-          ? 'bg-amber-500/15 border border-amber-500/25'
-          : 'bg-amber-50 border border-amber-200/80',
-        iconContainerStyle: { color: '#F59E0B' },
+          ? 'bg-neutral-800/90 border border-white/10'
+          : 'bg-white border border-neutral-200/80 shadow-2xs',
         onClick: handleGoogleReview,
         isActive: Boolean(activeModules.googleReview),
       },
@@ -1915,10 +1888,13 @@ export const PublicCompanyView: React.FC<PublicCompanyViewProps> = ({
                         {/* Foto com Thumbnail */}
                         <div className="relative w-20 h-20 sm:w-24 sm:h-24 rounded-xl overflow-hidden shrink-0 bg-neutral-800">
                           {item.photoUrl ? (
+                            /* eslint-disable-next-line @next/next/no-img-element */
                             <img
                               src={item.photoUrl}
                               alt={item.name}
                               className="w-full h-full object-cover"
+                              loading="lazy"
+                              referrerPolicy="no-referrer"
                               onError={(e) => {
                                 ;(e.target as HTMLElement).style.display = 'none'
                               }}
@@ -2227,13 +2203,13 @@ export const PublicCompanyView: React.FC<PublicCompanyViewProps> = ({
                 {/* Badge Oficial Google */}
                 <div className="flex items-center gap-2">
                   <div
-                    className={`w-7 h-7 rounded-lg flex items-center justify-center font-bold text-xs shadow-2xs ${
+                    className={`w-7 h-7 rounded-lg flex items-center justify-center shadow-2xs ${
                       isDark
                         ? 'bg-neutral-800/90 border border-white/10'
                         : 'bg-neutral-100 border border-neutral-200/60'
                     }`}
                   >
-                    <span className="text-[#4285F4] font-black">G</span>
+                    <GoogleColoredIcon className="w-4 h-4 shrink-0" />
                   </div>
                   <div>
                     <span
@@ -2722,6 +2698,8 @@ export const PublicCompanyView: React.FC<PublicCompanyViewProps> = ({
           isOpen={Boolean(selectedProductDetail)}
           onClose={() => setSelectedProductDetail(null)}
           company={company}
+          initialCustomerName={customerSession.name}
+          initialCustomerPhone={customerSession.phone || undefined}
         />
 
         {/* Modal de Personalização do Item do Cardápio */}
@@ -2742,6 +2720,9 @@ export const PublicCompanyView: React.FC<PublicCompanyViewProps> = ({
           cart={cart}
           company={company}
           isDark={isDark}
+          initialStep={cartInitialStep}
+          initialCustomerName={customerSession.name}
+          initialCustomerPhone={customerSession.phone || undefined}
           onClose={() => setIsCartOpen(false)}
           onUpdateQuantity={handleUpdateCartQty}
           onRemoveItem={handleRemoveCartItem}
@@ -2753,7 +2734,10 @@ export const PublicCompanyView: React.FC<PublicCompanyViewProps> = ({
           <div className="fixed bottom-20 sm:bottom-6 right-4 sm:right-6 z-40 animate-in fade-in slide-in-from-bottom-4 duration-200">
             <button
               type="button"
-              onClick={() => setIsCartOpen(true)}
+              onClick={() => {
+                setCartInitialStep('items')
+                setIsCartOpen(true)
+              }}
               className="px-4 py-3 rounded-2xl bg-teal-600 hover:bg-teal-500 text-white font-bold text-xs shadow-xl shadow-teal-950/40 flex items-center gap-2.5 transition-all transform active:scale-95 cursor-pointer border border-teal-400/30"
             >
               <ShoppingBag className="w-4 h-4" />

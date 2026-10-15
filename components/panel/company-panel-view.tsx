@@ -119,6 +119,26 @@ type TabType =
   | 'settings'
   | 'appearance'
 
+const ALL_ORDERABLE_MODULES: Array<{
+  key: string
+  label: string
+  icon: React.ComponentType<{ className?: string }>
+  color: string
+}> = [
+  { key: 'whatsapp', label: 'WhatsApp', icon: MessageCircle, color: 'text-emerald-600 bg-emerald-50 border-emerald-200' },
+  { key: 'services', label: 'Serviços', icon: Scissors, color: 'text-violet-600 bg-violet-50 border-violet-200' },
+  { key: 'products', label: 'Catálogo de Produtos', icon: Package, color: 'text-blue-600 bg-blue-50 border-blue-200' },
+  { key: 'appointments', label: 'Agendamento', icon: Calendar, color: 'text-indigo-600 bg-indigo-50 border-indigo-200' },
+  { key: 'menu', label: 'Cardápio', icon: UtensilsCrossed, color: 'text-amber-600 bg-amber-50 border-amber-200' },
+  { key: 'loyalty', label: 'Fidelidade', icon: Gift, color: 'text-emerald-600 bg-emerald-50 border-emerald-200' },
+  { key: 'googleReview', label: 'Avaliações do Google', icon: Star, color: 'text-amber-500 bg-amber-50 border-amber-200' },
+  { key: 'location', label: 'Localização', icon: MapPin, color: 'text-rose-600 bg-rose-50 border-rose-200' },
+  { key: 'contact', label: 'Contato', icon: MapPin, color: 'text-rose-600 bg-rose-50 border-rose-200' },
+  { key: 'wifi', label: 'Wi-Fi', icon: Wifi, color: 'text-cyan-600 bg-cyan-50 border-cyan-200' },
+  { key: 'feedback', label: 'Feedback Privado', icon: MessageSquare, color: 'text-purple-600 bg-purple-50 border-purple-200' },
+  { key: 'instagram', label: 'Instagram', icon: Instagram, color: 'text-pink-600 bg-pink-50 border-pink-200' },
+]
+
 export const CompanyPanelView: React.FC<CompanyPanelViewProps> = ({
   initialCompany,
 }) => {
@@ -242,25 +262,6 @@ export const CompanyPanelView: React.FC<CompanyPanelViewProps> = ({
   const [dragOverIndex, setDragOverIndex] = useState<number | null>(null)
   const [touchDragIndex, setTouchDragIndex] = useState<number | null>(null)
 
-  const ALL_ORDERABLE_MODULES: Array<{
-    key: string
-    label: string
-    icon: React.ComponentType<{ className?: string }>
-    color: string
-  }> = [
-    { key: 'whatsapp', label: 'WhatsApp', icon: MessageCircle, color: 'text-emerald-600 bg-emerald-50 border-emerald-200' },
-    { key: 'services', label: 'Serviços', icon: Scissors, color: 'text-violet-600 bg-violet-50 border-violet-200' },
-    { key: 'products', label: 'Catálogo de Produtos', icon: Package, color: 'text-blue-600 bg-blue-50 border-blue-200' },
-    { key: 'appointments', label: 'Agendamento', icon: Calendar, color: 'text-indigo-600 bg-indigo-50 border-indigo-200' },
-    { key: 'menu', label: 'Cardápio', icon: UtensilsCrossed, color: 'text-amber-600 bg-amber-50 border-amber-200' },
-    { key: 'loyalty', label: 'Fidelidade', icon: Gift, color: 'text-emerald-600 bg-emerald-50 border-emerald-200' },
-    { key: 'googleReview', label: 'Avaliações do Google', icon: Star, color: 'text-amber-500 bg-amber-50 border-amber-200' },
-    { key: 'location', label: 'Localização', icon: MapPin, color: 'text-rose-600 bg-rose-50 border-rose-200' },
-    { key: 'contact', label: 'Contato', icon: MapPin, color: 'text-rose-600 bg-rose-50 border-rose-200' },
-    { key: 'wifi', label: 'Wi-Fi', icon: Wifi, color: 'text-cyan-600 bg-cyan-50 border-cyan-200' },
-    { key: 'feedback', label: 'Feedback Privado', icon: MessageSquare, color: 'text-purple-600 bg-purple-50 border-purple-200' },
-    { key: 'instagram', label: 'Instagram', icon: Instagram, color: 'text-pink-600 bg-pink-50 border-pink-200' },
-  ]
 
   // Requisitos: Mostrar somente os módulos ativos
   const activeOrderedModules = React.useMemo(() => {
