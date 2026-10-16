@@ -285,7 +285,7 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
                 {/* Foto Principal do Produto */}
                 <div className="space-y-2">
                   <div
-                    className={`relative w-full aspect-square sm:aspect-[4/3] rounded-2xl overflow-hidden border flex items-center justify-center shadow-xs ${
+                    className={`relative w-full aspect-square sm:aspect-[4/3] min-h-[280px] sm:min-h-[340px] rounded-2xl overflow-hidden border flex items-center justify-center shadow-xs ${
                       isDark ? 'bg-neutral-900 border-white/5' : 'bg-neutral-100 border-neutral-200'
                     }`}
                   >

@@ -26,6 +26,7 @@ import {
   Copy,
   Info,
   ArrowUpDown,
+  Flame,
 } from 'lucide-react'
 import {
   Company,
@@ -105,6 +106,8 @@ export const MenuTab: React.FC<MenuTabProps> = ({ company, onCompanyUpdate }) =>
   const [promotionalPrice, setPromotionalPrice] = useState<string>('')
   const [isAvailable, setIsAvailable] = useState<boolean>(true)
   const [isFeatured, setIsFeatured] = useState<boolean>(false)
+  const [isBestSeller, setIsBestSeller] = useState<boolean>(false)
+  const [isNew, setIsNew] = useState<boolean>(false)
   const [order, setOrder] = useState<number>(0)
   const [photoUrl, setPhotoUrl] = useState('')
   const [photoPreview, setPhotoPreview] = useState('')
@@ -245,6 +248,8 @@ export const MenuTab: React.FC<MenuTabProps> = ({ company, onCompanyUpdate }) =>
     setPromotionalPrice('')
     setIsAvailable(true)
     setIsFeatured(false)
+    setIsBestSeller(false)
+    setIsNew(false)
     setOrder(menuItems.length + 1)
     setPhotoUrl('')
     setPhotoPreview('')
@@ -290,6 +295,8 @@ export const MenuTab: React.FC<MenuTabProps> = ({ company, onCompanyUpdate }) =>
     )
     setIsAvailable(item.isAvailable !== false)
     setIsFeatured(Boolean(item.isFeatured))
+    setIsBestSeller(Boolean(item.isBestSeller))
+    setIsNew(Boolean(item.isNew))
     setOrder(item.order || 0)
     setPhotoUrl(item.photoUrl || '')
     setPhotoPreview(item.photoUrl || '')
@@ -331,6 +338,9 @@ export const MenuTab: React.FC<MenuTabProps> = ({ company, onCompanyUpdate }) =>
       ...item,
       id: `mnu_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
       name: `${item.name} (Cópia)`,
+      isFeatured: Boolean(item.isFeatured),
+      isBestSeller: Boolean(item.isBestSeller),
+      isNew: Boolean(item.isNew),
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
     }
@@ -402,6 +412,8 @@ export const MenuTab: React.FC<MenuTabProps> = ({ company, onCompanyUpdate }) =>
         promotionalPrice: parsedPromo,
         isAvailable,
         isFeatured,
+        isBestSeller,
+        isNew,
         order: Number(order) || 0,
         photoUrl: finalPhotoUrl || undefined,
         allowNotes,
@@ -854,10 +866,22 @@ export const MenuTab: React.FC<MenuTabProps> = ({ company, onCompanyUpdate }) =>
 
                         {/* Badges Over Image */}
                         <div className="absolute top-2.5 left-2.5 flex flex-wrap gap-1.5">
+                          {item.isBestSeller && (
+                            <span className="px-2 py-0.5 rounded-full bg-orange-500 text-white text-[10px] font-bold shadow-xs flex items-center gap-1">
+                              <Flame className="w-2.5 h-2.5" />
+                              <span>Mais pedido</span>
+                            </span>
+                          )}
                           {item.isFeatured && (
                             <span className="px-2 py-0.5 rounded-full bg-amber-500 text-white text-[10px] font-bold shadow-xs flex items-center gap-1">
                               <Sparkles className="w-2.5 h-2.5" />
                               <span>Destaque</span>
+                            </span>
+                          )}
+                          {item.isNew && (
+                            <span className="px-2 py-0.5 rounded-full bg-emerald-600 text-white text-[10px] font-bold shadow-xs flex items-center gap-1">
+                              <Tag className="w-2.5 h-2.5" />
+                              <span>Novidade</span>
                             </span>
                           )}
                           {item.isCustomBuilder && (
@@ -1177,13 +1201,39 @@ export const MenuTab: React.FC<MenuTabProps> = ({ company, onCompanyUpdate }) =>
                   <label className="flex items-center gap-2 cursor-pointer">
                     <input
                       type="checkbox"
+                      checked={isBestSeller}
+                      onChange={(e) => setIsBestSeller(e.target.checked)}
+                      className="w-4 h-4 text-orange-500 rounded border-neutral-300"
+                    />
+                    <span className="text-xs font-semibold text-neutral-800 flex items-center gap-1">
+                      <Flame className="w-3.5 h-3.5 text-orange-500" />
+                      <span>Mais Pedido</span>
+                    </span>
+                  </label>
+
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <input
+                      type="checkbox"
                       checked={isFeatured}
                       onChange={(e) => setIsFeatured(e.target.checked)}
                       className="w-4 h-4 text-amber-500 rounded border-neutral-300"
                     />
                     <span className="text-xs font-semibold text-neutral-800 flex items-center gap-1">
                       <Sparkles className="w-3.5 h-3.5 text-amber-500" />
-                      <span>Item em Destaque</span>
+                      <span>Destaque</span>
+                    </span>
+                  </label>
+
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={isNew}
+                      onChange={(e) => setIsNew(e.target.checked)}
+                      className="w-4 h-4 text-emerald-500 rounded border-neutral-300"
+                    />
+                    <span className="text-xs font-semibold text-neutral-800 flex items-center gap-1">
+                      <Tag className="w-3.5 h-3.5 text-emerald-500" />
+                      <span>Novidade</span>
                     </span>
                   </label>
                 </div>

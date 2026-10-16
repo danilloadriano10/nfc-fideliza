@@ -19,7 +19,7 @@ export const metadata: Metadata = {
 
 export default function RootLayout({children}: {children: React.ReactNode}) {
   return (
-    <html lang="pt-BR" className="w-full max-w-full overflow-x-hidden">
+    <html lang="pt-BR" suppressHydrationWarning className="w-full max-w-full overflow-x-hidden">
       <head>
         <script
           dangerouslySetInnerHTML={{

@@ -30,6 +30,12 @@ import {
   Minus,
   Plus,
   Layers,
+  Flame,
+  Tag,
+  LayoutGrid,
+  Pizza,
+  Coffee,
+  Cake,
 } from 'lucide-react'
 import { Company, CompanyService, CompanyProduct, MenuItem } from '@/types/platform'
 import { LoyaltySheet } from './loyalty-sheet'
@@ -1817,38 +1823,34 @@ export const PublicCompanyView: React.FC<PublicCompanyViewProps> = ({
               menu: (activeModules.menu && !isExternalMenu && activeMenuItemsList.length > 0) ? (
             <div
               id="secao-cardapio"
-              className={`rounded-3xl p-4.5 sm:p-5 space-y-4 border ${
-                isDark
-                  ? 'bg-[#121217] border-white/[0.08] shadow-sm'
-                  : 'bg-white border-neutral-200/80 shadow-2xs'
-              }`}
+              className="space-y-3.5 sm:space-y-4 w-full"
             >
               {/* Cabeçalho do Cardápio */}
-              <div className="flex items-center justify-between">
+              <div className="flex items-center justify-between px-0.5">
                 <div className="flex items-center gap-2.5">
                   <div
-                    className="w-9 h-9 rounded-xl flex items-center justify-center shadow-xs text-white"
-                    style={{ backgroundColor: primaryColor }}
+                    className="w-10 h-10 rounded-2xl flex items-center justify-center shadow-xs text-white shrink-0"
+                    style={{ backgroundColor: primaryColor || '#7A1228' }}
                   >
                     <UtensilsCrossed className="w-5 h-5" />
                   </div>
                   <div>
                     <span
-                      className="text-[10px] font-bold uppercase tracking-wider block"
-                      style={{ color: primaryColor }}
+                      className="text-[10px] font-black uppercase tracking-wider block"
+                      style={{ color: primaryColor || '#7A1228' }}
                     >
                       Cardápio Digital
                     </span>
                     <div className="flex items-center gap-2">
                       <h3
-                        className={`text-sm sm:text-base font-black tracking-tight ${
+                        className={`text-base sm:text-lg font-black tracking-tight ${
                           isDark ? 'text-white' : 'text-neutral-900'
                         }`}
                       >
                         Nossas Opções
                       </h3>
                       <span
-                        className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
+                        className={`text-[11px] font-bold px-2.5 py-0.5 rounded-full ${
                           isDark
                             ? 'bg-white/10 text-neutral-300'
                             : 'bg-neutral-100 text-neutral-700'
@@ -1872,38 +1874,53 @@ export const PublicCompanyView: React.FC<PublicCompanyViewProps> = ({
                 )}
               </div>
 
-              {/* Filtro de Categorias */}
+              {/* Filtro de Categorias em Chips Horizontais */}
               {menuCategories.length > 1 && (
-                <div className="flex items-center gap-1.5 overflow-x-auto pb-1.5 scrollbar-none">
+                <div className="flex items-center gap-2 overflow-x-auto pb-2 scrollbar-none -mx-1 px-1 flex-nowrap shrink-0 touch-pan-x">
                   {menuCategories.map((cat) => {
                     const isSelected = selectedMenuCategory === cat
+
+                    const getCategoryIcon = (c: string) => {
+                      const lower = c.toLowerCase()
+                      if (lower === 'todos') return <LayoutGrid className="w-3.5 h-3.5 shrink-0" />
+                      if (lower.includes('pizza')) return <Pizza className="w-3.5 h-3.5 shrink-0" />
+                      if (lower.includes('bebida') || lower.includes('drink') || lower.includes('café') || lower.includes('suco'))
+                        return <Coffee className="w-3.5 h-3.5 shrink-0" />
+                      if (lower.includes('combo') || lower.includes('lanche') || lower.includes('burger'))
+                        return <Package className="w-3.5 h-3.5 shrink-0" />
+                      if (lower.includes('sobremesa') || lower.includes('doce') || lower.includes('torta') || lower.includes('chocolate'))
+                        return <Cake className="w-3.5 h-3.5 shrink-0" />
+                      return <UtensilsCrossed className="w-3.5 h-3.5 shrink-0" />
+                    }
+
                     return (
                       <button
                         key={cat}
                         type="button"
                         onClick={() => setSelectedMenuCategory(cat)}
-                        className={`px-3 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap transition-all cursor-pointer ${
+                        className={`px-3.5 sm:px-4 py-2 rounded-2xl text-xs font-bold whitespace-nowrap transition-all cursor-pointer flex items-center gap-1.5 shadow-2xs ${
                           isSelected
-                            ? 'text-white shadow-xs'
+                            ? 'text-white shadow-sm scale-[1.02]'
                             : isDark
-                              ? 'bg-white/[0.05] hover:bg-white/10 text-neutral-300'
-                              : 'bg-neutral-100 hover:bg-neutral-200/80 text-neutral-700'
+                              ? 'bg-[#181820] hover:bg-white/10 text-neutral-300 border border-white/10'
+                              : 'bg-white hover:bg-neutral-100 text-neutral-800 border border-neutral-200/90'
                         }`}
                         style={
                           isSelected
-                            ? { backgroundColor: primaryColor }
+                            ? { backgroundColor: primaryColor || '#7A1228' }
                             : undefined
                         }
                       >
-                        {cat}
+                        {getCategoryIcon(cat)}
+                        <span>{cat}</span>
                       </button>
                     )
                   })}
                 </div>
               )}
 
-              {/* Grade de Itens do Cardápio */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
+              {/* Lista de Cards do Cardápio - Mobile First (FOTO QUADRADA 1:1 À ESQUERDA + INFORMAÇÕES À DIREITA) */}
+              <div className="flex flex-col gap-3.5 sm:gap-4 pt-1 w-full">
                 {displayedMenuItems.map((item) => {
                   const hasPromo =
                     item.promotionalPrice != null &&
@@ -1919,152 +1936,190 @@ export const PublicCompanyView: React.FC<PublicCompanyViewProps> = ({
                     }).format(val)
                   }
 
+                  // Menor preço dos tamanhos para "A partir de R$ XX,XX"
+                  const validSizePrices = (item.sizes || [])
+                    .map((s) => s.price)
+                    .filter((p): p is number => typeof p === 'number' && p > 0)
+                  const minSizePrice =
+                    validSizePrices.length > 0 ? Math.min(...validSizePrices) : null
+                  const hasPriceFrom =
+                    item.sizes && item.sizes.length > 0 && minSizePrice != null
+
+                  // Texto descritivo de customização (ex: "3 tamanhos • Personalizável")
+                  const sizeCount = item.sizes?.length || 0
+                  const isCustomizable = Boolean(
+                    (item.extras && item.extras.length > 0) ||
+                      (item.removableIngredients && item.removableIngredients.length > 0) ||
+                      item.isCustomBuilder ||
+                      (item.flavors && item.flavors.length > 0)
+                  )
+                  let customizationTag = ''
+                  if (sizeCount > 0 && isCustomizable) {
+                    customizationTag = `${sizeCount} ${sizeCount === 1 ? 'tamanho' : 'tamanhos'} • Personalizável`
+                  } else if (sizeCount > 0) {
+                    customizationTag = `${sizeCount} ${sizeCount === 1 ? 'tamanho' : 'tamanhos'}`
+                  } else if (isCustomizable) {
+                    customizationTag = 'Personalizável'
+                  }
+
                   return (
                     <div
                       key={item.id}
                       onClick={() => {
                         if (!isSoldOut) setSelectedMenuItemDetail(item)
                       }}
-                      className={`rounded-2xl p-3 border transition-all flex flex-col justify-between gap-3 ${
+                      className={`group w-full rounded-2xl sm:rounded-3xl p-2.5 sm:p-3.5 border transition-all flex flex-row items-center sm:items-stretch gap-2.5 sm:gap-3.5 ${
                         isSoldOut
                           ? 'opacity-65 cursor-not-allowed'
-                          : 'cursor-pointer hover:border-teal-500/50 hover:shadow-md'
+                          : 'cursor-pointer hover:shadow-lg active:scale-[0.99]'
                       } ${
                         isDark
-                          ? 'bg-white/[0.03] border-white/[0.06]'
-                          : 'bg-neutral-50/70 border-neutral-200/80'
+                          ? 'bg-[#181820] hover:bg-[#1f1f28] border-white/10 hover:border-white/20'
+                          : 'bg-white hover:bg-neutral-50/70 border-neutral-200/90 hover:border-neutral-300 shadow-xs'
                       }`}
                     >
-                      <div className="flex gap-3">
-                        {/* Foto com Thumbnail */}
-                        <div className="relative w-20 h-20 sm:w-24 sm:h-24 rounded-xl overflow-hidden shrink-0 bg-neutral-800">
-                          {item.photoUrl ? (
-                            /* eslint-disable-next-line @next/next/no-img-element */
-                            <img
-                              src={item.photoUrl}
-                              alt={item.name}
-                              className="w-full h-full object-cover"
-                              loading="lazy"
-                              referrerPolicy="no-referrer"
-                              onError={(e) => {
-                                ;(e.target as HTMLElement).style.display = 'none'
-                              }}
-                            />
-                          ) : (
-                            <div className="w-full h-full flex items-center justify-center text-neutral-500">
-                              <UtensilsCrossed className="w-6 h-6 opacity-40" />
-                            </div>
-                          )}
-                          {hasPromo && (
-                            <span className="absolute top-1 left-1 px-1.5 py-0.5 rounded-full text-[8px] font-black uppercase bg-rose-600 text-white shadow-xs">
-                              Promo
+                      {/* 1. COLUNA ESQUERDA: FOTO AUMENTADA EM FORMATO QUADRADO 1:1 */}
+                      <div className="w-[145px] h-[145px] min-w-[145px] sm:w-[175px] sm:h-[175px] sm:min-w-[175px] md:w-[195px] md:h-[195px] md:min-w-[195px] shrink-0 aspect-square relative rounded-2xl sm:rounded-2xl overflow-hidden bg-neutral-100 dark:bg-neutral-800 border border-neutral-200/60 dark:border-white/10 self-center sm:self-start">
+                        {item.photoUrl ? (
+                          /* eslint-disable-next-line @next/next/no-img-element */
+                          <img
+                            src={item.photoUrl}
+                            alt={item.name}
+                            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                            loading="lazy"
+                            referrerPolicy="no-referrer"
+                            onError={(e) => {
+                              ;(e.target as HTMLElement).style.display = 'none'
+                            }}
+                          />
+                        ) : (
+                          <div className="w-full h-full flex flex-col items-center justify-center text-neutral-400 dark:text-neutral-600 p-2 text-center">
+                            <UtensilsCrossed className="w-8 h-8 opacity-40 mb-1" />
+                            <span className="text-[10px] font-medium">Sem foto</span>
+                          </div>
+                        )}
+
+                        {/* Selos SOBRE a foto no canto superior esquerdo: Mais pedido, Destaque, Novidade */}
+                        <div className="absolute top-1.5 left-1.5 sm:top-2 sm:left-2 flex flex-col gap-1 z-10 pointer-events-none items-start">
+                          {item.isBestSeller && (
+                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[9px] sm:text-[10px] font-black uppercase tracking-tight bg-[#E52E2E] text-white shadow-md">
+                              <Flame className="w-2.5 h-2.5 sm:w-3 sm:h-3 fill-white text-white shrink-0" />
+                              <span>Mais pedido</span>
                             </span>
                           )}
-                          {isSoldOut && (
-                            <span className="absolute inset-0 bg-black/70 flex items-center justify-center text-[10px] font-extrabold uppercase text-rose-300">
-                              Esgotado
+                          {item.isFeatured && (
+                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[9px] sm:text-[10px] font-black uppercase tracking-tight bg-[#FFB800] text-neutral-950 shadow-md">
+                              <Star className="w-2.5 h-2.5 sm:w-3 sm:h-3 fill-neutral-950 text-neutral-950 shrink-0" />
+                              <span>Destaque</span>
+                            </span>
+                          )}
+                          {item.isNew && (
+                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[9px] sm:text-[10px] font-black uppercase tracking-tight bg-[#008A5E] text-white shadow-md">
+                              <Tag className="w-2.5 h-2.5 sm:w-3 sm:h-3 fill-white text-white shrink-0" />
+                              <span>Novidade</span>
                             </span>
                           )}
                         </div>
 
-                        {/* Informações */}
-                        <div className="flex-1 min-w-0 space-y-1">
-                          <div className="flex items-center gap-1.5 flex-wrap">
-                            {item.category && (
-                              <span className="text-[9px] font-bold uppercase tracking-wider text-neutral-400 block truncate">
-                                {item.category}
-                              </span>
-                            )}
-                            {item.isFeatured && (
-                              <span className="text-[9px] font-bold text-amber-500 flex items-center gap-0.5">
-                                <Sparkles className="w-2.5 h-2.5" />
-                                <span>Destaque</span>
-                              </span>
-                            )}
-                            {item.isCustomBuilder && (
-                              <span className="text-[9px] font-bold text-violet-400 flex items-center gap-0.5">
-                                <Layers className="w-2.5 h-2.5" />
-                                <span>Monte seu pedido</span>
-                              </span>
-                            )}
-                          </div>
+                        {hasPromo && !item.isBestSeller && !item.isFeatured && !item.isNew && (
+                          <span className="absolute top-1.5 left-1.5 px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider bg-rose-600 text-white shadow-xs z-10">
+                            Promo
+                          </span>
+                        )}
 
+                        {isSoldOut && (
+                          <div className="absolute inset-0 bg-black/75 backdrop-blur-2xs flex items-center justify-center p-1 text-center z-20">
+                            <span className="text-[10px] font-black uppercase tracking-wider text-rose-300">
+                              Esgotado
+                            </span>
+                          </div>
+                        )}
+                      </div>
+
+                      {/* 2. COLUNA DIREITA: INFORMAÇÕES (Aproveita toda a largura, organizada verticalmente) */}
+                      <div className="flex-1 min-w-0 flex flex-col justify-between py-0.5 pl-0.5 sm:pl-1 pr-0.5">
+                        {/* Bloco Superior: Categoria, Nome, Descrição */}
+                        <div>
+                          {/* 1. CATEGORIA */}
+                          <span className="text-[10px] sm:text-[11px] font-bold uppercase tracking-wider text-neutral-400 dark:text-neutral-500 block truncate">
+                            {item.category || 'Geral'}
+                          </span>
+
+                          {/* 2. NOME DO PRODUTO */}
                           <h4
-                            className={`font-bold text-xs sm:text-sm leading-snug line-clamp-1 ${
+                            className={`font-black text-xs sm:text-base leading-tight tracking-tight line-clamp-2 mt-0.5 ${
                               isDark ? 'text-white' : 'text-neutral-900'
                             }`}
                           >
                             {item.name}
                           </h4>
 
+                          {/* 3. DESCRIÇÃO (limitada a 2 linhas) */}
                           {item.description && (
                             <p
-                              className={`text-[11px] line-clamp-2 leading-relaxed ${
+                              className={`text-[11px] sm:text-xs line-clamp-2 leading-snug sm:leading-relaxed mt-1 ${
                                 isDark ? 'text-neutral-400' : 'text-neutral-500'
                               }`}
                             >
                               {item.description}
                             </p>
                           )}
+                        </div>
 
-                          {/* Preço */}
-                          <div className="flex items-baseline gap-1.5 pt-1">
-                            {hasPromo ? (
-                              <>
-                                <span className="text-xs sm:text-sm font-extrabold text-emerald-500">
+                        {/* Bloco Inferior: "A partir de", Preço, Tag de Tamanhos, Botão */}
+                        <div className="mt-2 space-y-1">
+                          {/* 4. "A partir de" */}
+                          <span className="text-[10px] sm:text-[11px] text-neutral-500 dark:text-neutral-400 font-medium block leading-tight">
+                            {hasPriceFrom ? 'A partir de' : 'Valor'}
+                          </span>
+
+                          {/* 5. PREÇO */}
+                          <div className="text-base sm:text-lg font-black text-[#8B0000] dark:text-rose-400 leading-tight">
+                            {hasPriceFrom ? (
+                              formatMoney(minSizePrice)
+                            ) : hasPromo ? (
+                              <div className="flex items-baseline gap-1.5 flex-wrap">
+                                <span className="text-emerald-600 dark:text-emerald-400">
                                   {formatMoney(item.promotionalPrice)}
                                 </span>
-                                <span className="text-[10px] text-neutral-400 line-through">
+                                <span className="text-xs text-neutral-400 line-through font-normal">
                                   {formatMoney(item.price)}
                                 </span>
-                              </>
+                              </div>
                             ) : item.price != null ? (
-                              <span
-                                className={`text-xs sm:text-sm font-extrabold ${
-                                  isDark ? 'text-white' : 'text-neutral-900'
-                                }`}
-                              >
-                                {formatMoney(item.price)}
-                              </span>
+                              formatMoney(item.price)
                             ) : (
-                              <span className="text-xs font-semibold text-neutral-400">
-                                Sob consulta
-                              </span>
+                              <span className="text-xs font-semibold text-neutral-400">Sob consulta</span>
                             )}
                           </div>
-                        </div>
-                      </div>
 
-                      {/* Botão de Ação */}
-                      <div className="pt-2 border-t border-neutral-200/40 dark:border-white/[0.06] flex items-center justify-between">
-                        <div className="flex items-center gap-1 text-[10px] text-neutral-400">
-                          {item.sizes && item.sizes.length > 0 && (
-                            <span>{item.sizes.length} tamanhos</span>
-                          )}
-                          {item.extras && item.extras.length > 0 && (
-                            <span>• +adicionais</span>
-                          )}
-                          {item.isCustomBuilder && (
-                            <span>• {item.customSteps?.length || 0} etapas</span>
-                          )}
-                        </div>
+                          {/* 6. "3 tamanhos • Personalizável" (Completo, sem cortar) */}
+                          <div className="pt-0.5">
+                            <div className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md bg-neutral-100 dark:bg-neutral-800/80 text-neutral-700 dark:text-neutral-300 text-[10px] sm:text-[11px] font-semibold leading-tight">
+                              <Tag className="w-2.5 h-2.5 text-neutral-400 shrink-0" />
+                              <span className="whitespace-normal">{customizationTag || 'Personalizável'}</span>
+                            </div>
+                          </div>
 
-                        <button
-                          type="button"
-                          disabled={isSoldOut}
-                          onClick={(e) => {
-                            e.stopPropagation()
-                            if (!isSoldOut) setSelectedMenuItemDetail(item)
-                          }}
-                          className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1 ${
-                            isSoldOut
-                              ? 'opacity-40 cursor-not-allowed bg-neutral-500 text-white'
-                              : 'bg-teal-600 hover:bg-teal-500 text-white shadow-xs cursor-pointer active:scale-95'
-                          }`}
-                        >
-                          <Plus className="w-3.5 h-3.5" />
-                          <span>{item.isCustomBuilder ? 'Montar' : 'Pedir'}</span>
-                        </button>
+                          {/* 7. BOTÃO "+ Pedir agora" (Ocupando a largura da coluna direita) */}
+                          <div className="pt-1.5">
+                            <button
+                              type="button"
+                              disabled={isSoldOut}
+                              onClick={(e) => {
+                                e.stopPropagation()
+                                if (!isSoldOut) setSelectedMenuItemDetail(item)
+                              }}
+                              className={`w-full py-2 sm:py-2.5 px-2.5 sm:px-3 rounded-xl sm:rounded-2xl font-bold text-xs sm:text-sm text-white shadow-xs transition-all active:scale-[0.98] flex items-center justify-center cursor-pointer ${
+                                isSoldOut
+                                  ? 'opacity-40 cursor-not-allowed bg-neutral-400'
+                                  : 'bg-[#008A5E] hover:bg-[#007550] shadow-sm'
+                              }`}
+                            >
+                              <span>{item.isCustomBuilder ? '+ Montar agora' : '+ Pedir agora'}</span>
+                            </button>
+                          </div>
+                        </div>
                       </div>
                     </div>
                   )

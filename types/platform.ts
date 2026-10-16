@@ -147,6 +147,8 @@ export interface MenuItem {
   promotionalPrice?: number | null
   isAvailable: boolean // Disponível / Esgotado
   isFeatured?: boolean // Destaque
+  isBestSeller?: boolean // Mais pedido
+  isNew?: boolean // Novidade
   order?: number // Ordem de exibição
 
   // Opções e adicionais

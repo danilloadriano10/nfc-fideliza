@@ -173,6 +173,21 @@ export const AppointmentsTab: React.FC<AppointmentsTabProps> = ({
     }
   }, [company.id, loadData])
 
+  useEffect(() => {
+    if (company.bookingSettings) {
+      setSettings(company.bookingSettings)
+    } else {
+      setSettings({
+        mode: 'diretolink',
+        whatsappMessageTemplate: DEFAULT_WHATSAPP_BOOKING_TEMPLATE,
+        confirmationWhatsAppTemplate: DEFAULT_CONFIRMATION_TEMPLATE,
+        slotDurationMinutes: 30,
+        days: DEFAULT_DAYS,
+        blockedDates: [],
+      })
+    }
+  }, [company.id, company.bookingSettings])
+
   // Toggle Module Status
   const handleToggleModule = async () => {
     const current = Boolean(company.modules?.appointments)
@@ -378,6 +393,18 @@ export const AppointmentsTab: React.FC<AppointmentsTabProps> = ({
       bookingSettings: settings,
     }
     await saveCompany(updatedCompany)
+    try {
+      await fetch('/api/appointments', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          companyId: company.id,
+          bookingSettings: settings,
+        }),
+      })
+    } catch (err) {
+      console.error('Error syncing booking settings to server:', err)
+    }
     onUpdateCompany(updatedCompany)
     setIsSavingSettings(false)
     showToast('success', 'Horários e pausas salvos com sucesso!')
