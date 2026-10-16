@@ -51,6 +51,8 @@ import {
   ChevronDown,
   Instagram,
   MessageCircle,
+  QrCode,
+  Bell,
 } from 'lucide-react'
 import confetti from 'canvas-confetti'
 import { BRAND_COLOR_PRESETS, sanitizeHex, getGradientContrastTextColor } from '@/lib/colors'
@@ -67,6 +69,10 @@ import {
   getCompanyServices,
   getCompanyProducts,
   getCompanyMenuItems,
+  getCompanyTables,
+  getCompanyTableOrders,
+  fetchCompanyTablesFromServer,
+  fetchCompanyTableOrdersFromServer,
   getCompanyAppointments,
   getCompanyActivityLogs,
   getCompanyFeedbacks,
@@ -94,6 +100,8 @@ import { ServicesTab } from './services-tab'
 import { AppointmentsTab } from './appointments-tab'
 import { ProductsTab } from './products-tab'
 import { MenuTab } from './menu-tab'
+import { TablesTab } from './tables-tab'
+import { TableOrdersTab } from './table-orders-tab'
 
 const PRESET_BANNERS = [
   { label: '☕ Cafeteria / Café', url: '/images/cafe_central_banner_1791003956057.jpg' },
@@ -111,6 +119,8 @@ type TabType =
   | 'appointments'
   | 'products'
   | 'menu'
+  | 'tables'
+  | 'table_orders'
   | 'customers'
   | 'loyalty'
   | 'rewards'
@@ -659,6 +669,9 @@ export const CompanyPanelView: React.FC<CompanyPanelViewProps> = ({
   const servicesCount = getCompanyServices(company.id).length
   const productsCount = getCompanyProducts(company.id).length
   const menuItemsCount = getCompanyMenuItems(company.id).length
+  const tablesCount = getCompanyTables(company.id).length
+  const allTableOrders = getCompanyTableOrders(company.id)
+  const newTableOrdersCount = allTableOrders.filter((o) => o.status === 'novo').length
   const allAppointments = getCompanyAppointments(company.id)
   const pendingAppointmentsCount = allAppointments.filter((a) => a.status === 'pending').length
   const totalPoints = logs.reduce((acc, l) => acc + (l.pointsChange || 0), 0)
@@ -811,6 +824,19 @@ export const CompanyPanelView: React.FC<CompanyPanelViewProps> = ({
               count: menuItemsCount > 0 ? menuItemsCount : undefined,
               icon: UtensilsCrossed,
             },
+            {
+              id: 'tables',
+              label: 'Mesas',
+              count: tablesCount > 0 ? tablesCount : undefined,
+              icon: QrCode,
+            },
+            {
+              id: 'table_orders',
+              label: 'Pedidos do Salão',
+              count: newTableOrdersCount > 0 ? newTableOrdersCount : (allTableOrders.length > 0 ? allTableOrders.length : undefined),
+              badgeHighlight: newTableOrdersCount > 0,
+              icon: Bell,
+            },
             { id: 'customers', label: 'Clientes', count: totalCustomers, icon: Users },
             { id: 'loyalty', label: 'Fidelidade', icon: Gift },
             {
@@ -826,6 +852,7 @@ export const CompanyPanelView: React.FC<CompanyPanelViewProps> = ({
           ].map((tab) => {
             const Icon = tab.icon
             const isActive = activeTab === tab.id
+            const isHighlight = 'badgeHighlight' in tab && tab.badgeHighlight
             return (
               <button
                 key={tab.id}
@@ -857,7 +884,11 @@ export const CompanyPanelView: React.FC<CompanyPanelViewProps> = ({
                 {tab.count !== undefined && tab.count > 0 && (
                   <span
                     className={`text-[10px] font-bold px-1.5 py-0.2 rounded-full ${
-                      isActive ? 'bg-white/20 text-white' : 'bg-violet-100 text-violet-800'
+                      isHighlight
+                        ? 'bg-rose-500 text-white animate-pulse font-black'
+                        : isActive
+                        ? 'bg-white/20 text-white'
+                        : 'bg-violet-100 text-violet-800'
                     }`}
                   >
                     {tab.count}
@@ -942,6 +973,29 @@ export const CompanyPanelView: React.FC<CompanyPanelViewProps> = ({
                   <span>Iniciar Assistente</span>
                   <ArrowRight className="w-3.5 h-3.5" />
                 </button>
+              </div>
+            )}
+
+            {/* Live New Table Orders Alert (Real-time Salon Orders) */}
+            {newTableOrdersCount > 0 && (
+              <div className="p-4 sm:p-5 bg-gradient-to-r from-rose-50 via-rose-50 to-amber-50 border-2 border-rose-300 rounded-3xl shadow-sm space-y-3 animate-in fade-in">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                  <div className="flex items-center gap-2.5">
+                    <span className="w-3 h-3 rounded-full bg-rose-500 animate-ping shrink-0" />
+                    <h3 className="font-bold text-rose-950 text-sm flex items-center gap-2">
+                      <Bell className="w-4 h-4 text-rose-600" />
+                      <span>{newTableOrdersCount} Novo{newTableOrdersCount > 1 ? 's' : ''} Pedido{newTableOrdersCount > 1 ? 's' : ''} do Salão (Mesas)</span>
+                    </h3>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setActiveTab('table_orders')}
+                    className="text-xs font-bold text-rose-800 hover:text-rose-950 underline underline-offset-2 flex items-center gap-1 self-start sm:self-auto cursor-pointer"
+                  >
+                    <span>Abrir Pedidos do Salão</span>
+                    <ArrowRight className="w-3 h-3" />
+                  </button>
+                </div>
               </div>
             )}
 
@@ -1176,6 +1230,26 @@ export const CompanyPanelView: React.FC<CompanyPanelViewProps> = ({
               setCompany(updated)
               setFormData(updated)
             }}
+          />
+        )}
+
+        {/* ============================================== */}
+        {/* TAB 1.9: MESAS (CONSUMIR NO LOCAL) */}
+        {/* ============================================== */}
+        {activeTab === 'tables' && (
+          <TablesTab
+            company={company}
+            onOpenTableOrders={() => setActiveTab('table_orders')}
+          />
+        )}
+
+        {/* ============================================== */}
+        {/* TAB 1.10: PEDIDOS DO SALÃO */}
+        {/* ============================================== */}
+        {activeTab === 'table_orders' && (
+          <TableOrdersTab
+            company={company}
+            onOpenTables={() => setActiveTab('tables')}
           />
         )}
 

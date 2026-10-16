@@ -18,6 +18,7 @@ export interface CompanyModules {
   services?: boolean
   appointments?: boolean
   products?: boolean
+  tables?: boolean
 }
 
 export interface DaySchedule {
@@ -323,4 +324,52 @@ export interface GlobalStats {
   totalPointsDistributed: number
   totalRewardsEarned: number
   totalRewardsRedeemed: number
+}
+
+// ==========================================
+// MESAS E PEDIDOS DO SALÃO (CONSUMIR NO LOCAL)
+// ==========================================
+
+export interface CompanyTable {
+  id: string
+  companyId: string
+  name: string // ex: "Mesa 01", "Mesa 08"
+  identifier: string // ex: "01", "08"
+  isActive: boolean
+  qrCodeUrl?: string
+  notes?: string
+  createdAt: string
+  updatedAt?: string
+}
+
+export type TableOrderStatus = 'novo' | 'aceito' | 'preparo' | 'pronto' | 'entregue'
+
+export interface TableOrderItem {
+  id: string
+  menuItemId: string
+  name: string
+  quantity: number
+  unitPrice: number
+  totalPrice: number
+  sizeName?: string
+  flavors?: string[]
+  extras?: string[]
+  removals?: string[]
+  notes?: string
+  customSteps?: Array<{ stepTitle: string; options: string[] }>
+}
+
+export interface TableOrder {
+  id: string
+  companyId: string
+  tableNumber: string // ex: "08" ou "Mesa 08"
+  tableId?: string
+  customerName?: string
+  customerPhone?: string
+  items: TableOrderItem[]
+  totalAmount: number
+  notes?: string
+  status: TableOrderStatus
+  createdAt: string
+  updatedAt?: string
 }

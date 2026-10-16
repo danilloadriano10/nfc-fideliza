@@ -14,6 +14,7 @@ import {
   X,
   ExternalLink,
   Loader2,
+  UtensilsCrossed,
 } from 'lucide-react'
 import { motion, AnimatePresence } from 'motion/react'
 import { formatPhone, normalizePhone } from '@/lib/utils'
@@ -24,6 +25,7 @@ interface DeliveryOptionsFormProps {
   onChange: (updated: OrderDeliveryInfo) => void
   isDark: boolean
   errors?: Record<string, string>
+  autoDetectedTable?: string | null
 }
 
 export const DeliveryOptionsForm: React.FC<DeliveryOptionsFormProps> = ({
@@ -31,12 +33,17 @@ export const DeliveryOptionsForm: React.FC<DeliveryOptionsFormProps> = ({
   onChange,
   isDark,
   errors = {},
+  autoDetectedTable,
 }) => {
   const [isLocating, setIsLocating] = useState(false)
   const [locationError, setLocationError] = useState<string | null>(null)
 
   const handleTypeChange = (type: DeliveryType) => {
-    onChange({ ...info, deliveryType: type })
+    if (type === 'dine_in' && autoDetectedTable && !info.tableNumber) {
+      onChange({ ...info, deliveryType: type, tableNumber: autoDetectedTable })
+    } else {
+      onChange({ ...info, deliveryType: type })
+    }
   }
 
   const handleFieldChange = (field: keyof OrderDeliveryInfo, val: string) => {
@@ -102,17 +109,57 @@ export const DeliveryOptionsForm: React.FC<DeliveryOptionsFormProps> = ({
 
   return (
     <div className="space-y-4">
-      {/* 1. Escolha entre Retirada e Entrega */}
+      {/* 1. Escolha entre Consumir no Local, Retirada e Entrega */}
       <div className="space-y-1.5">
         <label className="text-[11px] font-bold uppercase tracking-wider text-neutral-400 block">
           Forma de Recebimento
         </label>
-        <div className="grid grid-cols-2 gap-2">
-          {/* Opção: Retirada no Local */}
+        <div className="grid grid-cols-3 gap-1.5 sm:gap-2">
+          {/* Opção 1: Consumir no Local */}
+          <button
+            type="button"
+            onClick={() => handleTypeChange('dine_in')}
+            className={`p-2.5 sm:p-3 rounded-2xl border text-left transition-all cursor-pointer flex flex-col justify-between gap-1 relative ${
+              info.deliveryType === 'dine_in'
+                ? isDark
+                  ? 'bg-teal-950/40 border-teal-500 text-white shadow-xs'
+                  : 'bg-teal-50 border-teal-500 text-teal-950 shadow-xs'
+                : isDark
+                ? 'bg-neutral-900 border-neutral-800 text-neutral-300 hover:border-neutral-700'
+                : 'bg-white border-neutral-200 text-neutral-700 hover:border-neutral-300'
+            }`}
+          >
+            <div className="flex items-center justify-between">
+              <div
+                className={`p-1.5 rounded-xl ${
+                  info.deliveryType === 'dine_in'
+                    ? 'bg-teal-600 text-white'
+                    : isDark
+                    ? 'bg-neutral-800 text-neutral-400'
+                    : 'bg-neutral-100 text-neutral-600'
+                }`}
+              >
+                <UtensilsCrossed className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+              </div>
+              {info.deliveryType === 'dine_in' && (
+                <CheckCircle2 className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-teal-500" />
+              )}
+            </div>
+            <div>
+              <span className="text-[11px] sm:text-xs font-bold block leading-tight">
+                No local
+              </span>
+              <span className="text-[9px] sm:text-[10px] text-neutral-400 block mt-0.5 truncate">
+                Mesa / Salão
+              </span>
+            </div>
+          </button>
+
+          {/* Opção 2: Retirada no Local */}
           <button
             type="button"
             onClick={() => handleTypeChange('pickup')}
-            className={`p-3 rounded-2xl border text-left transition-all cursor-pointer flex flex-col gap-1 relative ${
+            className={`p-2.5 sm:p-3 rounded-2xl border text-left transition-all cursor-pointer flex flex-col justify-between gap-1 relative ${
               info.deliveryType === 'pickup'
                 ? isDark
                   ? 'bg-teal-950/40 border-teal-500 text-white shadow-xs'
@@ -132,27 +179,27 @@ export const DeliveryOptionsForm: React.FC<DeliveryOptionsFormProps> = ({
                     : 'bg-neutral-100 text-neutral-600'
                 }`}
               >
-                <Store className="w-4 h-4" />
+                <Store className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
               </div>
               {info.deliveryType === 'pickup' && (
-                <CheckCircle2 className="w-4 h-4 text-teal-500" />
+                <CheckCircle2 className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-teal-500" />
               )}
             </div>
             <div>
-              <span className="text-xs sm:text-sm font-bold block leading-tight">
-                Retirada no local
+              <span className="text-[11px] sm:text-xs font-bold block leading-tight">
+                Retirada
               </span>
-              <span className="text-[10px] text-neutral-400 block mt-0.5">
-                Buscar no balcão
+              <span className="text-[9px] sm:text-[10px] text-neutral-400 block mt-0.5 truncate">
+                No balcão
               </span>
             </div>
           </button>
 
-          {/* Opção: Entrega */}
+          {/* Opção 3: Entrega */}
           <button
             type="button"
             onClick={() => handleTypeChange('delivery')}
-            className={`p-3 rounded-2xl border text-left transition-all cursor-pointer flex flex-col gap-1 relative ${
+            className={`p-2.5 sm:p-3 rounded-2xl border text-left transition-all cursor-pointer flex flex-col justify-between gap-1 relative ${
               info.deliveryType === 'delivery'
                 ? isDark
                   ? 'bg-teal-950/40 border-teal-500 text-white shadow-xs'
@@ -172,22 +219,77 @@ export const DeliveryOptionsForm: React.FC<DeliveryOptionsFormProps> = ({
                     : 'bg-neutral-100 text-neutral-600'
                 }`}
               >
-                <Truck className="w-4 h-4" />
+                <Truck className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
               </div>
               {info.deliveryType === 'delivery' && (
-                <CheckCircle2 className="w-4 h-4 text-teal-500" />
+                <CheckCircle2 className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-teal-500" />
               )}
             </div>
             <div>
-              <span className="text-xs sm:text-sm font-bold block leading-tight">
+              <span className="text-[11px] sm:text-xs font-bold block leading-tight">
                 Entrega
               </span>
-              <span className="text-[10px] text-neutral-400 block mt-0.5">
-                Receber no endereço
+              <span className="text-[9px] sm:text-[10px] text-neutral-400 block mt-0.5 truncate">
+                No endereço
               </span>
             </div>
           </button>
         </div>
+
+        {/* Bloco dedicado quando selecionado Consumir no Local */}
+        {info.deliveryType === 'dine_in' && (
+          <div className="pt-2">
+            {autoDetectedTable ? (
+              <div
+                className={`p-3 rounded-2xl border flex items-center justify-between gap-2.5 ${
+                  isDark
+                    ? 'bg-teal-950/30 border-teal-500/40 text-teal-200'
+                    : 'bg-teal-50/80 border-teal-300 text-teal-900'
+                }`}
+              >
+                <div className="flex items-center gap-2.5 min-w-0">
+                  <div className="w-8 h-8 rounded-xl bg-teal-600 text-white flex items-center justify-center font-black text-xs shrink-0 shadow-xs">
+                    <UtensilsCrossed className="w-4 h-4" />
+                  </div>
+                  <div className="min-w-0">
+                    <span className="text-xs font-bold block leading-tight truncate">
+                      Você está na <strong className="underline decoration-teal-400 decoration-2">{autoDetectedTable}</strong>
+                    </span>
+                    <span className="text-[10px] text-teal-600 dark:text-teal-400 block leading-tight mt-0.5">
+                      Identificada via QR Code • Não precisa digitar
+                    </span>
+                  </div>
+                </div>
+                <CheckCircle2 className="w-4 h-4 text-teal-500 shrink-0" />
+              </div>
+            ) : (
+              <div className="space-y-1">
+                <label className="text-[11px] font-bold text-neutral-400 block">
+                  Qual o número da sua mesa? <span className="text-rose-500">*</span>
+                </label>
+                <div className="relative">
+                  <UtensilsCrossed className="w-4 h-4 text-neutral-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                  <input
+                    type="text"
+                    value={info.tableNumber || ''}
+                    onChange={(e) => handleFieldChange('tableNumber', e.target.value)}
+                    placeholder="Ex: Mesa 08, 04, Balcão 2 *"
+                    className={`${inputBaseClass} pl-9 ${errors.tableNumber ? inputErrorClass : ''}`}
+                  />
+                </div>
+                {errors.tableNumber && (
+                  <p className="text-[10px] text-rose-500 mt-1 flex items-center gap-1 font-medium">
+                    <AlertCircle className="w-3 h-3 shrink-0" />
+                    <span>{errors.tableNumber}</span>
+                  </p>
+                )}
+                <span className="text-[10px] text-neutral-400 block">
+                  Informe o número identificado na placa da sua mesa.
+                </span>
+              </div>
+            )}
+          </div>
+        )}
       </div>
 
       {/* 2. Dados do Cliente (Nome e Telefone) */}

@@ -25,6 +25,7 @@ import {
   openOrderInWhatsApp,
   saveDeliveryInfo,
 } from '@/lib/order-delivery'
+import { saveCompanyTableOrderOnServerApi } from '@/lib/storage'
 
 interface MenuCartDrawerProps {
   isOpen: boolean
@@ -34,6 +35,7 @@ interface MenuCartDrawerProps {
   initialStep?: 'items' | 'delivery'
   initialCustomerName?: string
   initialCustomerPhone?: string
+  autoDetectedTable?: string | null
   onClose: () => void
   onUpdateQuantity: (cartItemId: string, newQty: number) => void
   onRemoveItem: (cartItemId: string) => void
@@ -48,6 +50,7 @@ export const MenuCartDrawer: React.FC<MenuCartDrawerProps> = ({
   initialStep = 'items',
   initialCustomerName,
   initialCustomerPhone,
+  autoDetectedTable,
   onClose,
   onUpdateQuantity,
   onRemoveItem,
@@ -57,9 +60,10 @@ export const MenuCartDrawer: React.FC<MenuCartDrawerProps> = ({
   const [deliveryInfo, setDeliveryInfo] = useState<OrderDeliveryInfo>(() => {
     const saved = loadSavedDeliveryInfo(company.id)
     return {
-      deliveryType: saved.deliveryType || 'delivery',
+      deliveryType: autoDetectedTable ? 'dine_in' : (saved.deliveryType || 'delivery'),
       customerName: initialCustomerName || saved.customerName || '',
       customerPhone: initialCustomerPhone || saved.customerPhone || '',
+      tableNumber: autoDetectedTable || saved.tableNumber || '',
       address: saved.address || '',
       number: saved.number || '',
       neighborhood: saved.neighborhood || '',
@@ -69,6 +73,17 @@ export const MenuCartDrawer: React.FC<MenuCartDrawerProps> = ({
       locationUrl: null,
     }
   })
+
+  // Synchronize detected table from QR
+  useEffect(() => {
+    if (autoDetectedTable) {
+      setDeliveryInfo((prev) => ({
+        ...prev,
+        deliveryType: 'dine_in',
+        tableNumber: autoDetectedTable,
+      }))
+    }
+  }, [autoDetectedTable])
   const [formErrors, setFormErrors] = useState<Record<string, string>>({})
 
   // Reset or update step when opening
@@ -126,6 +141,13 @@ export const MenuCartDrawer: React.FC<MenuCartDrawerProps> = ({
       }
     }
 
+    if (deliveryInfo.deliveryType === 'dine_in') {
+      const activeTable = deliveryInfo.tableNumber || autoDetectedTable
+      if (!activeTable || !activeTable.trim()) {
+        errs.tableNumber = 'Por favor, informe o número da sua mesa.'
+      }
+    }
+
     setFormErrors(errs)
     return Object.keys(errs).length === 0
   }
@@ -138,11 +160,48 @@ export const MenuCartDrawer: React.FC<MenuCartDrawerProps> = ({
     // Persist delivery info for customer convenience
     saveDeliveryInfo(deliveryInfo, company.id)
 
+    // Se for consumo no local / mesas, registrar imediatamente no sistema de pedidos do salão da empresa
+    if (deliveryInfo.deliveryType === 'dine_in') {
+      const activeTable = deliveryInfo.tableNumber || autoDetectedTable || 'Mesa do Salão'
+      const tableOrderItems = cart.map((c) => ({
+        id: c.id,
+        menuItemId: c.menuItem.id,
+        name: c.menuItem.name,
+        quantity: c.quantity,
+        unitPrice: c.totalPrice / (c.quantity || 1),
+        totalPrice: c.totalPrice,
+        sizeName: c.options.size?.name,
+        flavors: c.options.flavors,
+        extras: c.options.extras?.map((e) => e.name),
+        removals: c.options.removals,
+        notes: c.options.notes,
+        customSteps: c.options.customSteps?.map((cs) => ({
+          stepTitle: cs.stepTitle,
+          options: cs.selected.map((s) => s.name),
+        })),
+      }))
+
+      saveCompanyTableOrderOnServerApi({
+        id: '',
+        companyId: company.id,
+        tableNumber: activeTable,
+        customerName: deliveryInfo.customerName,
+        customerPhone: deliveryInfo.customerPhone,
+        items: tableOrderItems,
+        totalAmount: totalOrder,
+        status: 'novo',
+        createdAt: new Date().toISOString(),
+      }).catch((err) => console.error('Erro ao registrar pedido do salão:', err))
+    }
+
     const message = buildMenuOrderWhatsAppMessage({
       companyName: company.name,
       cart,
       totalOrder,
-      deliveryInfo,
+      deliveryInfo: {
+        ...deliveryInfo,
+        tableNumber: deliveryInfo.tableNumber || autoDetectedTable || '',
+      },
     })
 
     openOrderInWhatsApp(company.whatsapp, message)
@@ -394,6 +453,7 @@ export const MenuCartDrawer: React.FC<MenuCartDrawerProps> = ({
                 onChange={setDeliveryInfo}
                 isDark={isDark}
                 errors={formErrors}
+                autoDetectedTable={autoDetectedTable}
               />
             </div>
           )}

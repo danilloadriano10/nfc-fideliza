@@ -69,6 +69,8 @@ interface PublicCompanyViewProps {
   initialProducts?: CompanyProduct[]
   initialServices?: CompanyService[]
   initialMenuItems?: MenuItem[]
+  initialTableNumber?: string
+  autoScrollToMenu?: boolean
 }
 
 interface FeatureItem {
@@ -114,8 +116,31 @@ export const PublicCompanyView: React.FC<PublicCompanyViewProps> = ({
   initialProducts = [],
   initialServices = [],
   initialMenuItems = [],
+  initialTableNumber,
+  autoScrollToMenu,
 }) => {
   const isDark = (company.theme || 'dark') === 'dark'
+
+  const cleanTableNumber = initialTableNumber ? initialTableNumber.trim() : null
+  const displayTableLabel = useMemo(() => {
+    if (!cleanTableNumber) return null
+    return cleanTableNumber.toLowerCase().startsWith('mesa')
+      ? cleanTableNumber
+      : `Mesa ${cleanTableNumber}`
+  }, [cleanTableNumber])
+
+  useEffect(() => {
+    if (autoScrollToMenu) {
+      const timer = setTimeout(() => {
+        const el = document.getElementById('secao-cardapio')
+        if (el) {
+          el.scrollIntoView({ behavior: 'smooth' })
+        }
+      }, 400)
+      return () => clearTimeout(timer)
+    }
+  }, [autoScrollToMenu])
+
   const primaryColor = useMemo(
     () => sanitizeHex(company.primaryColor, '#6D28D9'),
     [company.primaryColor]
@@ -906,6 +931,22 @@ export const PublicCompanyView: React.FC<PublicCompanyViewProps> = ({
             : 'bg-white border-x sm:border border-neutral-200/80 text-neutral-900'
         }`}
       >
+        {/* Identificação Automática da Mesa no Salão (Discreta) */}
+        {displayTableLabel && (
+          <div className="sticky top-2 z-40 px-3 w-full pointer-events-auto">
+            <div className="bg-neutral-900/90 dark:bg-neutral-800/95 backdrop-blur-md text-white text-xs font-semibold py-2 px-3.5 rounded-full shadow-lg border border-white/10 flex items-center justify-between gap-2 animate-in fade-in slide-in-from-top-2 duration-300">
+              <div className="flex items-center gap-2 min-w-0">
+                <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse shrink-0" />
+                <span className="truncate">
+                  Você está na <strong className="text-teal-300 font-bold">{displayTableLabel}</strong>
+                </span>
+              </div>
+              <span className="text-[10px] bg-white/15 px-2 py-0.5 rounded-full font-bold uppercase tracking-wider shrink-0 text-neutral-200">
+                Consumo no Local
+              </span>
+            </div>
+          </div>
+        )}
         
         {/* ========================================================= */}
         {/* 1. TOPO DA EMPRESA: HERO IMERSIVO COM IDENTIDADE DA MARCA */}
@@ -1841,7 +1882,7 @@ export const PublicCompanyView: React.FC<PublicCompanyViewProps> = ({
                     >
                       Cardápio Digital
                     </span>
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-2 flex-wrap">
                       <h3
                         className={`text-base sm:text-lg font-black tracking-tight ${
                           isDark ? 'text-white' : 'text-neutral-900'
@@ -1858,6 +1899,12 @@ export const PublicCompanyView: React.FC<PublicCompanyViewProps> = ({
                       >
                         {activeMenuItemsList.length} {activeMenuItemsList.length === 1 ? 'item' : 'itens'}
                       </span>
+                      {displayTableLabel && (
+                        <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-teal-500/15 border border-teal-500/30 text-teal-600 dark:text-teal-400">
+                          <span className="w-1.5 h-1.5 rounded-full bg-teal-500 shrink-0" />
+                          <span>Você está na <strong>{displayTableLabel}</strong></span>
+                        </span>
+                      )}
                     </div>
                   </div>
                 </div>
@@ -1968,7 +2015,7 @@ export const PublicCompanyView: React.FC<PublicCompanyViewProps> = ({
                       onClick={() => {
                         if (!isSoldOut) setSelectedMenuItemDetail(item)
                       }}
-                      className={`group w-full rounded-2xl sm:rounded-3xl p-2.5 sm:p-3.5 border transition-all flex flex-row items-center sm:items-stretch gap-2.5 sm:gap-3.5 ${
+                      className={`group w-full rounded-2xl sm:rounded-3xl border transition-all flex flex-row items-stretch overflow-hidden select-none ${
                         isSoldOut
                           ? 'opacity-65 cursor-not-allowed'
                           : 'cursor-pointer hover:shadow-lg active:scale-[0.99]'
@@ -1978,8 +2025,8 @@ export const PublicCompanyView: React.FC<PublicCompanyViewProps> = ({
                           : 'bg-white hover:bg-neutral-50/70 border-neutral-200/90 hover:border-neutral-300 shadow-xs'
                       }`}
                     >
-                      {/* 1. COLUNA ESQUERDA: FOTO AUMENTADA EM FORMATO QUADRADO 1:1 */}
-                      <div className="w-[145px] h-[145px] min-w-[145px] sm:w-[175px] sm:h-[175px] sm:min-w-[175px] md:w-[195px] md:h-[195px] md:min-w-[195px] shrink-0 aspect-square relative rounded-2xl sm:rounded-2xl overflow-hidden bg-neutral-100 dark:bg-neutral-800 border border-neutral-200/60 dark:border-white/10 self-center sm:self-start">
+                      {/* 1. FOTO PERFEITAMENTE QUADRADA (1:1) ENCOSTANDO NAS BORDAS ESQUERDA, SUPERIOR E INFERIOR */}
+                      <div className="w-[172px] h-[172px] min-w-[172px] sm:w-[185px] sm:h-[185px] sm:min-w-[185px] aspect-square shrink-0 relative overflow-hidden bg-neutral-100 dark:bg-neutral-800">
                         {item.photoUrl ? (
                           /* eslint-disable-next-line @next/next/no-img-element */
                           <img
@@ -2000,7 +2047,7 @@ export const PublicCompanyView: React.FC<PublicCompanyViewProps> = ({
                         )}
 
                         {/* Selos SOBRE a foto no canto superior esquerdo: Mais pedido, Destaque, Novidade */}
-                        <div className="absolute top-1.5 left-1.5 sm:top-2 sm:left-2 flex flex-col gap-1 z-10 pointer-events-none items-start">
+                        <div className="absolute top-2 left-2 flex flex-col gap-1 z-10 pointer-events-none items-start">
                           {item.isBestSeller && (
                             <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[9px] sm:text-[10px] font-black uppercase tracking-tight bg-[#E52E2E] text-white shadow-md">
                               <Flame className="w-2.5 h-2.5 sm:w-3 sm:h-3 fill-white text-white shrink-0" />
@@ -2022,7 +2069,7 @@ export const PublicCompanyView: React.FC<PublicCompanyViewProps> = ({
                         </div>
 
                         {hasPromo && !item.isBestSeller && !item.isFeatured && !item.isNew && (
-                          <span className="absolute top-1.5 left-1.5 px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider bg-rose-600 text-white shadow-xs z-10">
+                          <span className="absolute top-2 left-2 px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider bg-rose-600 text-white shadow-xs z-10">
                             Promo
                           </span>
                         )}
@@ -2036,28 +2083,28 @@ export const PublicCompanyView: React.FC<PublicCompanyViewProps> = ({
                         )}
                       </div>
 
-                      {/* 2. COLUNA DIREITA: INFORMAÇÕES (Aproveita toda a largura, organizada verticalmente) */}
-                      <div className="flex-1 min-w-0 flex flex-col justify-between py-0.5 pl-0.5 sm:pl-1 pr-0.5">
+                      {/* 2. ÁREA DE INFORMAÇÕES À DIREITA COM EXATAMENTE A MESMA ALTURA DA FOTO (SEM NENHUM CORTE) */}
+                      <div className="flex-1 min-w-0 p-2.5 sm:p-3 flex flex-col justify-between h-[172px] sm:h-[185px]">
                         {/* Bloco Superior: Categoria, Nome, Descrição */}
-                        <div>
-                          {/* 1. CATEGORIA */}
-                          <span className="text-[10px] sm:text-[11px] font-bold uppercase tracking-wider text-neutral-400 dark:text-neutral-500 block truncate">
+                        <div className="min-w-0">
+                          {/* CATEGORIA */}
+                          <span className="text-[9px] sm:text-[10px] font-bold uppercase tracking-wider text-neutral-400 dark:text-neutral-500 block truncate leading-none">
                             {item.category || 'Geral'}
                           </span>
 
-                          {/* 2. NOME DO PRODUTO */}
+                          {/* NOME DO PRODUTO */}
                           <h4
-                            className={`font-black text-xs sm:text-base leading-tight tracking-tight line-clamp-2 mt-0.5 ${
+                            className={`font-black text-xs sm:text-base leading-snug tracking-tight line-clamp-2 mt-0.5 ${
                               isDark ? 'text-white' : 'text-neutral-900'
                             }`}
                           >
                             {item.name}
                           </h4>
 
-                          {/* 3. DESCRIÇÃO (limitada a 2 linhas) */}
+                          {/* DESCRIÇÃO */}
                           {item.description && (
                             <p
-                              className={`text-[11px] sm:text-xs line-clamp-2 leading-snug sm:leading-relaxed mt-1 ${
+                              className={`text-[10px] sm:text-xs line-clamp-1 leading-tight mt-0.5 ${
                                 isDark ? 'text-neutral-400' : 'text-neutral-500'
                               }`}
                             >
@@ -2066,43 +2113,43 @@ export const PublicCompanyView: React.FC<PublicCompanyViewProps> = ({
                           )}
                         </div>
 
-                        {/* Bloco Inferior: "A partir de", Preço, Tag de Tamanhos, Botão */}
-                        <div className="mt-2 space-y-1">
-                          {/* 4. "A partir de" */}
-                          <span className="text-[10px] sm:text-[11px] text-neutral-500 dark:text-neutral-400 font-medium block leading-tight">
-                            {hasPriceFrom ? 'A partir de' : 'Valor'}
-                          </span>
-
-                          {/* 5. PREÇO */}
-                          <div className="text-base sm:text-lg font-black text-[#8B0000] dark:text-rose-400 leading-tight">
-                            {hasPriceFrom ? (
-                              formatMoney(minSizePrice)
-                            ) : hasPromo ? (
-                              <div className="flex items-baseline gap-1.5 flex-wrap">
-                                <span className="text-emerald-600 dark:text-emerald-400">
-                                  {formatMoney(item.promotionalPrice)}
-                                </span>
-                                <span className="text-xs text-neutral-400 line-through font-normal">
-                                  {formatMoney(item.price)}
-                                </span>
-                              </div>
-                            ) : item.price != null ? (
-                              formatMoney(item.price)
-                            ) : (
-                              <span className="text-xs font-semibold text-neutral-400">Sob consulta</span>
-                            )}
-                          </div>
-
-                          {/* 6. "3 tamanhos • Personalizável" (Completo, sem cortar) */}
-                          <div className="pt-0.5">
-                            <div className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md bg-neutral-100 dark:bg-neutral-800/80 text-neutral-700 dark:text-neutral-300 text-[10px] sm:text-[11px] font-semibold leading-tight">
-                              <Tag className="w-2.5 h-2.5 text-neutral-400 shrink-0" />
-                              <span className="whitespace-normal">{customizationTag || 'Personalizável'}</span>
+                        {/* Bloco Inferior: "A partir de", Preço, Tag de Tamanhos, Botão (Sem cortes) */}
+                        <div className="space-y-1 pt-0.5 min-w-0 shrink-0">
+                          {/* Preço com "A partir de" */}
+                          <div>
+                            <span className="text-[9px] sm:text-[10px] text-neutral-500 dark:text-neutral-400 font-medium block leading-none">
+                              {hasPriceFrom ? 'A partir de' : 'Valor'}
+                            </span>
+                            <div className="text-sm sm:text-base font-black text-[#8B0000] dark:text-rose-400 leading-tight mt-0.5">
+                              {hasPriceFrom ? (
+                                formatMoney(minSizePrice)
+                              ) : hasPromo ? (
+                                <div className="flex items-baseline gap-1.5 flex-wrap">
+                                  <span className="text-emerald-600 dark:text-emerald-400">
+                                    {formatMoney(item.promotionalPrice)}
+                                  </span>
+                                  <span className="text-[11px] text-neutral-400 line-through font-normal">
+                                    {formatMoney(item.price)}
+                                  </span>
+                                </div>
+                              ) : item.price != null ? (
+                                formatMoney(item.price)
+                              ) : (
+                                <span className="text-xs font-semibold text-neutral-400">Sob consulta</span>
+                              )}
                             </div>
                           </div>
 
-                          {/* 7. BOTÃO "+ Pedir agora" (Ocupando a largura da coluna direita) */}
-                          <div className="pt-1.5">
+                          {/* "3 tamanhos • Personalizável" (completo) */}
+                          <div>
+                            <div className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md bg-neutral-100 dark:bg-neutral-800/80 text-neutral-700 dark:text-neutral-300 text-[9px] sm:text-[10px] font-semibold leading-none max-w-full">
+                              <Tag className="w-2.5 h-2.5 text-neutral-400 shrink-0" />
+                              <span className="truncate">{customizationTag || 'Personalizável'}</span>
+                            </div>
+                          </div>
+
+                          {/* BOTÃO "+ Pedir agora" (100% inteiro, visível e sem corte) */}
+                          <div className="pt-0.5 shrink-0">
                             <button
                               type="button"
                               disabled={isSoldOut}
@@ -2110,7 +2157,7 @@ export const PublicCompanyView: React.FC<PublicCompanyViewProps> = ({
                                 e.stopPropagation()
                                 if (!isSoldOut) setSelectedMenuItemDetail(item)
                               }}
-                              className={`w-full py-2 sm:py-2.5 px-2.5 sm:px-3 rounded-xl sm:rounded-2xl font-bold text-xs sm:text-sm text-white shadow-xs transition-all active:scale-[0.98] flex items-center justify-center cursor-pointer ${
+                              className={`w-full py-2 px-2.5 rounded-xl font-bold text-xs sm:text-sm text-white shadow-xs transition-all active:scale-[0.98] flex items-center justify-center cursor-pointer shrink-0 ${
                                 isSoldOut
                                   ? 'opacity-40 cursor-not-allowed bg-neutral-400'
                                   : 'bg-[#008A5E] hover:bg-[#007550] shadow-sm'
@@ -2827,6 +2874,7 @@ export const PublicCompanyView: React.FC<PublicCompanyViewProps> = ({
           initialStep={cartInitialStep}
           initialCustomerName={customerSession.name}
           initialCustomerPhone={customerSession.phone || undefined}
+          autoDetectedTable={displayTableLabel || cleanTableNumber || undefined}
           onClose={() => setIsCartOpen(false)}
           onUpdateQuantity={handleUpdateCartQty}
           onRemoveItem={handleRemoveCartItem}

@@ -7,6 +7,8 @@ import {
   CompanyService,
   CompanyProfessional,
   MenuItem,
+  CompanyTable,
+  TableOrder,
 } from '@/types/platform'
 
 export const INITIAL_COMPANIES: Company[] = [
@@ -624,5 +626,97 @@ export const INITIAL_MENU_ITEMS: MenuItem[] = [
     allowNotes: true,
     isActive: true,
     createdAt: '2026-02-01T10:00:00Z',
+  },
+]
+
+export const INITIAL_TABLES: CompanyTable[] = [
+  {
+    id: 'table_pizzaria_01',
+    companyId: 'comp_pizzaria_italia',
+    name: 'Mesa 01',
+    identifier: '01',
+    isActive: true,
+    notes: 'Salão principal - Próximo à janela',
+    createdAt: '2026-02-01T10:00:00Z',
+  },
+  {
+    id: 'table_pizzaria_02',
+    companyId: 'comp_pizzaria_italia',
+    name: 'Mesa 02',
+    identifier: '02',
+    isActive: true,
+    notes: 'Salão principal - Centro',
+    createdAt: '2026-02-01T10:00:00Z',
+  },
+  {
+    id: 'table_pizzaria_03',
+    companyId: 'comp_pizzaria_italia',
+    name: 'Mesa 03',
+    identifier: '03',
+    isActive: true,
+    notes: 'Salão principal',
+    createdAt: '2026-02-01T10:00:00Z',
+  },
+  {
+    id: 'table_pizzaria_08',
+    companyId: 'comp_pizzaria_italia',
+    name: 'Mesa 08',
+    identifier: '08',
+    isActive: true,
+    notes: 'Varanda externa',
+    createdAt: '2026-02-01T10:00:00Z',
+  },
+  {
+    id: 'table_cafe_01',
+    companyId: 'comp_cafe_central',
+    name: 'Mesa 01',
+    identifier: '01',
+    isActive: true,
+    notes: 'Bistrô interno',
+    createdAt: '2026-02-01T10:00:00Z',
+  },
+  {
+    id: 'table_cafe_02',
+    companyId: 'comp_cafe_central',
+    name: 'Mesa 02',
+    identifier: '02',
+    isActive: true,
+    notes: 'Deck ao ar livre',
+    createdAt: '2026-02-01T10:00:00Z',
+  },
+]
+
+export const INITIAL_TABLE_ORDERS: TableOrder[] = [
+  {
+    id: 'order_table_demo_01',
+    companyId: 'comp_pizzaria_italia',
+    tableNumber: 'Mesa 08',
+    customerName: 'Renato Silva',
+    customerPhone: '62999887766',
+    status: 'novo',
+    totalAmount: 97.9,
+    notes: 'Por favor, trazer copos extras com gelo e limão.',
+    items: [
+      {
+        id: 'item_ord_1',
+        menuItemId: 'menu_pizza_margherita',
+        name: 'Pizza Margherita Especial',
+        quantity: 1,
+        unitPrice: 59.9,
+        totalPrice: 59.9,
+        sizeName: 'Grande (8 fatias)',
+        extras: ['Borda Recheada Catupiry (+R$ 10,00)'],
+      },
+      {
+        id: 'item_ord_2',
+        menuItemId: 'menu_pizza_chocolate',
+        name: 'Pizza Doce de Chocolate Belga',
+        quantity: 1,
+        unitPrice: 38.0,
+        totalPrice: 38.0,
+        sizeName: 'Pequena (4 fatias)',
+      },
+    ],
+    createdAt: new Date().toISOString(),
   },
 ]

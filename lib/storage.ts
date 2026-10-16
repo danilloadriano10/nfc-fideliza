@@ -11,6 +11,9 @@ import {
   Appointment,
   AppointmentStatus,
   CompanyProfessional,
+  CompanyTable,
+  TableOrder,
+  TableOrderStatus,
 } from '@/types/platform'
 import {
   INITIAL_COMPANIES,
@@ -21,6 +24,8 @@ import {
   INITIAL_SERVICES,
   INITIAL_PROFESSIONALS,
   INITIAL_MENU_ITEMS,
+  INITIAL_TABLES,
+  INITIAL_TABLE_ORDERS,
 } from './initial-data'
 import { normalizePhone } from './utils'
 
@@ -35,6 +40,8 @@ const STORAGE_KEYS = {
   MENU_ITEMS: 'nfc_tenant_menu_items_v1',
   APPOINTMENTS: 'nfc_tenant_appointments_v1',
   PROFESSIONALS: 'nfc_tenant_professionals_v1',
+  TABLES: 'nfc_tenant_tables_v1',
+  TABLE_ORDERS: 'nfc_tenant_table_orders_v1',
   DELETED_COMPANIES: 'nfc_tenant_deleted_companies_v1',
   CURRENT_CUSTOMER_PREFIX: 'nfc_client_session_',
 }
@@ -63,6 +70,8 @@ let memoryProducts: CompanyProduct[] = []
 let memoryMenuItems: MenuItem[] = [...INITIAL_MENU_ITEMS]
 let memoryAppointments: Appointment[] = []
 let memoryProfessionals: CompanyProfessional[] = [...INITIAL_PROFESSIONALS]
+let memoryTables: CompanyTable[] = [...INITIAL_TABLES]
+let memoryTableOrders: TableOrder[] = [...INITIAL_TABLE_ORDERS]
 
 function isBrowser(): boolean {
   return typeof window !== 'undefined'
@@ -2112,3 +2121,245 @@ export async function deleteCompanyProfessionalOnServerApi(
     return true
   }
 }
+
+// ==========================================
+// 12. MESAS (MULTI-TENANT CRUD & SERVER SYNC)
+// ==========================================
+
+export function getCompanyTables(companyId: string): CompanyTable[] {
+  if (!companyId) return []
+  if (isBrowser()) {
+    const all = getItem<CompanyTable[]>(STORAGE_KEYS.TABLES, memoryTables)
+    const list = all.filter((t) => t.companyId === companyId)
+    if (list.length > 0) {
+      return list.sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true }))
+    }
+  }
+  const fallback = memoryTables.filter((t) => t.companyId === companyId)
+  return fallback.sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true }))
+}
+
+export function saveCompanyTableLocally(table: CompanyTable): void {
+  if (!table || !table.companyId) return
+  const cleanId = table.id || `table_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`
+  const toSave: CompanyTable = {
+    ...table,
+    id: cleanId,
+    createdAt: table.createdAt || new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+  }
+
+  const all = isBrowser() ? getItem<CompanyTable[]>(STORAGE_KEYS.TABLES, memoryTables) : memoryTables
+  const filtered = all.filter((t) => t.id !== toSave.id)
+  const updated = [...filtered, toSave]
+
+  memoryTables = updated
+  if (isBrowser()) {
+    setItem(STORAGE_KEYS.TABLES, updated)
+  }
+  notifyDataChange()
+}
+
+export function deleteCompanyTableLocally(tableId: string, companyId: string): void {
+  const all = isBrowser() ? getItem<CompanyTable[]>(STORAGE_KEYS.TABLES, memoryTables) : memoryTables
+  const updated = all.filter((t) => !(t.id === tableId && t.companyId === companyId))
+  memoryTables = updated
+  if (isBrowser()) {
+    setItem(STORAGE_KEYS.TABLES, updated)
+  }
+  notifyDataChange()
+}
+
+export async function fetchCompanyTablesFromServer(companyId: string): Promise<CompanyTable[]> {
+  if (!companyId) return []
+  try {
+    const res = await fetch(`/api/tables?companyId=${encodeURIComponent(companyId)}`)
+    if (res.ok) {
+      const data = await res.json()
+      if (Array.isArray(data.tables)) {
+        if (isBrowser()) {
+          const currentAll = getItem<CompanyTable[]>(STORAGE_KEYS.TABLES, memoryTables)
+          const others = currentAll.filter((t) => t.companyId !== companyId)
+          const merged = [...others, ...data.tables]
+          memoryTables = merged
+          setItem(STORAGE_KEYS.TABLES, merged)
+          notifyDataChange()
+        }
+        return data.tables
+      }
+    }
+  } catch (err) {
+    console.error('Error fetching tables from server:', err)
+  }
+  return getCompanyTables(companyId)
+}
+
+export async function saveCompanyTableOnServerApi(
+  table: CompanyTable
+): Promise<{ success: boolean; table?: CompanyTable; error?: string }> {
+  saveCompanyTableLocally(table)
+  try {
+    const res = await fetch('/api/tables', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(table),
+    })
+    const data = await res.json()
+    if (res.ok && data.success) {
+      if (data.table) {
+        saveCompanyTableLocally(data.table)
+      }
+      return { success: true, table: data.table || table }
+    }
+    return { success: false, error: data.error || 'Erro ao salvar mesa.' }
+  } catch {
+    return { success: true, table }
+  }
+}
+
+export async function toggleCompanyTableOnServerApi(
+  tableId: string,
+  companyId: string
+): Promise<boolean> {
+  const all = getCompanyTables(companyId)
+  const current = all.find((t) => t.id === tableId)
+  if (current) {
+    saveCompanyTableLocally({ ...current, isActive: !current.isActive })
+  }
+  try {
+    const res = await fetch('/api/tables', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id: tableId, companyId, toggleStatus: true }),
+    })
+    return res.ok
+  } catch {
+    return true
+  }
+}
+
+export async function deleteCompanyTableOnServerApi(
+  tableId: string,
+  companyId: string
+): Promise<boolean> {
+  deleteCompanyTableLocally(tableId, companyId)
+  try {
+    const res = await fetch(
+      `/api/tables?id=${encodeURIComponent(tableId)}&companyId=${encodeURIComponent(companyId)}`,
+      { method: 'DELETE' }
+    )
+    return res.ok
+  } catch {
+    return true
+  }
+}
+
+// ==========================================
+// 13. PEDIDOS DO SALÃO (TABLE ORDERS)
+// ==========================================
+
+export function getCompanyTableOrders(companyId: string): TableOrder[] {
+  if (!companyId) return []
+  if (isBrowser()) {
+    const all = getItem<TableOrder[]>(STORAGE_KEYS.TABLE_ORDERS, memoryTableOrders)
+    const list = all.filter((o) => o.companyId === companyId)
+    if (list.length > 0) {
+      return list.sort((a, b) => (b.createdAt || '').localeCompare(a.createdAt || ''))
+    }
+  }
+  const fallback = memoryTableOrders.filter((o) => o.companyId === companyId)
+  return fallback.sort((a, b) => (b.createdAt || '').localeCompare(a.createdAt || ''))
+}
+
+export function saveCompanyTableOrderLocally(order: TableOrder): void {
+  if (!order || !order.companyId) return
+  const cleanId = order.id || `ord_table_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`
+  const toSave: TableOrder = {
+    ...order,
+    id: cleanId,
+    createdAt: order.createdAt || new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+  }
+
+  const all = isBrowser()
+    ? getItem<TableOrder[]>(STORAGE_KEYS.TABLE_ORDERS, memoryTableOrders)
+    : memoryTableOrders
+  const filtered = all.filter((o) => o.id !== toSave.id)
+  const updated = [toSave, ...filtered]
+
+  memoryTableOrders = updated
+  if (isBrowser()) {
+    setItem(STORAGE_KEYS.TABLE_ORDERS, updated)
+  }
+  notifyDataChange()
+}
+
+export async function fetchCompanyTableOrdersFromServer(companyId: string): Promise<TableOrder[]> {
+  if (!companyId) return []
+  try {
+    const res = await fetch(`/api/table-orders?companyId=${encodeURIComponent(companyId)}`)
+    if (res.ok) {
+      const data = await res.json()
+      if (Array.isArray(data.orders)) {
+        if (isBrowser()) {
+          const currentAll = getItem<TableOrder[]>(STORAGE_KEYS.TABLE_ORDERS, memoryTableOrders)
+          const others = currentAll.filter((o) => o.companyId !== companyId)
+          const merged = [...data.orders, ...others]
+          memoryTableOrders = merged
+          setItem(STORAGE_KEYS.TABLE_ORDERS, merged)
+          notifyDataChange()
+        }
+        return data.orders
+      }
+    }
+  } catch (err) {
+    console.error('Error fetching table orders from server:', err)
+  }
+  return getCompanyTableOrders(companyId)
+}
+
+export async function saveCompanyTableOrderOnServerApi(
+  order: TableOrder
+): Promise<{ success: boolean; order?: TableOrder; error?: string }> {
+  saveCompanyTableOrderLocally(order)
+  try {
+    const res = await fetch('/api/table-orders', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(order),
+    })
+    const data = await res.json()
+    if (res.ok && data.success) {
+      if (data.order) {
+        saveCompanyTableOrderLocally(data.order)
+      }
+      return { success: true, order: data.order || order }
+    }
+    return { success: false, error: data.error || 'Erro ao registrar pedido de salão.' }
+  } catch {
+    return { success: true, order }
+  }
+}
+
+export async function updateTableOrderStatusOnServerApi(
+  orderId: string,
+  companyId: string,
+  status: TableOrderStatus
+): Promise<boolean> {
+  const all = getCompanyTableOrders(companyId)
+  const current = all.find((o) => o.id === orderId)
+  if (current) {
+    saveCompanyTableOrderLocally({ ...current, status, updatedAt: new Date().toISOString() })
+  }
+  try {
+    const res = await fetch('/api/table-orders', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id: orderId, companyId, status }),
+    })
+    return res.ok
+  } catch {
+    return true
+  }
+}
+

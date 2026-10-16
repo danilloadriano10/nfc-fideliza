@@ -1,12 +1,13 @@
 import { CartItem } from '@/components/public/menu-item-modal'
 import { formatPhone, getWhatsappLink, normalizePhone } from './utils'
 
-export type DeliveryType = 'pickup' | 'delivery'
+export type DeliveryType = 'pickup' | 'delivery' | 'dine_in'
 
 export interface OrderDeliveryInfo {
   deliveryType: DeliveryType
   customerName: string
   customerPhone: string
+  tableNumber?: string
   address: string
   number: string
   neighborhood: string
@@ -45,6 +46,7 @@ export function loadSavedDeliveryInfo(companyId?: string): Partial<OrderDelivery
       deliveryType: parsed.deliveryType || 'delivery',
       customerName: parsed.customerName || '',
       customerPhone: parsed.customerPhone || '',
+      tableNumber: parsed.tableNumber || '',
       address: parsed.address || '',
       number: parsed.number || '',
       neighborhood: parsed.neighborhood || '',
@@ -67,6 +69,7 @@ export function saveDeliveryInfo(info: OrderDeliveryInfo, companyId?: string): v
       deliveryType: info.deliveryType,
       customerName: info.customerName,
       customerPhone: info.customerPhone,
+      tableNumber: info.tableNumber || '',
       address: info.address,
       number: info.number,
       neighborhood: info.neighborhood,
@@ -151,6 +154,9 @@ export function buildMenuOrderWhatsAppMessage(options: {
 
   if (deliveryInfo.deliveryType === 'delivery') {
     msg += `🚚 *FORMA DE RECEBIMENTO:* Entrega\n\n`
+  } else if (deliveryInfo.deliveryType === 'dine_in') {
+    msg += `🍽️ *FORMA DE RECEBIMENTO:* Consumir no Local\n`
+    msg += `🪑 *MESA:* ${deliveryInfo.tableNumber ? deliveryInfo.tableNumber : 'Não informada'}\n\n`
   } else {
     msg += `🏬 *FORMA DE RECEBIMENTO:* Retirada no local\n\n`
   }

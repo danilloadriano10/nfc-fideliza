@@ -25,6 +25,9 @@ import {
   AppointmentStatus,
   CompanyProfessional,
   BookingSettings,
+  CompanyTable,
+  TableOrder,
+  TableOrderStatus,
 } from '@/types/platform'
 import { normalizePhone } from '@/lib/utils'
 import { hashPassword } from '@/lib/auth-crypto'
@@ -39,6 +42,8 @@ import {
   INITIAL_SERVICES,
   INITIAL_PROFESSIONALS,
   INITIAL_MENU_ITEMS,
+  INITIAL_TABLES,
+  INITIAL_TABLE_ORDERS,
 } from '@/lib/initial-data'
 
 // Collection references
@@ -54,6 +59,8 @@ const MENU_ITEMS_COLLECTION = 'menuItems'
 const APPOINTMENTS_COLLECTION = 'appointments'
 const PROFESSIONALS_COLLECTION = 'professionals'
 const DELETED_COMPANIES_COLLECTION = 'deleted_companies'
+const TABLES_COLLECTION = 'tables'
+const TABLE_ORDERS_COLLECTION = 'tableOrders'
 
 let migrationPromise: Promise<void> | null = null
 
@@ -191,6 +198,24 @@ export async function ensureFirestoreInitialized(): Promise<void> {
         const itemDoc = await getDoc(itemRef)
         if (!itemDoc.exists()) {
           await setDoc(itemRef, item)
+        }
+      }
+
+      // 10.5 Migrate Tables
+      for (const table of INITIAL_TABLES) {
+        const tableRef = doc(db, TABLES_COLLECTION, table.id)
+        const tableDoc = await getDoc(tableRef)
+        if (!tableDoc.exists()) {
+          await setDoc(tableRef, table)
+        }
+      }
+
+      // 10.6 Migrate Initial Table Orders
+      for (const ord of INITIAL_TABLE_ORDERS) {
+        const ordRef = doc(db, TABLE_ORDERS_COLLECTION, ord.id)
+        const ordDoc = await getDoc(ordRef)
+        if (!ordDoc.exists()) {
+          await setDoc(ordRef, ord)
         }
       }
 
@@ -2121,4 +2146,149 @@ export async function saveFirestoreMenuItemsOrder(
     return false
   }
 }
+
+// ==========================================
+// 12. MESAS (MULTI-TENANT CRUD)
+// ==========================================
+
+export async function getFirestoreTables(companyId: string): Promise<CompanyTable[]> {
+  try {
+    await ensureFirestoreInitialized()
+    const q = query(collection(db, TABLES_COLLECTION), where('companyId', '==', companyId))
+    const snap = await getDocs(q)
+    const list: CompanyTable[] = []
+    snap.forEach((d) => {
+      list.push(d.data() as CompanyTable)
+    })
+
+    if (list.length === 0 && companyId) {
+      const initMatch = INITIAL_TABLES.filter((t) => t.companyId === companyId)
+      if (initMatch.length > 0) return initMatch
+    }
+
+    return list.sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true }))
+  } catch (err) {
+    console.warn('Could not read tables from Firestore (returning initial fallback):', err)
+    if (companyId) {
+      return INITIAL_TABLES.filter((t) => t.companyId === companyId)
+    }
+    return INITIAL_TABLES
+  }
+}
+
+export async function saveFirestoreTable(table: CompanyTable): Promise<CompanyTable> {
+  try {
+    await ensureFirestoreInitialized()
+    const cleanId = table.id || `table_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`
+    const toSave: CompanyTable = {
+      ...table,
+      id: cleanId,
+      updatedAt: new Date().toISOString(),
+      createdAt: table.createdAt || new Date().toISOString(),
+    }
+    const docRef = doc(db, TABLES_COLLECTION, cleanId)
+    await setDoc(docRef, toSave, { merge: true })
+    return toSave
+  } catch (err) {
+    handleFirestoreError(err, OperationType.WRITE, TABLES_COLLECTION)
+    throw err
+  }
+}
+
+export async function deleteFirestoreTable(tableId: string): Promise<void> {
+  try {
+    await ensureFirestoreInitialized()
+    const docRef = doc(db, TABLES_COLLECTION, tableId)
+    await deleteDoc(docRef)
+  } catch (err) {
+    handleFirestoreError(err, OperationType.DELETE, TABLES_COLLECTION)
+    throw err
+  }
+}
+
+export async function toggleFirestoreTableStatus(
+  tableId: string,
+  companyId: string
+): Promise<boolean> {
+  try {
+    await ensureFirestoreInitialized()
+    const docRef = doc(db, TABLES_COLLECTION, tableId)
+    const snap = await getDoc(docRef)
+    if (!snap.exists()) return false
+    const data = snap.data() as CompanyTable
+    if (data.companyId !== companyId) return false
+    const nextStatus = !data.isActive
+    await updateDoc(docRef, { isActive: nextStatus, updatedAt: new Date().toISOString() })
+    return nextStatus
+  } catch (err) {
+    handleFirestoreError(err, OperationType.UPDATE, TABLES_COLLECTION)
+    return false
+  }
+}
+
+// ==========================================
+// 13. PEDIDOS DO SALÃO (TABLE ORDERS)
+// ==========================================
+
+export async function getFirestoreTableOrders(companyId: string): Promise<TableOrder[]> {
+  try {
+    await ensureFirestoreInitialized()
+    const q = query(collection(db, TABLE_ORDERS_COLLECTION), where('companyId', '==', companyId))
+    const snap = await getDocs(q)
+    const list: TableOrder[] = []
+    snap.forEach((d) => {
+      list.push(d.data() as TableOrder)
+    })
+
+    if (list.length === 0 && companyId) {
+      const initMatch = INITIAL_TABLE_ORDERS.filter((o) => o.companyId === companyId)
+      if (initMatch.length > 0) return initMatch
+    }
+
+    return list.sort((a, b) => (b.createdAt || '').localeCompare(a.createdAt || ''))
+  } catch (err) {
+    console.warn('Could not read table orders from Firestore (returning initial fallback):', err)
+    if (companyId) {
+      return INITIAL_TABLE_ORDERS.filter((o) => o.companyId === companyId)
+    }
+    return INITIAL_TABLE_ORDERS
+  }
+}
+
+export async function saveFirestoreTableOrder(order: TableOrder): Promise<TableOrder> {
+  try {
+    await ensureFirestoreInitialized()
+    const cleanId = order.id || `ord_table_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`
+    const toSave: TableOrder = {
+      ...order,
+      id: cleanId,
+      createdAt: order.createdAt || new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    }
+    const docRef = doc(db, TABLE_ORDERS_COLLECTION, cleanId)
+    await setDoc(docRef, toSave, { merge: true })
+    return toSave
+  } catch (err) {
+    handleFirestoreError(err, OperationType.WRITE, TABLE_ORDERS_COLLECTION)
+    throw err
+  }
+}
+
+export async function updateFirestoreTableOrderStatus(
+  orderId: string,
+  status: TableOrderStatus
+): Promise<void> {
+  try {
+    await ensureFirestoreInitialized()
+    const docRef = doc(db, TABLE_ORDERS_COLLECTION, orderId)
+    await updateDoc(docRef, {
+      status,
+      updatedAt: new Date().toISOString(),
+    })
+  } catch (err) {
+    handleFirestoreError(err, OperationType.UPDATE, TABLE_ORDERS_COLLECTION)
+    throw err
+  }
+}
+
 

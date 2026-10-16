@@ -51,6 +51,13 @@ import {
   saveFirestoreProductsOrder,
   saveFirestoreServicesOrder,
   saveFirestoreMenuItemsOrder,
+  getFirestoreTables,
+  saveFirestoreTable,
+  deleteFirestoreTable,
+  toggleFirestoreTableStatus,
+  getFirestoreTableOrders,
+  saveFirestoreTableOrder,
+  updateFirestoreTableOrderStatus,
   ensureFirestoreInitialized,
 } from './firestore-service'
 
@@ -66,6 +73,9 @@ import {
   Appointment,
   AppointmentStatus,
   CompanyProfessional,
+  CompanyTable,
+  TableOrder,
+  TableOrderStatus,
 } from '@/types/platform'
 
 // Ensure system migration is initialized on startup
@@ -397,5 +407,40 @@ export async function saveServerMenuItemsOrder(
   orderedIds: string[]
 ): Promise<boolean> {
   return await saveFirestoreMenuItemsOrder(companyId, orderedIds)
+}
+
+// ==========================================
+// MESAS E PEDIDOS DO SALÃO
+// ==========================================
+
+export async function getServerTables(companyId: string): Promise<CompanyTable[]> {
+  return await getFirestoreTables(companyId)
+}
+
+export async function saveServerTable(table: CompanyTable): Promise<CompanyTable> {
+  return await saveFirestoreTable(table)
+}
+
+export async function deleteServerTable(tableId: string): Promise<void> {
+  return await deleteFirestoreTable(tableId)
+}
+
+export async function toggleServerTableStatus(tableId: string, companyId: string): Promise<boolean> {
+  return await toggleFirestoreTableStatus(tableId, companyId)
+}
+
+export async function getServerTableOrders(companyId: string): Promise<TableOrder[]> {
+  return await getFirestoreTableOrders(companyId)
+}
+
+export async function saveServerTableOrder(order: TableOrder): Promise<TableOrder> {
+  return await saveFirestoreTableOrder(order)
+}
+
+export async function updateServerTableOrderStatus(
+  orderId: string,
+  status: TableOrderStatus
+): Promise<void> {
+  return await updateFirestoreTableOrderStatus(orderId, status)
 }
 

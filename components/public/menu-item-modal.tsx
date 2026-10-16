@@ -230,10 +230,10 @@ export const MenuItemModal: React.FC<MenuItemModalProps> = ({
             : 'bg-white border-neutral-200 text-neutral-900'
         }`}
       >
-        {/* FOTO GRANDE NO TOPO */}
+        {/* FOTO GRANDE NO TOPO - Cores e iluminação originais, sem filtros ou escurecimento */}
         <div className="relative shrink-0">
           {item.photoUrl ? (
-            <div className="relative h-72 sm:h-88 md:h-96 w-full bg-neutral-950 overflow-hidden">
+            <div className="relative h-72 sm:h-88 md:h-96 w-full bg-neutral-100 dark:bg-neutral-900 overflow-hidden">
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
                 src={item.photoUrl}
@@ -245,7 +245,6 @@ export const MenuItemModal: React.FC<MenuItemModalProps> = ({
                   ;(e.target as HTMLElement).style.display = 'none'
                 }}
               />
-              <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-black/30" />
             </div>
           ) : (
             <div
@@ -258,10 +257,10 @@ export const MenuItemModal: React.FC<MenuItemModalProps> = ({
             </div>
           )}
 
-          {/* Botão de Fechar */}
+          {/* Botão de Fechar visível sobre a foto */}
           <button
             onClick={onClose}
-            className="absolute top-3.5 right-3.5 p-2.5 rounded-full bg-black/65 hover:bg-black/85 text-white backdrop-blur-md transition-all z-10 cursor-pointer shadow-md active:scale-95"
+            className="absolute top-3.5 right-3.5 p-2.5 rounded-full bg-black/60 hover:bg-black/80 text-white backdrop-blur-md transition-all z-10 cursor-pointer shadow-lg active:scale-95 border border-white/20"
             aria-label="Fechar"
           >
             <X className="w-4 h-4" />

@@ -13,6 +13,8 @@ interface EmpresaClientPageProps {
   initialProducts?: CompanyProduct[]
   initialServices?: CompanyService[]
   initialMenuItems?: MenuItem[]
+  initialTableNumber?: string
+  autoScrollToMenu?: boolean
 }
 
 export const EmpresaClientPage: React.FC<EmpresaClientPageProps> = ({
@@ -21,6 +23,8 @@ export const EmpresaClientPage: React.FC<EmpresaClientPageProps> = ({
   initialProducts,
   initialServices,
   initialMenuItems,
+  initialTableNumber,
+  autoScrollToMenu,
 }) => {
   const [company, setCompany] = useState<Company | null>(() => {
     if (isCompanyDeleted(slug)) return null
@@ -165,6 +169,8 @@ export const EmpresaClientPage: React.FC<EmpresaClientPageProps> = ({
       initialProducts={initialProducts}
       initialServices={initialServices}
       initialMenuItems={initialMenuItems}
+      initialTableNumber={initialTableNumber}
+      autoScrollToMenu={autoScrollToMenu}
     />
   )
 }
