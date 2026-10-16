@@ -66,5 +66,15 @@ service cloud.firestore {
     match /deleted_companies/{companyId} {
       allow read, write: if true;
     }
+
+    // Tables: Mesas do estabelecimento para consumo local
+    match /tables/{tableId} {
+      allow read, write: if true;
+    }
+
+    // Table Orders: Pedidos do salão vinculados a mesas
+    match /tableOrders/{orderId} {
+      allow read, write: if true;
+    }
   }
 }

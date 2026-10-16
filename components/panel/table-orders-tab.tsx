@@ -363,7 +363,11 @@ export const TableOrdersTab: React.FC<TableOrdersTabProps> = ({ company, onOpenT
               { key: 'preparo', label: 'Em preparo' },
               { key: 'pronto', label: 'Prontos' },
               { key: 'entregue', label: 'Entregues' },
-            ] as const
+            ] as Array<{
+              key: 'todos' | TableOrderStatus
+              label: string
+              count?: number
+            }>
           ).map((tab) => {
             const isActive = activeFilter === tab.key
             return (
