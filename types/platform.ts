@@ -216,6 +216,43 @@ export interface CompanyOwnerAuth {
   ownerPhone?: string
 }
 
+export type PublicPageThemeId =
+  | 'clean'
+  | 'natural-green'
+  | 'dark'
+  | 'rustic'
+  | 'gold-luxury'
+  | 'professional-blue'
+  | 'elegant-rose'
+  | 'earth'
+  | 'vibrant'
+  | 'custom'
+  | 'light' // Backward compatibility
+
+export interface CustomThemeConfig {
+  bgType?: 'color' | 'gradient' | 'image'
+  bgColor?: string
+  bgGradient?: string
+  bgImageUrl?: string
+  bgImageOpacity?: number
+  bgImageBlur?: number
+  cardBgColor?: string
+  accentColor?: string
+  isDarkBase?: boolean
+}
+
+export interface AdvancedColorsConfig {
+  pageBg?: string      // Fundo da página
+  cardBg?: string      // Fundo dos cards
+  primary?: string     // Cor principal
+  secondary?: string   // Cor secundária
+  buttonBg?: string    // Cor dos botões
+  priceColor?: string  // Cor dos preços
+  titleColor?: string  // Cor dos títulos
+  textColor?: string   // Cor dos textos
+  borderColor?: string // Cor das bordas/detalhes
+}
+
 export interface Company {
   id: string
   slug: string
@@ -247,7 +284,9 @@ export interface Company {
   productsOrder?: string[] // Custom display order for catalog products
   servicesOrder?: string[] // Custom display order for company services
   menuItemsOrder?: string[] // Custom display order for digital menu items
-  theme?: 'dark' | 'light' // Public page appearance theme (Escuro / Claro)
+  theme?: PublicPageThemeId | string // Public page appearance theme (Clean, Verde Natural, Escuro Premium, Rústico, etc.)
+  customThemeConfig?: CustomThemeConfig // Specific configuration when theme is 'custom'
+  themeColors?: AdvancedColorsConfig // Custom advanced colors for individual customization
   rating?: number
   reviewCount?: number
   bookingSettings?: BookingSettings

@@ -13,6 +13,7 @@ import {
   Filter,
 } from 'lucide-react'
 import { Company, CompanyProduct } from '@/types/platform'
+import { getPublicTheme } from '@/lib/public-themes'
 import { ProductDetailModal } from './product-detail-modal'
 
 interface ProductsSheetProps {
@@ -84,8 +85,9 @@ export const ProductsSheet: React.FC<ProductsSheetProps> = ({
 
   if (!isOpen) return null
 
-  const isDark = (company.theme || 'dark') === 'dark'
-  const primaryColor = company.primaryColor || '#6D28D9'
+  const activeTheme = getPublicTheme(company.theme, company.customThemeConfig, company.themeColors)
+  const isDark = activeTheme.isDarkBase
+  const primaryColor = activeTheme.colors.primary || company.primaryColor || '#6D28D9'
 
   // Format currency
   const formatPrice = (value?: number | null) => {
@@ -224,11 +226,19 @@ export const ProductsSheet: React.FC<ProductsSheetProps> = ({
                       onClick={() => setSelectedCategory(cat.name)}
                       className={`px-3 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap transition-all cursor-pointer flex items-center gap-1.5 ${
                         isSelected
-                          ? 'bg-violet-600 text-white shadow-xs'
+                          ? 'shadow-xs'
                           : isDark
                           ? 'bg-neutral-900/90 hover:bg-neutral-800 text-neutral-400 hover:text-white border border-white/5'
                           : 'bg-neutral-100 hover:bg-neutral-200/80 text-neutral-700'
                       }`}
+                      style={
+                        isSelected
+                          ? {
+                              backgroundColor: activeTheme.colors.buttonBg,
+                              color: activeTheme.colors.buttonText,
+                            }
+                          : undefined
+                      }
                     >
                       <span>{cat.name}</span>
                       <span
@@ -277,7 +287,11 @@ export const ProductsSheet: React.FC<ProductsSheetProps> = ({
                       setSearch('')
                       setSelectedCategory('Todos')
                     }}
-                    className="mt-4 px-4 py-2 rounded-xl text-xs font-bold bg-violet-600 hover:bg-violet-700 text-white transition-colors cursor-pointer"
+                    className="mt-4 px-4 py-2 rounded-xl text-xs font-bold transition-colors cursor-pointer"
+                    style={{
+                      backgroundColor: activeTheme.colors.buttonBg,
+                      color: activeTheme.colors.buttonText,
+                    }}
                   >
                     Ver todos os produtos
                   </button>
@@ -391,7 +405,10 @@ export const ProductsSheet: React.FC<ProductsSheetProps> = ({
                             </span>
                           ) : hasPromo ? (
                             <div>
-                              <span className="text-xs sm:text-sm font-black text-emerald-500 font-mono block leading-tight">
+                              <span
+                                className="text-xs sm:text-sm font-black font-mono block leading-tight"
+                                style={{ color: activeTheme.colors.priceColor }}
+                              >
                                 {formatPrice(item.promotionalPrice)}
                               </span>
                               <span
@@ -404,9 +421,8 @@ export const ProductsSheet: React.FC<ProductsSheetProps> = ({
                             </div>
                           ) : (
                             <span
-                              className={`text-xs sm:text-sm font-black font-mono block leading-tight ${
-                                isDark ? 'text-white' : 'text-neutral-900'
-                              }`}
+                              className="text-xs sm:text-sm font-black font-mono block leading-tight"
+                              style={{ color: activeTheme.colors.priceColor }}
                             >
                               {formatPrice(item.price)}
                             </span>
@@ -416,8 +432,8 @@ export const ProductsSheet: React.FC<ProductsSheetProps> = ({
                         <div
                           className={`px-2 py-1 rounded-lg text-[10px] font-bold flex items-center gap-0.5 shrink-0 transition-colors ${
                             isDark
-                              ? 'bg-white/5 group-hover:bg-violet-600 group-hover:text-white text-neutral-300'
-                              : 'bg-neutral-100 group-hover:bg-violet-600 group-hover:text-white text-neutral-700'
+                              ? 'bg-white/10 hover:bg-white/20 text-white'
+                              : 'bg-neutral-100 hover:bg-neutral-200 text-neutral-800'
                           }`}
                         >
                           <span>Ver</span>

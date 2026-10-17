@@ -456,6 +456,16 @@ export async function saveFirestoreCompany(
     } else if (existing.productCatalog !== undefined) {
       finalCompany.productCatalog = existing.productCatalog
     }
+    if (company.customThemeConfig !== undefined) {
+      finalCompany.customThemeConfig = company.customThemeConfig
+    } else if (existing.customThemeConfig !== undefined) {
+      finalCompany.customThemeConfig = existing.customThemeConfig
+    }
+    if (company.themeColors !== undefined) {
+      finalCompany.themeColors = company.themeColors
+    } else if (existing.themeColors !== undefined) {
+      finalCompany.themeColors = existing.themeColors
+    }
   } else {
     // New company registration
     finalCompany.createdAt = company.createdAt || new Date().toISOString()

@@ -63,6 +63,7 @@ import {
   getGradientContrastTextColor,
   hexToRgba,
 } from '@/lib/colors'
+import { getPublicTheme } from '@/lib/public-themes'
 
 interface PublicCompanyViewProps {
   company: Company
@@ -119,7 +120,16 @@ export const PublicCompanyView: React.FC<PublicCompanyViewProps> = ({
   initialTableNumber,
   autoScrollToMenu,
 }) => {
-  const isDark = (company.theme || 'dark') === 'dark'
+  const activeTheme = useMemo(
+    () => getPublicTheme(company.theme, company.customThemeConfig, company.themeColors),
+    [company.theme, company.customThemeConfig, company.themeColors]
+  )
+  const isDark = activeTheme.isDarkBase
+
+  const themedCardStyle = useMemo(() => ({
+    backgroundColor: activeTheme.colors.cardBg || activeTheme.cardBg,
+    borderColor: activeTheme.colors.borderColor || activeTheme.cardBorder,
+  }), [activeTheme.colors.cardBg, activeTheme.cardBg, activeTheme.colors.borderColor, activeTheme.cardBorder])
 
   const cleanTableNumber = initialTableNumber ? initialTableNumber.trim() : null
   const displayTableLabel = useMemo(() => {
@@ -142,12 +152,12 @@ export const PublicCompanyView: React.FC<PublicCompanyViewProps> = ({
   }, [autoScrollToMenu])
 
   const primaryColor = useMemo(
-    () => sanitizeHex(company.primaryColor, '#6D28D9'),
-    [company.primaryColor]
+    () => sanitizeHex(activeTheme.colors.primary || company.primaryColor, '#6D28D9'),
+    [activeTheme.colors.primary, company.primaryColor]
   )
   const secondaryColor = useMemo(
-    () => sanitizeHex(company.secondaryColor, '#8B5CF6'),
-    [company.secondaryColor]
+    () => sanitizeHex(activeTheme.colors.secondary || company.secondaryColor, '#8B5CF6'),
+    [activeTheme.colors.secondary, company.secondaryColor]
   )
   const gradientBg = useMemo(
     () => `linear-gradient(135deg, ${primaryColor} 0%, ${secondaryColor} 100%)`,
@@ -179,7 +189,6 @@ export const PublicCompanyView: React.FC<PublicCompanyViewProps> = ({
   const [isCartOpen, setIsCartOpen] = useState(false)
   const [cartInitialStep, setCartInitialStep] = useState<'items' | 'delivery'>('items')
   const [coverError, setCoverError] = useState(false)
-  const [logoError, setLogoError] = useState(false)
   const [copiedLink, setCopiedLink] = useState(false)
 
   const [customerSession, setCustomerSession] = useState<{
@@ -731,11 +740,13 @@ export const PublicCompanyView: React.FC<PublicCompanyViewProps> = ({
           : activeProductsList.length > 0
           ? `${activeProductsList.length} itens disponíveis`
           : 'Vitrine de produtos',
-        icon: <ShoppingBag className="w-5 h-5 text-violet-400" />,
-        iconContainerClass: isDark
-          ? 'bg-violet-500/15 border border-violet-500/25'
-          : 'bg-violet-50 border border-violet-200/80',
-        iconContainerStyle: { color: '#8B5CF6' },
+        icon: <ShoppingBag className="w-5 h-5" style={{ color: primaryColor }} />,
+        iconContainerClass: 'border',
+        iconContainerStyle: {
+          backgroundColor: hexToRgba(primaryColor, isDark ? 0.15 : 0.08),
+          borderColor: hexToRgba(primaryColor, isDark ? 0.3 : 0.2),
+          color: primaryColor,
+        },
         onClick: isExternalCatalog ? handleOpenCatalogExternal : () => setIsProductsSheetOpen(true),
         isActive: Boolean(activeModules.products),
       },
@@ -745,11 +756,13 @@ export const PublicCompanyView: React.FC<PublicCompanyViewProps> = ({
         description: activeServicesList.length > 0
           ? `${activeServicesList.length} opções disponíveis`
           : 'Tabela de serviços',
-        icon: <Scissors className="w-5 h-5 text-purple-400" />,
-        iconContainerClass: isDark
-          ? 'bg-purple-500/15 border border-purple-500/25'
-          : 'bg-purple-50 border border-purple-200/80',
-        iconContainerStyle: { color: '#8B5CF6' },
+        icon: <Scissors className="w-5 h-5" style={{ color: secondaryColor }} />,
+        iconContainerClass: 'border',
+        iconContainerStyle: {
+          backgroundColor: hexToRgba(secondaryColor, isDark ? 0.15 : 0.08),
+          borderColor: hexToRgba(secondaryColor, isDark ? 0.3 : 0.2),
+          color: secondaryColor,
+        },
         onClick: () => setIsServicesOpen(true),
         isActive: Boolean(activeModules.services),
       },
@@ -823,6 +836,8 @@ export const PublicCompanyView: React.FC<PublicCompanyViewProps> = ({
     handleOpenWifi,
     handleOpenInstagram,
     handleInitiateBooking,
+    primaryColor,
+    secondaryColor,
   ])
 
   // Resolve os 4 cards de destaque em layout 2x2 no celular
@@ -917,19 +932,34 @@ export const PublicCompanyView: React.FC<PublicCompanyViewProps> = ({
 
   return (
     <div
-      className={`min-h-screen sm:py-6 flex justify-center transition-colors duration-200 ${
+      className={`min-h-screen sm:py-6 flex justify-center transition-colors duration-200 relative ${
         isDark
-          ? 'bg-[#070709] selection:bg-neutral-800 selection:text-white'
-          : 'bg-neutral-100/90 selection:bg-neutral-900 selection:text-white'
-      }`}
+          ? 'selection:bg-neutral-800 selection:text-white'
+          : 'selection:bg-neutral-900 selection:text-white'
+      } ${activeTheme.pageBgClass || ''}`}
+      style={activeTheme.pageBgStyle}
     >
+      {/* Camada Atmosférica de Textura / Brilho / Gradiente do Tema */}
+      {activeTheme.textureOverlay && (
+        <div
+          className="absolute inset-0 pointer-events-none overflow-hidden"
+          style={activeTheme.textureOverlay.style}
+        />
+      )}
+
       {/* Mobile-first App Container */}
       <main
-        className={`w-full max-w-md sm:rounded-3xl shadow-2xl overflow-hidden relative pb-28 sm:pb-24 flex flex-col transition-colors duration-200 ${
+        className={`w-full max-w-md sm:rounded-3xl shadow-2xl overflow-hidden relative pb-28 sm:pb-24 flex flex-col transition-all duration-200 ${
           isDark
-            ? 'bg-[#0d0d12] border-x sm:border border-white/[0.08] text-white'
-            : 'bg-white border-x sm:border border-neutral-200/80 text-neutral-900'
+            ? 'border-x sm:border text-white'
+            : 'border-x sm:border text-neutral-900'
         }`}
+        style={{
+          ...activeTheme.containerBgStyle,
+          borderColor: activeTheme.containerBorderColor,
+          boxShadow: activeTheme.containerShadow,
+          color: activeTheme.textPrimary,
+        }}
       >
         {/* Identificação Automática da Mesa no Salão (Discreta) */}
         {displayTableLabel && (
@@ -966,15 +996,10 @@ export const PublicCompanyView: React.FC<PublicCompanyViewProps> = ({
                   referrerPolicy="no-referrer"
                   onError={() => setCoverError(true)}
                 />
-                {/* Overlay sutil para foco e alto contraste da logo no centro */}
-                <div className="absolute inset-0 bg-black/30 pointer-events-none" />
-                {/* Gradiente escuro concentrado na base da foto para transição suave com o fundo */}
+                {/* Gradiente concentrado na base da foto para transição suave com o fundo do tema */}
                 <div
-                  className={`absolute bottom-0 left-0 right-0 h-14 sm:h-16 pointer-events-none ${
-                    isDark
-                      ? 'bg-gradient-to-t from-[#0d0d12] via-[#0d0d12]/60 to-transparent'
-                      : 'bg-gradient-to-t from-white via-white/60 to-transparent'
-                  }`}
+                  className="absolute bottom-0 left-0 right-0 h-14 sm:h-16 pointer-events-none"
+                  style={{ background: activeTheme.heroTransitionGradient }}
                 />
               </>
             ) : (
@@ -985,11 +1010,8 @@ export const PublicCompanyView: React.FC<PublicCompanyViewProps> = ({
                 <div className="absolute -right-8 -top-8 w-36 h-36 rounded-full bg-white/20 blur-xl pointer-events-none" />
                 <div className="absolute right-0 bottom-0 w-28 h-28 rounded-full bg-black/25 blur-xl pointer-events-none" />
                 <div
-                  className={`absolute inset-0 pointer-events-none ${
-                    isDark
-                      ? 'bg-gradient-to-t from-[#0d0d12] via-[#0d0d12]/60 to-transparent'
-                      : 'bg-gradient-to-t from-white via-white/50 to-transparent'
-                  }`}
+                  className="absolute inset-0 pointer-events-none"
+                  style={{ background: activeTheme.heroTransitionGradient }}
                 />
               </div>
             )}
@@ -1009,45 +1031,6 @@ export const PublicCompanyView: React.FC<PublicCompanyViewProps> = ({
                 )}
               </button>
             </div>
-
-            {/* LOGO CENTRALIZADA NO MEIO DA CAPA (A capa atrás e a logo na frente no centro) */}
-            <div className="absolute inset-0 z-10 flex items-center justify-center pointer-events-none">
-              <div
-                className="relative w-22 h-22 sm:w-24 sm:h-24 rounded-2xl p-[3px] shadow-2xl overflow-hidden flex items-center justify-center pointer-events-auto transition-transform hover:scale-105"
-                style={{
-                  background: gradientBg,
-                  boxShadow: `0 12px 28px -4px ${hexToRgba(primaryColor, isDark ? 0.65 : 0.45)}`,
-                }}
-              >
-                <div
-                  className={`w-full h-full rounded-[13px] p-1 overflow-hidden flex items-center justify-center ${
-                    isDark ? 'bg-[#141419]' : 'bg-white'
-                  }`}
-                >
-                  {company.logoUrl && !logoError ? (
-                    <Image
-                      src={company.logoUrl}
-                      alt={`${company.name} logo`}
-                      width={88}
-                      height={88}
-                      className="w-full h-full object-cover rounded-xl"
-                      referrerPolicy="no-referrer"
-                      onError={() => setLogoError(true)}
-                    />
-                  ) : (
-                    <div
-                      className="w-full h-full rounded-xl flex items-center justify-center text-xl font-black shadow-inner"
-                      style={{
-                        background: gradientBg,
-                        color: contrastText,
-                      }}
-                    >
-                      {company.name.slice(0, 2).toUpperCase()}
-                    </div>
-                  )}
-                </div>
-              </div>
-            </div>
           </div>
 
           {/* ======================================================= */}
@@ -1062,12 +1045,12 @@ export const PublicCompanyView: React.FC<PublicCompanyViewProps> = ({
                     key={card.id}
                     type="button"
                     onClick={card.onClick}
-                    className={`w-full text-center p-1.5 sm:p-2 rounded-2xl border transition-all duration-200 active:scale-95 hover:scale-[1.02] cursor-pointer group flex flex-col items-center justify-center gap-1 sm:gap-1.5 shadow-2xs hover:shadow-md select-none relative overflow-hidden h-[68px] sm:h-[72px] ${
-                      isDark
-                        ? 'bg-[#141419]/95 hover:bg-[#1a1a22] border-white/[0.08] hover:border-white/20'
-                        : 'bg-white/95 hover:bg-neutral-50/90 border-neutral-200/90 hover:border-neutral-300'
-                    }`}
-                    style={{ WebkitTapHighlightColor: 'transparent' }}
+                    className="w-full text-center p-1.5 sm:p-2 rounded-2xl border transition-all duration-200 active:scale-95 hover:scale-[1.02] cursor-pointer group flex flex-col items-center justify-center gap-1 sm:gap-1.5 shadow-2xs hover:shadow-md select-none relative overflow-hidden h-[68px] sm:h-[72px]"
+                    style={{
+                      WebkitTapHighlightColor: 'transparent',
+                      backgroundColor: activeTheme.cardBg,
+                      borderColor: activeTheme.cardBorder,
+                    }}
                   >
                     {/* Badge flutuante (ex: Prêmio!) */}
                     {card.badgeText && (
@@ -1099,7 +1082,7 @@ export const PublicCompanyView: React.FC<PublicCompanyViewProps> = ({
           )}
 
           {/* ======================================================= */}
-          {/* 3. IDENTIDADE DA EMPRESA (NOME, STATUS, AVALIAÇÕES)     */}
+          {/* 3. IDENTIDADE DA EMPRESA (NOME E DESCRIÇÃO)             */}
           {/* ======================================================= */}
           <div className="px-4 mt-3 sm:mt-4 relative z-10 flex flex-col items-center text-center">
             {/* Nome da Empresa */}
@@ -1107,59 +1090,22 @@ export const PublicCompanyView: React.FC<PublicCompanyViewProps> = ({
               className={`text-xl sm:text-2xl font-black tracking-tight leading-tight ${
                 isDark ? 'text-white' : 'text-neutral-900'
               }`}
+              style={{ color: activeTheme.colors.titleColor }}
             >
               {company.name}
             </h1>
 
-            {/* Tagline da Empresa */}
+            {/* Descrição da Empresa */}
             {company.tagline && (
               <p
                 className={`text-xs font-medium max-w-xs mt-1 leading-snug ${
                   isDark ? 'text-neutral-400' : 'text-neutral-500'
                 }`}
+                style={{ color: activeTheme.colors.textColor }}
               >
                 {company.tagline}
               </p>
             )}
-
-            {/* Linha de Metadados: Avaliação no Google & Status */}
-            <div className="flex items-center justify-center flex-wrap gap-2 mt-2">
-              {/* Avaliação Google */}
-              <button
-                type="button"
-                onClick={activeModules.googleReview ? handleGoogleReview : undefined}
-                className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-bold transition-all ${
-                  isDark
-                    ? 'bg-[#16161c] border border-white/[0.08] text-amber-300 hover:border-amber-400/40 shadow-xs'
-                    : 'bg-amber-50/90 border border-amber-200/70 text-amber-900 hover:bg-amber-100'
-                } ${
-                  activeModules.googleReview ? 'hover:scale-[1.02] cursor-pointer' : 'cursor-default'
-                }`}
-                title={activeModules.googleReview ? 'Ver avaliações no Google' : undefined}
-              >
-                <Star className="w-3.5 h-3.5 fill-amber-400 text-amber-400 shrink-0" />
-                <span>{company.rating ? company.rating.toFixed(1) : '4.9'}</span>
-                <span
-                  className={`font-normal text-[10px] ${
-                    isDark ? 'text-neutral-400' : 'text-amber-700/80'
-                  }`}
-                >
-                  ({company.reviewCount || '120+'})
-                </span>
-              </button>
-
-              {/* Status do Estabelecimento */}
-              <div
-                className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-semibold ${
-                  isDark
-                    ? 'bg-[#0f1b14] border border-emerald-500/30 text-emerald-300 shadow-xs'
-                    : 'bg-emerald-50 border border-emerald-200/70 text-emerald-800'
-                }`}
-              >
-                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
-                <span>Atendimento Ativo</span>
-              </div>
-            </div>
           </div>
         </div>
 
@@ -1176,11 +1122,8 @@ export const PublicCompanyView: React.FC<PublicCompanyViewProps> = ({
               whatsapp: activeModules.whatsapp ? (
                 <div
                   key="whatsapp"
-                  className={`rounded-3xl p-4 sm:p-4.5 border flex items-center justify-between gap-3 ${
-                    isDark
-                      ? 'bg-[#141419] border-white/[0.08] shadow-sm'
-                      : 'bg-white border-neutral-200/80 shadow-2xs'
-                  }`}
+                  className="rounded-3xl p-4 sm:p-4.5 border flex items-center justify-between gap-3 shadow-xs"
+                  style={themedCardStyle}
                 >
                   <div className="flex items-center gap-3 min-w-0">
                     <div className="w-10 h-10 rounded-2xl bg-emerald-500/15 text-emerald-400 border border-emerald-500/30 flex items-center justify-center shrink-0">
@@ -1254,12 +1197,10 @@ export const PublicCompanyView: React.FC<PublicCompanyViewProps> = ({
                   return (
                     <div
                       key={srv.id}
-                      className={`rounded-3xl p-3 sm:p-3.5 flex flex-col sm:flex-row gap-3 transition-all cursor-pointer group relative overflow-hidden ${
-                        isDark
-                          ? 'bg-[#141419] hover:bg-[#191920] border border-white/[0.07] hover:border-white/15 shadow-md'
-                          : 'bg-white hover:border-neutral-300 border border-neutral-200/90 shadow-xs hover:shadow-md'
-                      }`}
+                      className="rounded-3xl p-3 sm:p-3.5 flex flex-col sm:flex-row gap-3 transition-all cursor-pointer group relative overflow-hidden border shadow-sm hover:shadow-md"
                       style={{
+                        backgroundColor: activeTheme.cardBg,
+                        borderColor: activeTheme.cardBorder,
                         boxShadow: isDark
                           ? `0 6px 20px -4px rgba(0,0,0,0.5)`
                           : `0 4px 16px -4px ${hexToRgba(primaryColor, 0.08)}`,
@@ -1361,9 +1302,8 @@ export const PublicCompanyView: React.FC<PublicCompanyViewProps> = ({
                                 </span>
                               ) : (
                                 <span
-                                  className={`text-sm sm:text-base font-black font-mono ${
-                                    isDark ? 'text-white' : 'text-neutral-900'
-                                  }`}
+                                  className="text-sm sm:text-base font-black font-mono"
+                                  style={{ color: activeTheme.colors.priceColor }}
                                 >
                                   R$ {srv.price?.toFixed(2).replace('.', ',')}
                                 </span>
@@ -1378,10 +1318,11 @@ export const PublicCompanyView: React.FC<PublicCompanyViewProps> = ({
                                   e.stopPropagation()
                                   handleInitiateBooking(srv)
                                 }}
-                                className="px-3.5 py-1.5 rounded-xl text-xs font-extrabold text-white shadow-xs hover:opacity-90 active:scale-95 transition-all flex items-center gap-1.5 cursor-pointer"
+                                className="px-3.5 py-1.5 rounded-xl text-xs font-extrabold shadow-xs hover:opacity-90 active:scale-95 transition-all flex items-center gap-1.5 cursor-pointer"
                                 style={{
-                                  backgroundColor: primaryColor,
-                                  boxShadow: `0 4px 12px -2px ${hexToRgba(primaryColor, 0.45)}`,
+                                  backgroundColor: activeTheme.colors.buttonBg,
+                                  color: activeTheme.colors.buttonText,
+                                  boxShadow: `0 4px 12px -2px ${hexToRgba(activeTheme.colors.buttonBg, 0.45)}`,
                                 }}
                               >
                                 <Calendar className="w-3 h-3" />
@@ -1428,9 +1369,8 @@ export const PublicCompanyView: React.FC<PublicCompanyViewProps> = ({
           ) : (
             <div
               key="services-card"
-              className={`rounded-3xl p-4.5 sm:p-5 border space-y-3 ${
-                isDark ? 'bg-[#141419] border-white/[0.08] shadow-sm' : 'bg-white border-neutral-200/80 shadow-2xs'
-              }`}
+              className="rounded-3xl p-4.5 sm:p-5 border space-y-3 shadow-xs"
+              style={themedCardStyle}
             >
               <div className="flex items-center gap-2.5">
                 <div
@@ -1567,11 +1507,8 @@ export const PublicCompanyView: React.FC<PublicCompanyViewProps> = ({
                     <div
                       key={prod.id}
                       onClick={() => setSelectedProductDetail(prod)}
-                      className={`group rounded-2xl border p-2.5 flex flex-col justify-between transition-all cursor-pointer ${
-                        isDark
-                          ? 'bg-[#181820] border-white/[0.06] hover:border-white/20'
-                          : 'bg-neutral-50/80 border-neutral-200/90 hover:border-neutral-300 hover:bg-white shadow-2xs'
-                      }`}
+                      className="group rounded-2xl border p-2.5 flex flex-col justify-between transition-all cursor-pointer shadow-xs hover:shadow-md"
+                      style={themedCardStyle}
                     >
                       {/* Foto do Produto */}
                       <div
@@ -1638,7 +1575,10 @@ export const PublicCompanyView: React.FC<PublicCompanyViewProps> = ({
                             </span>
                           ) : hasPromo ? (
                             <div className="flex items-baseline gap-1.5 flex-wrap">
-                              <span className="text-xs font-black text-emerald-400 font-mono">
+                              <span
+                                className="text-xs font-black font-mono"
+                                style={{ color: activeTheme.colors.priceColor }}
+                              >
                                 R$ {prod.promotionalPrice?.toFixed(2).replace('.', ',')}
                               </span>
                               <span
@@ -1651,9 +1591,8 @@ export const PublicCompanyView: React.FC<PublicCompanyViewProps> = ({
                             </div>
                           ) : (
                             <span
-                              className={`text-xs font-black font-mono block ${
-                                isDark ? 'text-white' : 'text-neutral-900'
-                              }`}
+                              className="text-xs font-black font-mono block"
+                              style={{ color: activeTheme.colors.priceColor }}
                             >
                               R$ {prod.price?.toFixed(2).replace('.', ',')}
                             </span>
@@ -1809,11 +1748,8 @@ export const PublicCompanyView: React.FC<PublicCompanyViewProps> = ({
               appointments: (activeModules.appointments && (
                 <div
                   key="appointments"
-                  className={`rounded-3xl p-4.5 sm:p-5 border space-y-3.5 transition-all ${
-                    isDark
-                      ? 'bg-[#141419] border-white/[0.08] shadow-sm'
-                      : 'bg-white border-neutral-200/80 shadow-2xs'
-                  }`}
+                  className="rounded-3xl p-4.5 sm:p-5 border space-y-3.5 transition-all shadow-xs"
+                  style={themedCardStyle}
                 >
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2.5">
@@ -2019,11 +1955,8 @@ export const PublicCompanyView: React.FC<PublicCompanyViewProps> = ({
                         isSoldOut
                           ? 'opacity-65 cursor-not-allowed'
                           : 'cursor-pointer hover:shadow-lg active:scale-[0.99]'
-                      } ${
-                        isDark
-                          ? 'bg-[#181820] hover:bg-[#1f1f28] border-white/10 hover:border-white/20'
-                          : 'bg-white hover:bg-neutral-50/70 border-neutral-200/90 hover:border-neutral-300 shadow-xs'
-                      }`}
+                      } shadow-xs`}
+                      style={themedCardStyle}
                     >
                       {/* 1. FOTO PERFEITAMENTE QUADRADA (1:1) ENCOSTANDO NAS BORDAS ESQUERDA, SUPERIOR E INFERIOR */}
                       <div className="w-[172px] h-[172px] min-w-[172px] sm:w-[185px] sm:h-[185px] sm:min-w-[185px] aspect-square shrink-0 relative overflow-hidden bg-neutral-100 dark:bg-neutral-800">
@@ -2120,12 +2053,15 @@ export const PublicCompanyView: React.FC<PublicCompanyViewProps> = ({
                             <span className="text-[9px] sm:text-[10px] text-neutral-500 dark:text-neutral-400 font-medium block leading-none">
                               {hasPriceFrom ? 'A partir de' : 'Valor'}
                             </span>
-                            <div className="text-sm sm:text-base font-black text-[#8B0000] dark:text-rose-400 leading-tight mt-0.5">
+                            <div
+                              className="text-sm sm:text-base font-black leading-tight mt-0.5"
+                              style={{ color: activeTheme.colors.priceColor }}
+                            >
                               {hasPriceFrom ? (
                                 formatMoney(minSizePrice)
                               ) : hasPromo ? (
                                 <div className="flex items-baseline gap-1.5 flex-wrap">
-                                  <span className="text-emerald-600 dark:text-emerald-400">
+                                  <span style={{ color: activeTheme.colors.priceColor }}>
                                     {formatMoney(item.promotionalPrice)}
                                   </span>
                                   <span className="text-[11px] text-neutral-400 line-through font-normal">
@@ -2157,11 +2093,19 @@ export const PublicCompanyView: React.FC<PublicCompanyViewProps> = ({
                                 e.stopPropagation()
                                 if (!isSoldOut) setSelectedMenuItemDetail(item)
                               }}
-                              className={`w-full py-2 px-2.5 rounded-xl font-bold text-xs sm:text-sm text-white shadow-xs transition-all active:scale-[0.98] flex items-center justify-center cursor-pointer shrink-0 ${
+                              className={`w-full py-2 px-2.5 rounded-xl font-bold text-xs sm:text-sm shadow-xs transition-all active:scale-[0.98] flex items-center justify-center cursor-pointer shrink-0 ${
                                 isSoldOut
-                                  ? 'opacity-40 cursor-not-allowed bg-neutral-400'
-                                  : 'bg-[#008A5E] hover:bg-[#007550] shadow-sm'
+                                  ? 'opacity-40 cursor-not-allowed bg-neutral-400 text-white'
+                                  : 'shadow-sm hover:opacity-95'
                               }`}
+                              style={
+                                !isSoldOut
+                                  ? {
+                                      backgroundColor: activeTheme.colors.buttonBg,
+                                      color: activeTheme.colors.buttonText,
+                                    }
+                                  : undefined
+                              }
                             >
                               <span>{item.isCustomBuilder ? '+ Montar agora' : '+ Pedir agora'}</span>
                             </button>
@@ -2259,8 +2203,8 @@ export const PublicCompanyView: React.FC<PublicCompanyViewProps> = ({
               }`}
               style={{
                 background: isDark
-                  ? `linear-gradient(135deg, ${hexToRgba(primaryColor, 0.16)} 0%, #131318 50%, ${hexToRgba(secondaryColor, 0.1)} 100%)`
-                  : `linear-gradient(135deg, ${hexToRgba(primaryColor, 0.05)} 0%, #ffffff 50%, ${hexToRgba(secondaryColor, 0.07)} 100%)`,
+                  ? `linear-gradient(135deg, ${hexToRgba(primaryColor, 0.16)} 0%, ${activeTheme.cardBg} 50%, ${hexToRgba(secondaryColor, 0.1)} 100%)`
+                  : `linear-gradient(135deg, ${hexToRgba(primaryColor, 0.05)} 0%, ${activeTheme.cardBg} 50%, ${hexToRgba(secondaryColor, 0.07)} 100%)`,
                 borderColor: hexToRgba(primaryColor, isDark ? 0.28 : 0.2),
               }}
             >
@@ -2346,11 +2290,8 @@ export const PublicCompanyView: React.FC<PublicCompanyViewProps> = ({
           ) : null,
               googleReview: activeModules.googleReview ? (
             <div
-              className={`rounded-3xl p-4.5 sm:p-5 space-y-3.5 ${
-                isDark
-                  ? 'bg-[#141419] border border-white/[0.07] shadow-sm'
-                  : 'bg-white border border-neutral-200/80 shadow-2xs'
-              }`}
+              className="rounded-3xl p-4.5 sm:p-5 space-y-3.5 border shadow-xs"
+              style={themedCardStyle}
             >
               <div className="flex items-center justify-between">
                 {/* Badge Oficial Google */}
@@ -2434,12 +2375,12 @@ export const PublicCompanyView: React.FC<PublicCompanyViewProps> = ({
             <div key="location" className="pt-1">
               <div
                 onClick={handleOpenLocation}
-                className={`w-full rounded-2xl p-3 flex items-center justify-between gap-3 active:scale-[0.99] transition-all cursor-pointer group ${
-                  isDark
-                    ? 'bg-[#141419] hover:bg-[#1a1a22] border border-white/[0.07] hover:border-white/15'
-                    : 'bg-white border border-neutral-200/80 hover:border-neutral-300 shadow-2xs hover:shadow-xs'
-                }`}
-                style={{ WebkitTapHighlightColor: 'transparent' }}
+                className="w-full rounded-2xl p-3 flex items-center justify-between gap-3 active:scale-[0.99] transition-all cursor-pointer group border shadow-2xs hover:shadow-xs"
+                style={{
+                  WebkitTapHighlightColor: 'transparent',
+                  backgroundColor: activeTheme.cardBg,
+                  borderColor: activeTheme.cardBorder,
+                }}
               >
                 <div className="flex items-center gap-2.5 min-w-0">
                   <div
@@ -2484,11 +2425,8 @@ export const PublicCompanyView: React.FC<PublicCompanyViewProps> = ({
               wifi: (activeModules.wifi && (
                 <div
                   key="wifi"
-                  className={`rounded-3xl p-4 sm:p-4.5 border flex items-center justify-between gap-3 ${
-                    isDark
-                      ? 'bg-[#141419] border-white/[0.08] shadow-sm'
-                      : 'bg-white border-neutral-200/80 shadow-2xs'
-                  }`}
+                  className="rounded-3xl p-4 sm:p-4.5 border flex items-center justify-between gap-3 shadow-xs"
+                  style={themedCardStyle}
                 >
                   <div className="flex items-center gap-3 min-w-0">
                     <div className="w-9 h-9 rounded-xl bg-cyan-500/15 text-cyan-400 border border-cyan-500/30 flex items-center justify-center shrink-0">
@@ -2515,14 +2453,18 @@ export const PublicCompanyView: React.FC<PublicCompanyViewProps> = ({
               feedback: (activeModules.feedback && (
                 <div
                   key="feedback"
-                  className={`rounded-3xl p-4 sm:p-4.5 border flex items-center justify-between gap-3 ${
-                    isDark
-                      ? 'bg-[#141419] border-white/[0.08] shadow-sm'
-                      : 'bg-white border-neutral-200/80 shadow-2xs'
-                  }`}
+                  className="rounded-3xl p-4 sm:p-4.5 border flex items-center justify-between gap-3 shadow-xs"
+                  style={themedCardStyle}
                 >
                   <div className="flex items-center gap-3 min-w-0">
-                    <div className="w-9 h-9 rounded-xl bg-purple-500/15 text-purple-400 border border-purple-500/30 flex items-center justify-center shrink-0">
+                    <div
+                      className="w-9 h-9 rounded-xl border flex items-center justify-center shrink-0"
+                      style={{
+                        backgroundColor: hexToRgba(primaryColor, isDark ? 0.15 : 0.08),
+                        borderColor: hexToRgba(primaryColor, isDark ? 0.3 : 0.2),
+                        color: primaryColor,
+                      }}
+                    >
                       <MessageSquareHeart className="w-5 h-5" />
                     </div>
                     <div className="min-w-0">
@@ -2537,7 +2479,11 @@ export const PublicCompanyView: React.FC<PublicCompanyViewProps> = ({
                   <button
                     type="button"
                     onClick={() => setIsFeedbackOpen(true)}
-                    className="px-3.5 py-1.5 rounded-xl text-xs font-bold bg-purple-600 hover:bg-purple-500 text-white shrink-0 cursor-pointer shadow-xs active:scale-95 transition-all"
+                    className="px-3.5 py-1.5 rounded-xl text-xs font-bold shrink-0 cursor-pointer shadow-xs active:scale-95 transition-all hover:opacity-90"
+                    style={{
+                      backgroundColor: activeTheme.colors.buttonBg,
+                      color: activeTheme.colors.buttonText,
+                    }}
                   >
                     Opinar
                   </button>
@@ -2546,11 +2492,8 @@ export const PublicCompanyView: React.FC<PublicCompanyViewProps> = ({
               instagram: (activeModules.instagram && (
                 <div
                   key="instagram"
-                  className={`rounded-3xl p-4 sm:p-4.5 border flex items-center justify-between gap-3 ${
-                    isDark
-                      ? 'bg-[#141419] border-white/[0.08] shadow-sm'
-                      : 'bg-white border-neutral-200/80 shadow-2xs'
-                  }`}
+                  className="rounded-3xl p-4 sm:p-4.5 border flex items-center justify-between gap-3 shadow-xs"
+                  style={themedCardStyle}
                 >
                   <div className="flex items-center gap-3 min-w-0">
                     <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-amber-500 via-rose-500 to-purple-600 text-white flex items-center justify-center shrink-0 shadow-xs">

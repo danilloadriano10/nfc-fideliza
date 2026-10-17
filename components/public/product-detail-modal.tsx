@@ -18,6 +18,7 @@ import {
   ArrowRight,
 } from 'lucide-react'
 import { Company, CompanyProduct } from '@/types/platform'
+import { getPublicTheme } from '@/lib/public-themes'
 import { DeliveryOptionsForm } from './delivery-options-form'
 import {
   OrderDeliveryInfo,
@@ -130,8 +131,9 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
 
   if (!isOpen || !product) return null
 
-  const isDark = (company.theme || 'dark') === 'dark'
-  const primaryColor = company.primaryColor || '#6D28D9'
+  const activeTheme = getPublicTheme(company.theme, company.customThemeConfig, company.themeColors)
+  const isDark = activeTheme.isDarkBase
+  const primaryColor = activeTheme.colors.primary || company.primaryColor || '#6D28D9'
 
   // Format currency
   const formatPrice = (value?: number | null) => {
@@ -385,7 +387,10 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
                       </span>
                     ) : hasPromo ? (
                       <div className="flex items-baseline gap-2">
-                        <span className="text-2xl sm:text-3xl font-black text-emerald-500 font-mono">
+                        <span
+                          className="text-2xl sm:text-3xl font-black font-mono"
+                          style={{ color: activeTheme.colors.priceColor }}
+                        >
                           {formatPrice(product.promotionalPrice)}
                         </span>
                         <span
@@ -399,7 +404,7 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
                     ) : (
                       <span
                         className="text-2xl sm:text-3xl font-black font-mono"
-                        style={{ color: isDark ? '#ffffff' : primaryColor }}
+                        style={{ color: activeTheme.colors.priceColor }}
                       >
                         {formatPrice(product.price)}
                       </span>
@@ -551,7 +556,10 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
                       {product.name}
                     </h4>
                     {selectedVariation && (
-                      <span className="text-[11px] text-violet-400 block truncate">
+                      <span
+                        className="text-[11px] block truncate"
+                        style={{ color: primaryColor }}
+                      >
                         Variação: {selectedVariation}
                       </span>
                     )}
@@ -562,7 +570,10 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
 
                   <div className="text-right shrink-0">
                     <span className="text-[10px] text-neutral-400 block">Total</span>
-                    <span className="text-xs sm:text-sm font-black text-emerald-500 font-mono">
+                    <span
+                      className="text-xs sm:text-sm font-black font-mono"
+                      style={{ color: activeTheme.colors.priceColor }}
+                    >
                       {totalPrice != null ? formatMoneyBRL(totalPrice) : 'Sob consulta'}
                     </span>
                   </div>

@@ -102,6 +102,7 @@ import { ProductsTab } from './products-tab'
 import { MenuTab } from './menu-tab'
 import { TablesTab } from './tables-tab'
 import { TableOrdersTab } from './table-orders-tab'
+import { PageThemeSelector } from './page-theme-selector'
 
 const PRESET_BANNERS = [
   { label: '☕ Cafeteria / Café', url: '/images/cafe_central_banner_1791003956057.jpg' },
@@ -1666,7 +1667,7 @@ export const CompanyPanelView: React.FC<CompanyPanelViewProps> = ({
                 className="px-3.5 py-1.5 rounded-xl text-xs font-bold bg-violet-600 text-white shadow-xs flex items-center gap-1.5 whitespace-nowrap hover:bg-violet-700 transition-all"
               >
                 <Palette className="w-3.5 h-3.5" />
-                <span>3. Aparência da Página (Tema Escuro / Claro)</span>
+                <span>3. Aparência da Página (Temas Visuais)</span>
               </a>
               <a
                 href="#secao-contatos"
@@ -2063,149 +2064,33 @@ export const CompanyPanelView: React.FC<CompanyPanelViewProps> = ({
                       Aparência da Página
                     </h3>
                     <p className="text-xs text-neutral-500">
-                      Personalize o tema visual (Escuro / Claro) e as cores da página pública da sua empresa.
+                      Escolha entre 10 temas visuais com prévia em tempo real e personalize a atmosfera da sua empresa.
                     </p>
                   </div>
                 </div>
               </div>
 
-              {/* TEMA DA PÁGINA (ESCURO / CLARO) */}
-              <div className="p-5 rounded-2xl bg-neutral-950 text-white shadow-md border border-neutral-800 space-y-4">
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-                  <div>
-                    <label className="text-xs font-black text-white uppercase tracking-wider flex items-center gap-2">
-                      <Sparkles className="w-4 h-4 text-amber-400" />
-                      TEMA DA PÁGINA
-                    </label>
-                    <p className="text-xs text-neutral-400 mt-0.5">
-                      Defina a experiência visual dos seus clientes na Página Pública da sua empresa.
-                    </p>
-                  </div>
-                  <span className="text-[10px] font-bold px-2.5 py-1 rounded-full bg-neutral-800 text-neutral-300 border border-neutral-700 self-start sm:self-auto">
-                    Individual por Empresa (Firestore)
-                  </span>
-                </div>
-
-                <div className="grid grid-cols-2 gap-3 pt-1">
-                  {/* Opção ESCURO */}
-                  <button
-                    type="button"
-                    onClick={() => setFormData((prev) => ({ ...prev, theme: 'dark' }))}
-                    className={`relative p-3.5 rounded-2xl border text-left transition-all cursor-pointer flex flex-col gap-2 group ${
-                      (formData.theme || 'dark') === 'dark'
-                        ? 'bg-neutral-950 text-white border-neutral-950 ring-2 ring-neutral-950/20 shadow-md'
-                        : 'bg-white hover:bg-neutral-100 text-neutral-800 border-neutral-200'
-                    }`}
-                  >
-                    <div className="flex items-center justify-between w-full">
-                      <div className="flex items-center gap-2">
-                        <div
-                          className={`w-7 h-7 rounded-xl flex items-center justify-center transition-colors ${
-                            (formData.theme || 'dark') === 'dark'
-                              ? 'bg-neutral-800 text-amber-400'
-                              : 'bg-neutral-100 text-neutral-600'
-                          }`}
-                        >
-                          <Moon className="w-4 h-4" />
-                        </div>
-                        <span className="text-sm font-extrabold tracking-tight">Escuro</span>
-                      </div>
-                      {(formData.theme || 'dark') === 'dark' && (
-                        <div className="w-5 h-5 rounded-full bg-emerald-500 text-white flex items-center justify-center shadow-xs">
-                          <Check className="w-3 h-3 stroke-[3]" />
-                        </div>
-                      )}
-                    </div>
-                    <p
-                      className={`text-[11px] leading-relaxed ${
-                        (formData.theme || 'dark') === 'dark'
-                          ? 'text-neutral-400'
-                          : 'text-neutral-500'
-                      }`}
-                    >
-                      Preto profundo e grafite premium, visual moderno de app móvel.
-                    </p>
-                  </button>
-
-                  {/* Opção CLARO */}
-                  <button
-                    type="button"
-                    onClick={() => setFormData((prev) => ({ ...prev, theme: 'light' }))}
-                    className={`relative p-3.5 rounded-2xl border text-left transition-all cursor-pointer flex flex-col gap-2 group ${
-                      formData.theme === 'light'
-                        ? 'bg-neutral-900 text-white border-neutral-900 ring-2 ring-neutral-900/20 shadow-md'
-                        : 'bg-white hover:bg-neutral-50 text-neutral-800 border-neutral-200'
-                    }`}
-                  >
-                    <div className="flex items-center justify-between w-full">
-                      <div className="flex items-center gap-2">
-                        <div
-                          className={`w-7 h-7 rounded-xl flex items-center justify-center transition-colors ${
-                            formData.theme === 'light'
-                              ? 'bg-neutral-800 text-amber-400'
-                              : 'bg-amber-50 text-amber-600'
-                          }`}
-                        >
-                          <Sun className="w-4 h-4" />
-                        </div>
-                        <span className="text-sm font-extrabold tracking-tight">Claro</span>
-                      </div>
-                      {formData.theme === 'light' && (
-                        <div className="w-5 h-5 rounded-full bg-emerald-500 text-white flex items-center justify-center shadow-xs">
-                          <Check className="w-3 h-3 stroke-[3]" />
-                        </div>
-                      )}
-                    </div>
-                    <p
-                      className={`text-[11px] leading-relaxed ${
-                        formData.theme === 'light'
-                          ? 'text-neutral-400'
-                          : 'text-neutral-500'
-                      }`}
-                    >
-                      Fundo branco limpo clássico com cards suaves e alto contraste.
-                    </p>
-                  </button>
-                </div>
-
-                {/* Barra de ação rápida para salvar o tema imediatamente */}
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-3 border-t border-neutral-800">
-                  <div className="flex items-center gap-2">
-                    <span className="text-xs text-neutral-400 font-medium">Tema Ativo da Empresa:</span>
-                    <span
-                      className={`text-xs font-bold px-2.5 py-0.5 rounded-full ${
-                        (formData.theme || 'dark') === 'dark'
-                          ? 'bg-neutral-800 text-amber-400 border border-neutral-700'
-                          : 'bg-amber-400 text-neutral-950 font-extrabold'
-                      }`}
-                    >
-                      {(formData.theme || 'dark') === 'dark' ? '🌙 Escuro (Preto/Grafite)' : '☀️ Claro (Branco)'}
-                    </span>
-                  </div>
-                  <button
-                    type="button"
-                    disabled={isSaving}
-                    onClick={async () => {
-                      setIsSaving(true)
-                      const res = await saveCompanyAsync(formData)
-                      setIsSaving(false)
-                      if (res.success) {
-                        setCompany(formData)
-                        showToast(
-                          'success',
-                          `Tema ${formData.theme === 'light' ? 'Claro' : 'Escuro'} salvo com sucesso no Firestore!`
-                        )
-                      } else {
-                        showToast('error', res.error || 'Erro ao salvar tema.')
-                      }
-                    }}
-                    className="px-5 py-2.5 rounded-xl bg-violet-600 hover:bg-violet-500 text-white text-xs font-bold shadow-md flex items-center justify-center gap-2 transition-all cursor-pointer"
-                  >
-                    <Save className="w-4 h-4" />
-                    <span>{isSaving ? 'Salvando...' : 'Salvar Escolha de Tema'}</span>
-                  </button>
-                </div>
-              </div>
+              {/* SELEÇÃO E PRÉVIA DOS 10 TEMAS DA PÁGINA PÚBLICA */}
+              <PageThemeSelector
+                company={company}
+                formData={formData}
+                setFormData={setFormData}
+                isSaving={isSaving}
+                onSaveTheme={async () => {
+                  setIsSaving(true)
+                  const res = await saveCompanyAsync(formData)
+                  setIsSaving(false)
+                  if (res.success) {
+                    setCompany(formData)
+                    showToast(
+                      'success',
+                      `Tema da Página Pública salvo com sucesso para ${company.name}!`
+                    )
+                  } else {
+                    showToast('error', res.error || 'Erro ao salvar tema.')
+                  }
+                }}
+              />
 
               {/* 1. COMBINAÇÕES PRONTAS DE CORES */}
               <div className="space-y-3">
