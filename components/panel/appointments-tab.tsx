@@ -18,6 +18,7 @@ import {
   Check,
   X,
   Filter,
+  LayoutGrid,
   Sparkles,
   Scissors,
   Coffee,
@@ -31,6 +32,12 @@ import {
   RotateCcw,
   Info,
   Send,
+  CalendarDays,
+  CalendarClock,
+  CheckCheck,
+  Search,
+  Play,
+  RotateCw,
 } from 'lucide-react'
 import {
   Company,
@@ -46,6 +53,7 @@ import {
   getCompanyAppointments,
   fetchCompanyAppointmentsFromServer,
   updateAppointmentStatusOnServerApi,
+  updateAppointmentOnServerApi,
   createAppointmentOnServerApi,
   getCompanyProfessionals,
   fetchCompanyProfessionalsFromServer,
@@ -53,6 +61,8 @@ import {
   deleteCompanyProfessionalOnServerApi,
   getCompanyServices,
   saveCompany,
+  saveCompanyLocally,
+  saveCompanyAsync,
   DATA_CHANGE_EVENT,
 } from '@/lib/storage'
 import { formatPhone, normalizePhone } from '@/lib/utils'
@@ -90,6 +100,13 @@ const DEFAULT_DAYS: DaySchedule[] = [
 
 type SubTabType = 'list' | 'settings' | 'hours' | 'professionals'
 
+function generateUniqueId(prefix: string): string {
+  if (typeof crypto !== 'undefined' && crypto.randomUUID) {
+    return `${prefix}_${crypto.randomUUID().replace(/-/g, '').slice(0, 12)}`
+  }
+  return `${prefix}_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`
+}
+
 export const AppointmentsTab: React.FC<AppointmentsTabProps> = ({
   company,
   onUpdateCompany,
@@ -124,6 +141,55 @@ export const AppointmentsTab: React.FC<AppointmentsTabProps> = ({
   })
   const [isSavingSettings, setIsSavingSettings] = useState(false)
   const [newBlockedDate, setNewBlockedDate] = useState('')
+
+  // Modo de exibição na Página Pública (full | card)
+  const [appointmentsDisplayMode, setAppointmentsDisplayMode] = useState<'full' | 'card'>(
+    () => company.appointmentsDisplayMode || company.bookingSettings?.displayMode || 'full'
+  )
+  const [isSavingDisplayMode, setIsSavingDisplayMode] = useState(false)
+
+  useEffect(() => {
+    const mode = company.appointmentsDisplayMode || company.bookingSettings?.displayMode || 'full'
+    setAppointmentsDisplayMode(mode)
+  }, [company.appointmentsDisplayMode, company.bookingSettings?.displayMode])
+
+  const handleSaveDisplayMode = async (mode: 'full' | 'card') => {
+    setAppointmentsDisplayMode(mode)
+    setIsSavingDisplayMode(true)
+    const updatedSettings: BookingSettings = {
+      ...settings,
+      displayMode: mode,
+    }
+    setSettings(updatedSettings)
+
+    const updatedCompany: Company = {
+      ...company,
+      appointmentsDisplayMode: mode,
+      bookingSettings: updatedSettings,
+    }
+
+    saveCompanyLocally(updatedCompany)
+    await saveCompany(updatedCompany)
+    onUpdateCompany(updatedCompany)
+
+    try {
+      await fetch('/api/appointments', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          companyId: company.id,
+          bookingSettings: updatedSettings,
+        }),
+      })
+      await saveCompanyAsync(updatedCompany)
+      showToast('success', 'Modo de exibição de Agendamento atualizado com sucesso!')
+    } catch (err) {
+      console.error('Error syncing appointments display mode:', err)
+      showToast('error', 'Salvo localmente.')
+    } finally {
+      setIsSavingDisplayMode(false)
+    }
+  }
 
   // Professional modal state
   const [isProfModalOpen, setIsProfModalOpen] = useState(false)
@@ -295,7 +361,7 @@ export const AppointmentsTab: React.FC<AppointmentsTabProps> = ({
         showToast('error', 'Nome do serviço é obrigatório.')
         return
       }
-      serviceId = `srv_custom_${Date.now()}`
+      serviceId = generateUniqueId('srv_custom')
       serviceName = manualCustomServiceName.trim()
       servicePrice = manualCustomServicePrice ? parseFloat(manualCustomServicePrice) : null
       serviceDuration = manualCustomDuration ? parseInt(manualCustomDuration, 10) : 30
@@ -319,7 +385,7 @@ export const AppointmentsTab: React.FC<AppointmentsTabProps> = ({
 
     setIsSavingManual(true)
     const newAppt: Appointment = {
-      id: `apt_man_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
+      id: generateUniqueId('apt_man'),
       companyId: company.id,
       serviceId,
       serviceName,
@@ -362,10 +428,16 @@ export const AppointmentsTab: React.FC<AppointmentsTabProps> = ({
   const handleSaveBookingConfig = async (e: React.FormEvent) => {
     e.preventDefault()
     setIsSavingSettings(true)
+    const updatedSettings: BookingSettings = {
+      ...settings,
+      displayMode: appointmentsDisplayMode,
+    }
     const updatedCompany: Company = {
       ...company,
-      bookingSettings: settings,
+      appointmentsDisplayMode: appointmentsDisplayMode,
+      bookingSettings: updatedSettings,
     }
+    saveCompanyLocally(updatedCompany)
     await saveCompany(updatedCompany)
     try {
       await fetch('/api/appointments', {
@@ -373,9 +445,10 @@ export const AppointmentsTab: React.FC<AppointmentsTabProps> = ({
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           companyId: company.id,
-          bookingSettings: settings,
+          bookingSettings: updatedSettings,
         }),
       })
+      await saveCompanyAsync(updatedCompany)
     } catch (err) {
       console.error('Error syncing booking settings to server:', err)
     }
@@ -459,7 +532,7 @@ export const AppointmentsTab: React.FC<AppointmentsTabProps> = ({
 
     setIsSavingProf(true)
     const prof: CompanyProfessional = {
-      id: editingProf ? editingProf.id : `prf_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
+      id: editingProf ? editingProf.id : generateUniqueId('prf'),
       companyId: company.id,
       name: profName.trim(),
       role: profRole.trim(),
@@ -624,6 +697,114 @@ export const AppointmentsTab: React.FC<AppointmentsTabProps> = ({
         </div>
       </div>
 
+      {/* Seletor de Modo de Exibição na Página Pública */}
+      <div className="bg-white rounded-3xl border border-neutral-200/80 shadow-xs p-5 sm:p-6 space-y-4">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+          <div className="flex items-center gap-2.5">
+            <div className="w-8 h-8 rounded-xl bg-violet-50 text-violet-700 border border-violet-200 flex items-center justify-center shrink-0">
+              <LayoutGrid className="w-4 h-4" />
+            </div>
+            <div>
+              <h3 className="text-xs sm:text-sm font-bold text-neutral-900">
+                Modo de Exibição na Página Pública
+              </h3>
+              <p className="text-[11px] text-neutral-500">
+                Escolha individualmente como o módulo de Agendamento é apresentado aos seus clientes.
+              </p>
+            </div>
+          </div>
+          {isSavingDisplayMode && (
+            <span className="text-[10px] text-violet-600 font-bold animate-pulse">
+              Salvando...
+            </span>
+          )}
+        </div>
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          {/* Opção 1: Exibir conteúdo */}
+          <div
+            onClick={() => handleSaveDisplayMode('full')}
+            className={`p-4 rounded-2xl border-2 transition-all cursor-pointer ${
+              appointmentsDisplayMode === 'full'
+                ? 'border-violet-600 bg-violet-50/60 shadow-xs'
+                : 'border-neutral-200 hover:border-neutral-300 bg-white'
+            }`}
+          >
+            <div className="flex items-start justify-between">
+              <div className="flex items-center gap-2.5">
+                <div
+                  className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 ${
+                    appointmentsDisplayMode === 'full'
+                      ? 'bg-violet-600 text-white'
+                      : 'bg-neutral-100 text-neutral-600'
+                  }`}
+                >
+                  <CalendarDays className="w-4 h-4" />
+                </div>
+                <div>
+                  <h4 className="text-xs sm:text-sm font-bold text-neutral-900">
+                    1. Exibir conteúdo
+                  </h4>
+                  <p className="text-[11px] text-neutral-500 mt-0.5">
+                    Mostra a seção completa de agendamento normalmente na Página Pública.
+                  </p>
+                </div>
+              </div>
+              <div
+                className={`w-5 h-5 rounded-full border-2 flex items-center justify-center shrink-0 ml-2 ${
+                  appointmentsDisplayMode === 'full'
+                    ? 'border-violet-600 bg-violet-600 text-white'
+                    : 'border-neutral-300 bg-white'
+                }`}
+              >
+                {appointmentsDisplayMode === 'full' && <Check className="w-3 h-3 stroke-[3]" />}
+              </div>
+            </div>
+          </div>
+
+          {/* Opção 2: Somente card */}
+          <div
+            onClick={() => handleSaveDisplayMode('card')}
+            className={`p-4 rounded-2xl border-2 transition-all cursor-pointer ${
+              appointmentsDisplayMode === 'card'
+                ? 'border-violet-600 bg-violet-50/60 shadow-xs'
+                : 'border-neutral-200 hover:border-neutral-300 bg-white'
+            }`}
+          >
+            <div className="flex items-start justify-between">
+              <div className="flex items-center gap-2.5">
+                <div
+                  className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 ${
+                    appointmentsDisplayMode === 'card'
+                      ? 'bg-violet-600 text-white'
+                      : 'bg-neutral-100 text-neutral-600'
+                  }`}
+                >
+                  <Layers className="w-4 h-4" />
+                </div>
+                <div>
+                  <h4 className="text-xs sm:text-sm font-bold text-neutral-900">
+                    2. Somente card
+                  </h4>
+                  <p className="text-[11px] text-neutral-500 mt-0.5">
+                    Mostra apenas o card &quot;Agendamento Online&quot;. Ao clicar no card, abrir o agendamento completo internamente na DiretoLink.
+                  </p>
+                </div>
+              </div>
+              <div
+                className={`w-5 h-5 rounded-full border-2 flex items-center justify-center shrink-0 ml-2 ${
+                  appointmentsDisplayMode === 'card'
+                    ? 'border-violet-600 bg-violet-600 text-white'
+                    : 'border-neutral-300 bg-white'
+                }`}
+              >
+                {appointmentsDisplayMode === 'card' && <Check className="w-3 h-3 stroke-[3]" />}
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
       {/* SUBTAB 1: LISTA DE AGENDAMENTOS */}
       {activeSubTab === 'list' && (
         <div className="space-y-4">
@@ -715,16 +896,18 @@ export const AppointmentsTab: React.FC<AppointmentsTabProps> = ({
                 const [y, m, d] = appt.date.split('-')
                 const formattedDate = `${d}/${m}/${y}`
 
-                const statusStyles = {
+                const statusStyles: Record<AppointmentStatus, string> = {
                   pending: 'bg-amber-50 text-amber-800 border-amber-200',
                   confirmed: 'bg-emerald-50 text-emerald-800 border-emerald-200',
+                  in_service: 'bg-indigo-50 text-indigo-800 border-indigo-200',
                   completed: 'bg-blue-50 text-blue-800 border-blue-200',
                   cancelled: 'bg-neutral-100 text-neutral-500 border-neutral-200',
                 }
 
-                const statusLabels = {
+                const statusLabels: Record<AppointmentStatus, string> = {
                   pending: 'Pendente',
                   confirmed: 'Confirmado',
+                  in_service: 'Em atendimento',
                   completed: 'Concluído',
                   cancelled: 'Cancelado',
                 }
@@ -880,6 +1063,7 @@ export const AppointmentsTab: React.FC<AppointmentsTabProps> = ({
       {/* SUBTAB: MODO DE AGENDAMENTO & WHATSAPP (Requirement 1 & 3) */}
       {activeSubTab === 'settings' && (
         <form onSubmit={handleSaveBookingConfig} className="space-y-6">
+
           {/* Card 1: Seleção de Modo */}
           <div className="bg-white rounded-3xl border border-neutral-200/80 shadow-xs p-5 sm:p-6 space-y-4">
             <div>

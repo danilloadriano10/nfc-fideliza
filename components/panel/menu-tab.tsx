@@ -27,11 +27,13 @@ import {
   Info,
   ArrowUpDown,
   Flame,
+  BookOpen,
 } from 'lucide-react'
 import {
   Company,
   MenuItem,
   MenuMode,
+  MenuDisplayMode,
   MenuSizeOption,
   MenuFlavorOption,
   MenuExtraOption,
@@ -74,6 +76,9 @@ export const MenuTab: React.FC<MenuTabProps> = ({ company, onCompanyUpdate }) =>
   // Mode: External link vs Internal DiretoLink
   const [menuMode, setMenuMode] = useState<MenuMode>(
     company.menuMode || (company.menuUrl ? 'external' : 'internal')
+  )
+  const [menuDisplayMode, setMenuDisplayMode] = useState<MenuDisplayMode>(
+    company.menuDisplayMode || company.menuConfig?.displayMode || 'full'
   )
   const [externalUrl, setExternalUrl] = useState(company.menuUrl || '')
   const [isSavingConfig, setIsSavingConfig] = useState(false)
@@ -170,6 +175,13 @@ export const MenuTab: React.FC<MenuTabProps> = ({ company, onCompanyUpdate }) =>
       ...company,
       menuMode: newMode,
       menuUrl: finalUrl.trim(),
+      menuDisplayMode,
+      menuConfig: {
+        ...(company.menuConfig || { mode: newMode }),
+        mode: newMode,
+        externalUrl: finalUrl.trim(),
+        displayMode: menuDisplayMode,
+      },
       modules: {
         ...company.modules,
         menu: true,
@@ -209,6 +221,55 @@ export const MenuTab: React.FC<MenuTabProps> = ({ company, onCompanyUpdate }) =>
       if (onCompanyUpdate) onCompanyUpdate(updatedCompany)
       setMenuMode(newMode)
       showToast('success', 'Configurações atualizadas!')
+    } finally {
+      setIsSavingConfig(false)
+    }
+  }
+
+  // Save Display Mode (Cardápio Completo vs Somente Card/Atalho)
+  const handleSaveDisplayMode = async (newDisplayMode: MenuDisplayMode) => {
+    setIsSavingConfig(true)
+    const updatedCompany: Company = {
+      ...company,
+      menuDisplayMode: newDisplayMode,
+      menuConfig: {
+        ...(company.menuConfig || { mode: menuMode }),
+        mode: menuMode,
+        externalUrl: externalUrl.trim(),
+        displayMode: newDisplayMode,
+      },
+    }
+
+    try {
+      saveCompanyLocally(updatedCompany)
+      if (onCompanyUpdate) onCompanyUpdate(updatedCompany)
+      setMenuDisplayMode(newDisplayMode)
+
+      await fetch('/api/menu', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          companyId: company.id,
+          updateMenuConfig: true,
+          menuMode,
+          menuUrl: externalUrl.trim(),
+          menuDisplayMode: newDisplayMode,
+          menuConfig: {
+            mode: menuMode,
+            externalUrl: externalUrl.trim(),
+            displayMode: newDisplayMode,
+          },
+        }),
+      })
+
+      showToast(
+        'success',
+        newDisplayMode === 'card'
+          ? 'Modo "Somente card/atalho" ativado com sucesso!'
+          : 'Modo "Cardápio completo" ativado com sucesso!'
+      )
+    } catch {
+      showToast('success', 'Modo de exibição salvo com sucesso!')
     } finally {
       setIsSavingConfig(false)
     }
@@ -705,6 +766,109 @@ export const MenuTab: React.FC<MenuTabProps> = ({ company, onCompanyUpdate }) =>
           </div>
         </div>
       </div>
+
+      {/* FORMATO DE EXIBIÇÃO NA PÁGINA PÚBLICA */}
+      {menuMode === 'internal' && (
+        <div className="p-5 rounded-3xl bg-white border border-neutral-200/80 shadow-xs space-y-4">
+          <div>
+            <h3 className="text-sm font-bold text-neutral-900 flex items-center gap-2">
+              <Layers className="w-4 h-4 text-teal-600" />
+              <span>Formato de Exibição na Página Pública</span>
+            </h3>
+            <p className="text-xs text-neutral-500 mt-0.5">
+              Escolha como o Cardápio Digital é apresentado para os clientes na sua vitrine online.
+            </p>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5">
+            {/* Opção A: Cardápio Completo */}
+            <div
+              onClick={() => handleSaveDisplayMode('full')}
+              className={`p-4 rounded-2xl border-2 transition-all cursor-pointer ${
+                menuDisplayMode === 'full'
+                  ? 'border-teal-600 bg-teal-50/60 shadow-xs'
+                  : 'border-neutral-200 hover:border-neutral-300 bg-white'
+              }`}
+            >
+              <div className="flex items-start justify-between">
+                <div className="flex items-center gap-2.5">
+                  <div
+                    className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 ${
+                      menuDisplayMode === 'full'
+                        ? 'bg-teal-600 text-white'
+                        : 'bg-neutral-100 text-neutral-600'
+                    }`}
+                  >
+                    <UtensilsCrossed className="w-4 h-4" />
+                  </div>
+                  <div>
+                    <h4 className="text-xs sm:text-sm font-bold text-neutral-900">
+                      1. Exibir conteúdo
+                    </h4>
+                    <p className="text-[11px] text-neutral-500 mt-0.5">
+                      Mostra o conteúdo normalmente na Página Pública (todas as categorias e itens).
+                    </p>
+                  </div>
+                </div>
+                <div
+                  className={`w-5 h-5 rounded-full flex items-center justify-center border transition-all shrink-0 ${
+                    menuDisplayMode === 'full'
+                      ? 'border-teal-600 bg-teal-600'
+                      : 'border-neutral-300 bg-white'
+                  }`}
+                >
+                  {menuDisplayMode === 'full' && (
+                    <Check className="w-2.5 h-2.5 text-white stroke-[3]" />
+                  )}
+                </div>
+              </div>
+            </div>
+
+            {/* Opção B: Somente card */}
+            <div
+              onClick={() => handleSaveDisplayMode('card')}
+              className={`p-4 rounded-2xl border-2 transition-all cursor-pointer ${
+                menuDisplayMode === 'card'
+                  ? 'border-teal-600 bg-teal-50/60 shadow-xs'
+                  : 'border-neutral-200 hover:border-neutral-300 bg-white'
+              }`}
+            >
+              <div className="flex items-start justify-between">
+                <div className="flex items-center gap-2.5">
+                  <div
+                    className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 ${
+                      menuDisplayMode === 'card'
+                        ? 'bg-teal-600 text-white'
+                        : 'bg-neutral-100 text-neutral-600'
+                    }`}
+                  >
+                    <BookOpen className="w-4 h-4" />
+                  </div>
+                  <div>
+                    <h4 className="text-xs sm:text-sm font-bold text-neutral-900">
+                      2. Somente card
+                    </h4>
+                    <p className="text-[11px] text-neutral-500 mt-0.5">
+                      Mostra apenas um card do módulo na Página Pública. Ao clicar, abre o conteúdo completo internamente na DiretoLink.
+                    </p>
+                  </div>
+                </div>
+                <div
+                  className={`w-5 h-5 rounded-full flex items-center justify-center border transition-all shrink-0 ${
+                    menuDisplayMode === 'card'
+                      ? 'border-teal-600 bg-teal-600'
+                      : 'border-neutral-300 bg-white'
+                  }`}
+                >
+                  {menuDisplayMode === 'card' && (
+                    <Check className="w-2.5 h-2.5 text-white stroke-[3]" />
+                  )}
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* GESTÃO DO CARDÁPIO INTERNO */}
       {menuMode === 'internal' && (

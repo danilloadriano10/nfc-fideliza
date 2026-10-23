@@ -34,6 +34,7 @@ export type BookingMode = 'diretolink' | 'whatsapp'
 
 export interface BookingSettings {
   mode?: BookingMode
+  displayMode?: ModuleDisplayMode // 'full' (Conteúdo completo) | 'card' (Somente card)
   whatsappMessageTemplate?: string
   confirmationWhatsAppTemplate?: string
   slotDurationMinutes: number
@@ -52,7 +53,7 @@ export interface CompanyProfessional {
   createdAt?: string
 }
 
-export type AppointmentStatus = 'pending' | 'confirmed' | 'completed' | 'cancelled'
+export type AppointmentStatus = 'pending' | 'confirmed' | 'in_service' | 'completed' | 'cancelled'
 
 export interface Appointment {
   id: string
@@ -94,6 +95,7 @@ export type ProductCatalogMode = 'internal' | 'external'
 
 export interface ProductCatalogConfig {
   mode: ProductCatalogMode // 'internal' | 'external'
+  displayMode?: ModuleDisplayMode // 'full' (Conteúdo completo) | 'card' (Somente card)
   externalButtonText?: string // Default: "Ver Catálogo"
   externalUrl?: string
   whatsappMessageTemplate?: string // Mensagem personalizada do WhatsApp para produtos ({produto}, {preco}, {variacao}, {empresa})
@@ -169,10 +171,14 @@ export interface MenuItem {
   updatedAt?: string
 }
 
+export type ModuleDisplayMode = 'full' | 'card'
+export type MenuDisplayMode = ModuleDisplayMode
+
 export interface MenuConfig {
   mode: MenuMode // 'external' | 'internal'
   externalUrl?: string
   categories?: string[]
+  displayMode?: ModuleDisplayMode // 'full' (Cardápio completo) | 'card' (Somente card/atalho)
 }
 
 export interface ProductVariationOption {
@@ -269,6 +275,10 @@ export interface Company {
   menuUrl: string
   menuMode?: MenuMode
   menuConfig?: MenuConfig
+  menuDisplayMode?: MenuDisplayMode
+  servicesDisplayMode?: ModuleDisplayMode
+  productsDisplayMode?: ModuleDisplayMode
+  appointmentsDisplayMode?: ModuleDisplayMode
   wifi: CompanyWifi
   locationUrl: string
   addressText: string
@@ -278,7 +288,8 @@ export interface Company {
   productCatalog?: ProductCatalogConfig
   productWhatsAppTemplate?: string // Mensagem personalizada do WhatsApp para produtos ({produto}, {preco}, {variacao}, {empresa})
   highlightModule?: string // 'auto' | 'appointments' | 'services' | 'whatsapp' | 'loyalty' | 'googleReview' | 'menu' | etc.
-  featuredCards?: string[] // IDs of the 4 featured highlight cards chosen for the top of the public page
+  featuredCards?: string[] // IDs of the featured highlight cards chosen for the top of the public page
+  featuredCardsCount?: number // Number of top shortcut cards to display (0, 1, 2, 3, or 4)
   cardOrder?: string[] // Custom display order for public page modules/cards
   publicSectionsOrder?: string[] // Custom display order for public page sections
   productsOrder?: string[] // Custom display order for catalog products
@@ -381,7 +392,9 @@ export interface CompanyTable {
   updatedAt?: string
 }
 
-export type TableOrderStatus = 'novo' | 'aceito' | 'preparo' | 'pronto' | 'entregue'
+export type TableOrderStatus = 'novo' | 'aceito' | 'preparo' | 'pronto' | 'finalizado' | 'entregue'
+
+export type OrderOrigin = 'mesa' | 'retirada' | 'entrega'
 
 export interface TableOrderItem {
   id: string
@@ -401,10 +414,14 @@ export interface TableOrderItem {
 export interface TableOrder {
   id: string
   companyId: string
-  tableNumber: string // ex: "08" ou "Mesa 08"
+  orderType?: OrderOrigin
+  origin?: OrderOrigin
+  tableNumber?: string // ex: "08" ou "Mesa 08"
   tableId?: string
   customerName?: string
   customerPhone?: string
+  deliveryAddress?: string
+  address?: string
   items: TableOrderItem[]
   totalAmount: number
   notes?: string

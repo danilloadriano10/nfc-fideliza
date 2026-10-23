@@ -45,6 +45,7 @@ import {
   getFirestoreAppointments,
   createFirestoreAppointment,
   updateFirestoreAppointmentStatus,
+  updateFirestoreAppointment,
   getFirestoreProfessionals,
   saveFirestoreProfessional,
   deleteFirestoreProfessional,
@@ -371,6 +372,14 @@ export async function updateServerAppointmentStatus(
   return await updateFirestoreAppointmentStatus(id, companyId, status)
 }
 
+export async function updateServerAppointment(
+  id: string,
+  companyId: string,
+  patch: Partial<Appointment>
+): Promise<{ success: boolean; appointment?: Appointment; error?: string }> {
+  return await updateFirestoreAppointment(id, companyId, patch)
+}
+
 export async function getServerProfessionals(companyId: string): Promise<CompanyProfessional[]> {
   return await getFirestoreProfessionals(companyId)
 }
@@ -439,8 +448,9 @@ export async function saveServerTableOrder(order: TableOrder): Promise<TableOrde
 
 export async function updateServerTableOrderStatus(
   orderId: string,
-  status: TableOrderStatus
+  status: TableOrderStatus,
+  companyId?: string
 ): Promise<void> {
-  return await updateFirestoreTableOrderStatus(orderId, status)
+  return await updateFirestoreTableOrderStatus(orderId, status, companyId)
 }
 

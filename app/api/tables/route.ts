@@ -29,16 +29,10 @@ export async function GET(req: NextRequest) {
       realCompany = await getServerCompanyBySlug(companyIdOrSlug)
     }
 
-    if (!realCompany) {
-      return NextResponse.json(
-        { success: false, error: 'Estabelecimento não encontrado.' },
-        { status: 404 }
-      )
-    }
-
-    const tables = await getServerTables(realCompany.id)
+    const targetCompanyId = realCompany?.id || companyIdOrSlug
+    const tables = await getServerTables(targetCompanyId)
     return NextResponse.json(
-      { success: true, tables, companyId: realCompany.id },
+      { success: true, tables, companyId: targetCompanyId },
       { status: 200 }
     )
   } catch (err: unknown) {

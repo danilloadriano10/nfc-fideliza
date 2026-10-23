@@ -13,6 +13,7 @@ import {
   Settings,
   ExternalLink,
   Search,
+  LayoutGrid,
   Check,
   X,
   Plus,
@@ -150,6 +151,26 @@ const ALL_ORDERABLE_MODULES: Array<{
   { key: 'instagram', label: 'Instagram', icon: Instagram, color: 'text-pink-600 bg-pink-50 border-pink-200' },
 ]
 
+export const AVAILABLE_TOP_SHORTCUTS: Array<{
+  id: string
+  label: string
+  icon: React.ComponentType<{ className?: string }>
+  description: string
+  color: string
+}> = [
+  { id: 'whatsapp', label: 'WhatsApp', icon: MessageCircle, description: 'Atendimento direto', color: 'text-emerald-500 bg-emerald-50 border-emerald-200' },
+  { id: 'location', label: 'Localização', icon: MapPin, description: 'Como chegar e mapa', color: 'text-rose-500 bg-rose-50 border-rose-200' },
+  { id: 'googleReview', label: 'Avaliações do Google', icon: Star, description: 'Avaliação 5 estrelas no Google', color: 'text-amber-500 bg-amber-50 border-amber-200' },
+  { id: 'instagram', label: 'Instagram', icon: Instagram, description: 'Perfil oficial do estabelecimento', color: 'text-pink-500 bg-pink-50 border-pink-200' },
+  { id: 'wifi', label: 'Wi-Fi', icon: Wifi, description: 'Conexão e senha da rede Wi-Fi', color: 'text-sky-500 bg-sky-50 border-sky-200' },
+  { id: 'appointments', label: 'Agendamento', icon: Calendar, description: 'Reserva e agendamento online', color: 'text-indigo-500 bg-indigo-50 border-indigo-200' },
+  { id: 'loyalty', label: 'Cartão Fidelidade', icon: Gift, description: 'Acúmulo de pontos e prêmios', color: 'text-orange-500 bg-orange-50 border-orange-200' },
+  { id: 'menu', label: 'Cardápio Digital', icon: UtensilsCrossed, description: 'Cardápio e pedidos diretos', color: 'text-teal-500 bg-teal-50 border-teal-200' },
+  { id: 'products', label: 'Catálogo de Produtos', icon: Package, description: 'Vitrine ou catálogo de itens', color: 'text-blue-500 bg-blue-50 border-blue-200' },
+  { id: 'services', label: 'Serviços', icon: Scissors, description: 'Tabela de serviços e valores', color: 'text-purple-500 bg-purple-50 border-purple-200' },
+  { id: 'feedback', label: 'Feedback Privado', icon: MessageSquare, description: 'Mensagem privada à gerência', color: 'text-pink-500 bg-pink-50 border-pink-200' },
+]
+
 export const CompanyPanelView: React.FC<CompanyPanelViewProps> = ({
   initialCompany,
 }) => {
@@ -173,12 +194,19 @@ export const CompanyPanelView: React.FC<CompanyPanelViewProps> = ({
     primaryColor: initialCompany.primaryColor || '#6D28D9',
     secondaryColor: initialCompany.secondaryColor || '#8B5CF6',
     highlightModule: initialCompany.highlightModule || 'auto',
-    featuredCards: initialCompany.featuredCards || [
-      'whatsapp',
-      'appointments',
-      'googleReview',
-      'loyalty',
-    ],
+    featuredCardsCount:
+      typeof initialCompany.featuredCardsCount === 'number' &&
+      [0, 1, 2, 3, 4].includes(initialCompany.featuredCardsCount)
+        ? initialCompany.featuredCardsCount
+        : Array.isArray(initialCompany.featuredCards) &&
+          initialCompany.featuredCards.length >= 0 &&
+          initialCompany.featuredCards.length <= 4
+        ? initialCompany.featuredCards.length
+        : 4,
+    featuredCards:
+      Array.isArray(initialCompany.featuredCards) && initialCompany.featuredCards.length > 0
+        ? initialCompany.featuredCards
+        : ['whatsapp', 'location', 'googleReview', 'instagram'],
     modules: {
       ...initialCompany.modules,
       services: initialCompany.modules?.services ?? false,
@@ -383,6 +411,49 @@ export const CompanyPanelView: React.FC<CompanyPanelViewProps> = ({
       setIsSavingOrder(false)
       console.error('Erro ao salvar ordem:', err)
       showToast('error', 'Falha ao salvar ordem no servidor.')
+    }
+  }
+
+  // Top Shortcuts / Featured Cards State & Quick Save
+  const [isSavingFeaturedCards, setIsSavingFeaturedCards] = useState(false)
+
+  const handleSaveFeaturedCards = async () => {
+    setIsSavingFeaturedCards(true)
+    const count =
+      typeof formData.featuredCardsCount === 'number' && [0, 1, 2, 3, 4].includes(formData.featuredCardsCount)
+        ? formData.featuredCardsCount
+        : 4
+    const cards = (formData.featuredCards || ['whatsapp', 'location', 'googleReview', 'instagram']).slice(0, count)
+
+    const updatedToSave: Company = {
+      ...company,
+      ...formData,
+      featuredCardsCount: count,
+      featuredCards: cards,
+    }
+
+    saveCompanyLocally(updatedToSave)
+    saveCompany(updatedToSave)
+
+    try {
+      const res = await saveCompanyAsync(updatedToSave)
+      setIsSavingFeaturedCards(false)
+      if (res.success) {
+        const saved = res.company || updatedToSave
+        setCompany(saved)
+        setFormData((prev) => ({
+          ...prev,
+          featuredCardsCount: saved.featuredCardsCount,
+          featuredCards: saved.featuredCards,
+        }))
+        showToast('success', 'Configuração dos atalhos do topo salva com sucesso!')
+      } else {
+        showToast('error', res.error || 'Erro ao salvar atalhos do topo.')
+      }
+    } catch (err) {
+      setIsSavingFeaturedCards(false)
+      console.error('Erro ao salvar atalhos do topo:', err)
+      showToast('error', 'Falha ao salvar atalhos no servidor.')
     }
   }
 
@@ -596,9 +667,20 @@ export const CompanyPanelView: React.FC<CompanyPanelViewProps> = ({
     const currentPass = formData.ownerAuth?.password || 'empresa123'
     const finalPass = newPassword.trim() ? newPassword.trim() : currentPass
 
+    const finalFeaturedCount =
+      typeof formData.featuredCardsCount === 'number' &&
+      [0, 1, 2, 3, 4].includes(formData.featuredCardsCount)
+        ? formData.featuredCardsCount
+        : 4
+    const finalFeaturedCards = (
+      formData.featuredCards || ['whatsapp', 'location', 'googleReview', 'instagram']
+    ).slice(0, finalFeaturedCount)
+
     const updatedToSave: Company = {
       ...formData,
       cardOrder: orderedModuleKeys,
+      featuredCardsCount: finalFeaturedCount,
+      featuredCards: finalFeaturedCards,
       ownerAuth: {
         ...(formData.ownerAuth || {}),
         username: ownerUsername.trim() || formData.slug,
@@ -749,6 +831,7 @@ export const CompanyPanelView: React.FC<CompanyPanelViewProps> = ({
                   company.name.slice(0, 2).toUpperCase()
                 )}
               </div>
+
               <div>
                 <div className="flex items-center gap-2">
                   <span className="text-[10px] text-violet-700 font-bold uppercase tracking-wider bg-violet-50 px-2 py-0.5 rounded-full border border-violet-100">
@@ -809,7 +892,7 @@ export const CompanyPanelView: React.FC<CompanyPanelViewProps> = ({
             { id: 'services', label: 'Serviços', count: servicesCount > 0 ? servicesCount : undefined, icon: Scissors },
             {
               id: 'appointments',
-              label: 'Agendamentos',
+              label: 'Central de Agendamentos',
               count: pendingAppointmentsCount > 0 ? pendingAppointmentsCount : (allAppointments.length > 0 ? allAppointments.length : undefined),
               icon: Calendar,
             },
@@ -833,7 +916,7 @@ export const CompanyPanelView: React.FC<CompanyPanelViewProps> = ({
             },
             {
               id: 'table_orders',
-              label: 'Pedidos do Salão',
+              label: 'Central de Pedidos',
               count: newTableOrdersCount > 0 ? newTableOrdersCount : (allTableOrders.length > 0 ? allTableOrders.length : undefined),
               badgeHighlight: newTableOrdersCount > 0,
               icon: Bell,
@@ -985,7 +1068,7 @@ export const CompanyPanelView: React.FC<CompanyPanelViewProps> = ({
                     <span className="w-3 h-3 rounded-full bg-rose-500 animate-ping shrink-0" />
                     <h3 className="font-bold text-rose-950 text-sm flex items-center gap-2">
                       <Bell className="w-4 h-4 text-rose-600" />
-                      <span>{newTableOrdersCount} Novo{newTableOrdersCount > 1 ? 's' : ''} Pedido{newTableOrdersCount > 1 ? 's' : ''} do Salão (Mesas)</span>
+                      <span>{newTableOrdersCount} Novo{newTableOrdersCount > 1 ? 's' : ''} Pedido{newTableOrdersCount > 1 ? 's' : ''} na Central</span>
                     </h3>
                   </div>
                   <button
@@ -993,7 +1076,7 @@ export const CompanyPanelView: React.FC<CompanyPanelViewProps> = ({
                     onClick={() => setActiveTab('table_orders')}
                     className="text-xs font-bold text-rose-800 hover:text-rose-950 underline underline-offset-2 flex items-center gap-1 self-start sm:self-auto cursor-pointer"
                   >
-                    <span>Abrir Pedidos do Salão</span>
+                    <span>Abrir Central de Pedidos</span>
                     <ArrowRight className="w-3 h-3" />
                   </button>
                 </div>
@@ -1193,6 +1276,10 @@ export const CompanyPanelView: React.FC<CompanyPanelViewProps> = ({
           <ServicesTab
             company={company}
             onEnableModule={() => setActiveTab('settings')}
+            onCompanyUpdate={(updated) => {
+              setCompany(updated)
+              setFormData(updated)
+            }}
           />
         )}
 
@@ -1202,7 +1289,10 @@ export const CompanyPanelView: React.FC<CompanyPanelViewProps> = ({
         {activeTab === 'appointments' && (
           <AppointmentsTab
             company={company}
-            onUpdateCompany={(updated) => setCompany(updated)}
+            onUpdateCompany={(updated) => {
+              setCompany(updated)
+              setFormData(updated)
+            }}
           />
         )}
 
@@ -1676,23 +1766,30 @@ export const CompanyPanelView: React.FC<CompanyPanelViewProps> = ({
                 4. Contatos & Redes
               </a>
               <a
+                href="#secao-cards-topo"
+                className="px-3 py-1.5 rounded-xl text-xs font-bold text-violet-700 bg-violet-50 hover:bg-violet-100 border border-violet-200 transition-all whitespace-nowrap flex items-center gap-1.5"
+              >
+                <LayoutGrid className="w-3.5 h-3.5" />
+                <span>5. Cards do Topo (1 a 4)</span>
+              </a>
+              <a
                 href="#secao-modulos"
                 className="px-3 py-1.5 rounded-xl text-xs font-semibold text-neutral-600 hover:text-neutral-900 hover:bg-neutral-100 transition-all whitespace-nowrap"
               >
-                5. Recursos & Módulos
+                6. Recursos & Módulos
               </a>
               <a
                 href="#secao-ordem"
                 className="px-3 py-1.5 rounded-xl text-xs font-bold text-violet-700 bg-violet-50 hover:bg-violet-100 border border-violet-200 transition-all whitespace-nowrap flex items-center gap-1.5"
               >
                 <SlidersHorizontal className="w-3.5 h-3.5" />
-                <span>6. Ordem da Página Pública</span>
+                <span>7. Ordem da Página Pública</span>
               </a>
               <a
                 href="#secao-seguranca"
                 className="px-3 py-1.5 rounded-xl text-xs font-semibold text-neutral-600 hover:text-neutral-900 hover:bg-neutral-100 transition-all whitespace-nowrap"
               >
-                7. Acesso & Senha
+                8. Acesso & Senha
               </a>
             </div>
 
@@ -2488,15 +2585,70 @@ export const CompanyPanelView: React.FC<CompanyPanelViewProps> = ({
                       className="w-full px-3 py-2 rounded-xl border border-neutral-300 text-xs font-mono"
                     />
                   ) : (
-                    <div className="p-2.5 rounded-xl bg-teal-50 border border-teal-200 text-xs text-teal-900 flex items-center justify-between">
-                      <span>Cardápio digital DiretoLink configurado</span>
-                      <button
-                        type="button"
-                        onClick={() => setActiveTab('menu')}
-                        className="px-2.5 py-1 bg-teal-600 text-white rounded-lg text-[11px] font-bold hover:bg-teal-700 transition-all"
-                      >
-                        Ver Itens
-                      </button>
+                    <div className="space-y-2">
+                      <div className="p-2.5 rounded-xl bg-teal-50 border border-teal-200 text-xs text-teal-900 flex items-center justify-between">
+                        <span>Cardápio digital DiretoLink configurado</span>
+                        <button
+                          type="button"
+                          onClick={() => setActiveTab('menu')}
+                          className="px-2.5 py-1 bg-teal-600 text-white rounded-lg text-[11px] font-bold hover:bg-teal-700 transition-all cursor-pointer"
+                        >
+                          Ver Itens
+                        </button>
+                      </div>
+
+                      {/* Escolha do Formato de Exibição na Página Pública */}
+                      <div className="p-3 rounded-xl bg-neutral-50 border border-neutral-200/80 space-y-2">
+                        <label className="block text-[11px] font-bold text-neutral-700">
+                          Exibição na Página Pública:
+                        </label>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                          <button
+                            type="button"
+                            onClick={() =>
+                              setFormData({
+                                ...formData,
+                                menuDisplayMode: 'full',
+                                menuConfig: {
+                                  ...(formData.menuConfig || {}),
+                                  mode: 'internal',
+                                  displayMode: 'full',
+                                },
+                              })
+                            }
+                            className={`p-2.5 rounded-xl border text-left text-xs font-semibold transition-all cursor-pointer ${
+                              (formData.menuDisplayMode || formData.menuConfig?.displayMode || 'full') === 'full'
+                                ? 'bg-teal-50/80 border-teal-600 text-teal-950 ring-1 ring-teal-600'
+                                : 'bg-white border-neutral-200 text-neutral-600 hover:border-neutral-300'
+                            }`}
+                          >
+                            <span className="block font-bold">Cardápio completo</span>
+                            <span className="text-[10px] text-neutral-500 font-normal">Mostra categorias e produtos</span>
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() =>
+                              setFormData({
+                                ...formData,
+                                menuDisplayMode: 'card',
+                                menuConfig: {
+                                  ...(formData.menuConfig || {}),
+                                  mode: 'internal',
+                                  displayMode: 'card',
+                                },
+                              })
+                            }
+                            className={`p-2.5 rounded-xl border text-left text-xs font-semibold transition-all cursor-pointer ${
+                              (formData.menuDisplayMode || formData.menuConfig?.displayMode) === 'card'
+                                ? 'bg-teal-50/80 border-teal-600 text-teal-950 ring-1 ring-teal-600'
+                                : 'bg-white border-neutral-200 text-neutral-600 hover:border-neutral-300'
+                            }`}
+                          >
+                            <span className="block font-bold">Somente card/atalho</span>
+                            <span className="text-[10px] text-neutral-500 font-normal">Card com &quot;Ver Cardápio&quot;</span>
+                          </button>
+                        </div>
+                      </div>
                     </div>
                   )}
                 </div>
@@ -2585,7 +2737,7 @@ export const CompanyPanelView: React.FC<CompanyPanelViewProps> = ({
             </div>
 
             {/* Credenciais e Senha de Acesso do Estabelecimento */}
-            <div className="bg-white rounded-3xl border border-neutral-200/80 shadow-sm p-6 space-y-4">
+            <div id="secao-seguranca" className="bg-white rounded-3xl border border-neutral-200/80 shadow-sm p-6 space-y-4">
               <div className="flex items-center gap-2.5">
                 <div className="w-8 h-8 rounded-xl bg-violet-100 text-violet-700 flex items-center justify-center">
                   <KeyRound className="w-4 h-4" />
@@ -3104,126 +3256,331 @@ export const CompanyPanelView: React.FC<CompanyPanelViewProps> = ({
                 </div>
               )}
 
-              {/* 4 Cards de Destaque Flutuantes da Página Pública */}
-              <div className="pt-5 border-t border-neutral-100 space-y-4">
-                <div className="flex items-start justify-between gap-3">
-                  <div className="flex items-center gap-2.5">
-                    <div className="w-8 h-8 rounded-xl bg-violet-100 text-violet-700 flex items-center justify-center shrink-0">
-                      <Sparkles className="w-4 h-4" />
-                    </div>
-                    <div>
-                      <h4 className="text-sm font-bold text-neutral-900">
-                        4 Cards de Destaque Flutuantes (Topo da Página)
-                      </h4>
-                      <p className="text-xs text-neutral-500">
-                        Escolha quais 4 recursos ativos aparecerão nos cards em layout 2x2 flutuante logo abaixo da capa/perfil. Somente módulos ativos podem ser selecionados.
-                      </p>
-                    </div>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setFormData({
-                        ...formData,
-                        featuredCards: ['whatsapp', 'appointments', 'googleReview', 'loyalty'],
-                      })
-                      showToast('success', 'Destaques redefinidos para os 4 padrões!')
-                    }}
-                    className="text-xs font-semibold text-violet-600 hover:text-violet-800 transition-colors whitespace-nowrap cursor-pointer shrink-0"
-                  >
-                    Restaurar Padrão
-                  </button>
-                </div>
+              {/* Cards e Atalhos do Topo da Página Pública (0, 1, 2, 3 ou 4 cards) */}
+              {(() => {
+                const currentFeaturedCount =
+                  typeof formData.featuredCardsCount === 'number' &&
+                  [0, 1, 2, 3, 4].includes(formData.featuredCardsCount)
+                    ? formData.featuredCardsCount
+                    : 4
 
-                {(() => {
-                  const ALL_HIGHLIGHTABLE_MODULES = [
-                    { id: 'whatsapp', name: 'WhatsApp Direto', icon: '💬', modKey: 'whatsapp' as const },
-                    { id: 'appointments', name: 'Agendamento Online', icon: '📅', modKey: 'appointments' as const },
-                    { id: 'googleReview', name: 'Avaliações do Google', icon: '⭐', modKey: 'googleReview' as const },
-                    { id: 'loyalty', name: 'Cartão Fidelidade', icon: '🎁', modKey: 'loyalty' as const },
-                    { id: 'menu', name: 'Cardápio Digital', icon: '📖', modKey: 'menu' as const },
-                    { id: 'products', name: 'Catálogo de Produtos', icon: '📦', modKey: 'products' as const },
-                    { id: 'services', name: 'Nossos Serviços', icon: '✂️', modKey: 'services' as const },
-                    { id: 'location', name: 'Localização e Rota', icon: '📍', modKey: 'location' as const },
-                    { id: 'wifi', name: 'Wi-Fi Grátis', icon: '📶', modKey: 'wifi' as const },
-                    { id: 'feedback', name: 'Feedback Privado', icon: '💭', modKey: 'feedback' as const },
-                    { id: 'instagram', name: 'Instagram', icon: '📸', modKey: 'instagram' as const },
-                  ]
-
-                  const activeHighlightModules = ALL_HIGHLIGHTABLE_MODULES.filter((m) =>
-                    Boolean(formData.modules?.[m.modKey])
-                  )
-
-                  const rawList = formData.featuredCards && formData.featuredCards.length > 0
-                    ? formData.featuredCards
-                    : ['whatsapp', 'appointments', 'googleReview', 'loyalty']
-
-                  const slotsList = [...rawList]
-                  while (slotsList.length < 4) {
-                    const nextAvail = activeHighlightModules.find((m) => !slotsList.includes(m.id))
-                    slotsList.push(nextAvail ? nextAvail.id : 'whatsapp')
-                  }
-
-                  if (activeHighlightModules.length === 0) {
-                    return (
-                      <div className="p-4 rounded-2xl bg-amber-50 border border-amber-200 text-amber-800 text-xs">
-                        ⚠️ Nenhum módulo está ativo no momento. Ative os recursos desejados na seção de <strong>Recursos da sua DiretoLink</strong> acima para selecioná-los como destaques.
+                return (
+                  <div id="secao-cards-topo" className="pt-6 border-t-2 border-violet-100 space-y-5">
+                    <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 bg-violet-50/70 p-4 rounded-2xl border border-violet-200/80">
+                      <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 rounded-2xl bg-violet-600 text-white flex items-center justify-center shadow-xs shrink-0">
+                          <LayoutGrid className="w-5 h-5" />
+                        </div>
+                        <div>
+                          <h4 className="font-black text-neutral-900 text-sm uppercase tracking-wide flex items-center gap-2">
+                            <span>CARDS DO TOPO DA PÁGINA PÚBLICA</span>
+                            <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-violet-200 text-violet-800">
+                              {currentFeaturedCount === 0
+                                ? '0 cards (oculto)'
+                                : `${currentFeaturedCount} ${currentFeaturedCount === 1 ? 'card' : 'cards'}`}
+                            </span>
+                          </h4>
+                          <p className="text-xs text-neutral-600">
+                            Escolha a quantidade de cards exibidos no topo (0 a 4) e quais atalhos cada posição irá abrir.
+                          </p>
+                        </div>
                       </div>
-                    )
-                  }
 
-                  return (
-                    <div className="space-y-3">
-                      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 max-w-2xl">
-                        {[
-                          { label: 'Card 1 (Primeiro)', slot: 0 },
-                          { label: 'Card 2 (Segundo)', slot: 1 },
-                          { label: 'Card 3 (Terceiro)', slot: 2 },
-                          { label: 'Card 4 (Quarto)', slot: 3 },
-                        ].map(({ label, slot }) => {
-                          const currentVal = slotsList[slot] || ''
-                          const isStillActive = activeHighlightModules.some((m) => m.id === currentVal)
+                      <div className="flex items-center gap-2 self-end sm:self-auto shrink-0">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setFormData({
+                              ...formData,
+                              featuredCardsCount: 4,
+                              featuredCards: ['whatsapp', 'location', 'googleReview', 'instagram'],
+                            })
+                            showToast('success', 'Atalhos redefinidos para os 4 padrões!')
+                          }}
+                          className="px-3 py-2 text-xs font-semibold text-neutral-600 hover:text-neutral-900 hover:bg-white rounded-xl transition-all cursor-pointer"
+                        >
+                          Restaurar Padrão
+                        </button>
 
+                        <button
+                          type="button"
+                          onClick={handleSaveFeaturedCards}
+                          disabled={isSavingFeaturedCards}
+                          className="px-4 py-2 rounded-xl bg-violet-600 hover:bg-violet-700 active:scale-95 text-white font-bold text-xs shadow-xs transition-all flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+                        >
+                          {isSavingFeaturedCards ? (
+                            <>
+                              <span className="w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                              <span>Salvando...</span>
+                            </>
+                          ) : (
+                            <>
+                              <Save className="w-3.5 h-3.5" />
+                              <span>Salvar Atalhos do Topo</span>
+                            </>
+                          )}
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* 1. Escolha da Quantidade (0, 1, 2, 3 ou 4) */}
+                    <div className="space-y-2">
+                      <div className="flex items-center justify-between">
+                        <label className="text-xs font-bold text-neutral-800 uppercase tracking-wide">
+                          Quantidade de Cards:
+                        </label>
+                        <span className="text-[11px] text-neutral-500">
+                          Selecione quantos atalhos deseja mostrar no topo
+                        </span>
+                      </div>
+
+                      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2.5">
+                        {[0, 1, 2, 3, 4].map((count) => {
+                          const isSelected = currentFeaturedCount === count
                           return (
-                            <div
-                              key={slot}
-                              className="p-3 rounded-2xl border border-neutral-200 bg-neutral-50/70 space-y-1.5"
+                            <button
+                              key={count}
+                              type="button"
+                              onClick={() => {
+                                if (count === 0) {
+                                  setFormData((prev) => ({
+                                    ...prev,
+                                    featuredCardsCount: 0,
+                                  }))
+                                  return
+                                }
+                                const current =
+                                  Array.isArray(formData.featuredCards) && formData.featuredCards.length > 0
+                                    ? [...formData.featuredCards]
+                                    : ['whatsapp', 'location', 'googleReview', 'instagram']
+                                const defaults = ['whatsapp', 'location', 'googleReview', 'instagram']
+                                while (current.length < count) {
+                                  current.push(defaults[current.length] || 'whatsapp')
+                                }
+                                setFormData((prev) => ({
+                                  ...prev,
+                                  featuredCardsCount: count,
+                                  featuredCards: current,
+                                }))
+                              }}
+                              className={`p-3 rounded-2xl border text-center transition-all cursor-pointer flex flex-col items-center justify-center gap-0.5 ${
+                                isSelected
+                                  ? 'bg-violet-600 text-white border-violet-600 shadow-sm ring-2 ring-violet-500/25'
+                                  : 'bg-white text-neutral-700 border-neutral-200 hover:bg-neutral-50 hover:border-neutral-300'
+                              }`}
                             >
-                              <label className="text-[11px] font-bold text-neutral-600 flex items-center justify-between">
-                                <span>{label}</span>
-                                {!isStillActive && (
-                                  <span className="text-[10px] text-rose-500 font-medium">Inativo</span>
-                                )}
-                              </label>
-                              <select
-                                value={currentVal}
-                                onChange={(e) => {
-                                  const updated = [...slotsList.slice(0, 4)]
-                                  updated[slot] = e.target.value
-                                  setFormData({
-                                    ...formData,
-                                    featuredCards: updated,
-                                  })
-                                }}
-                                className="w-full px-3 py-2 rounded-xl border border-neutral-300 text-xs bg-white text-neutral-900 font-semibold focus:ring-2 focus:ring-violet-500 focus:outline-none"
-                              >
-                                {activeHighlightModules.map((mod) => (
-                                  <option key={mod.id} value={mod.id}>
-                                    {mod.icon} {mod.name}
-                                  </option>
-                                ))}
-                              </select>
-                            </div>
+                              {count === 0 ? (
+                                <>
+                                  <span className="text-sm font-bold flex items-center justify-center gap-1">
+                                    <EyeOff className={`w-3.5 h-3.5 ${isSelected ? 'text-white' : 'text-neutral-500'}`} />
+                                    <span>0 Cards</span>
+                                  </span>
+                                  <span
+                                    className={`text-[10px] text-center leading-tight ${
+                                      isSelected ? 'text-violet-100 font-medium' : 'text-neutral-400'
+                                    }`}
+                                  >
+                                    Não exibir atalhos no topo
+                                  </span>
+                                </>
+                              ) : (
+                                <>
+                                  <span className="text-sm font-bold">
+                                    {count} {count === 1 ? 'Card' : 'Cards'}
+                                  </span>
+                                  <span
+                                    className={`text-[10px] ${
+                                      isSelected ? 'text-violet-100 font-medium' : 'text-neutral-400'
+                                    }`}
+                                  >
+                                    {count === 1
+                                      ? 'Destaque central'
+                                      : count === 2
+                                      ? '2 colunas'
+                                      : count === 3
+                                      ? '3 colunas'
+                                      : '4 colunas'}
+                                  </span>
+                                </>
+                              )}
+                            </button>
                           )
                         })}
                       </div>
+                    </div>
+
+                    {/* 2. Seletores Dinâmicos (Mostra somente a quantidade correspondente ou mensagem se 0) */}
+                    <div className="space-y-3 pt-1">
+                      {currentFeaturedCount === 0 ? (
+                        <div className="p-4 rounded-2xl bg-neutral-50 border border-neutral-200/90 text-neutral-600 flex items-center gap-3.5 shadow-2xs">
+                          <div className="w-10 h-10 rounded-2xl bg-neutral-200 text-neutral-600 flex items-center justify-center shrink-0">
+                            <EyeOff className="w-5 h-5" />
+                          </div>
+                          <div>
+                            <h5 className="text-xs sm:text-sm font-bold text-neutral-800">
+                              Atalhos do topo desativados (0 Cards selecionado)
+                            </h5>
+                            <p className="text-[11px] text-neutral-500 mt-0.5">
+                              Nenhum card de atalho será exibido no topo da sua Página Pública. Os seletores de posição estão ocultos. Para reativar, selecione de 1 a 4 cards acima.
+                            </p>
+                          </div>
+                        </div>
+                      ) : (
+                        <>
+                          <div className="flex items-center justify-between">
+                            <label className="text-xs font-bold text-neutral-800 uppercase tracking-wide">
+                              Seletores dos Atalhos ({currentFeaturedCount} {currentFeaturedCount === 1 ? 'posição' : 'posições'}):
+                            </label>
+                            <span className="text-[11px] text-neutral-400">
+                              Mostrando Card 1 até Card {currentFeaturedCount}
+                            </span>
+                          </div>
+
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                            {Array.from({ length: currentFeaturedCount }).map((_, index) => {
+                              const currentSelectedId =
+                                formData.featuredCards?.[index] ||
+                                ['whatsapp', 'location', 'googleReview', 'instagram'][index] ||
+                                'whatsapp'
+                              const shortcutMeta =
+                                AVAILABLE_TOP_SHORTCUTS.find((s) => s.id === currentSelectedId) ||
+                                AVAILABLE_TOP_SHORTCUTS[0]
+                              const IconComp = shortcutMeta.icon
+
+                              return (
+                                <div
+                                  key={index}
+                                  className="p-3.5 rounded-2xl border border-neutral-200 bg-white shadow-2xs space-y-2 transition-all hover:border-violet-300"
+                                >
+                                  <div className="flex items-center justify-between">
+                                    <span className="text-xs font-bold text-neutral-900 flex items-center gap-1.5">
+                                      <span className="w-5 h-5 rounded-full bg-violet-600 text-white text-[11px] font-black flex items-center justify-center shadow-2xs">
+                                        {index + 1}
+                                      </span>
+                                      Card {index + 1}
+                                    </span>
+                                    <span className="text-[10px] text-neutral-400 font-medium">
+                                      Atalho na posição {index + 1}
+                                    </span>
+                                  </div>
+
+                                  <div className="flex items-center gap-2.5">
+                                    <div className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 border ${shortcutMeta.color}`}>
+                                      <IconComp className="w-4.5 h-4.5" />
+                                    </div>
+
+                                    <select
+                                      value={currentSelectedId}
+                                      onChange={(e) => {
+                                        const val = e.target.value
+                                        const current =
+                                          Array.isArray(formData.featuredCards) && formData.featuredCards.length > 0
+                                            ? [...formData.featuredCards]
+                                            : ['whatsapp', 'location', 'googleReview', 'instagram']
+                                        current[index] = val
+                                        setFormData((prev) => ({
+                                          ...prev,
+                                          featuredCards: current,
+                                        }))
+                                      }}
+                                      className="flex-1 px-3 py-2 text-xs font-semibold rounded-xl border border-neutral-300 bg-white text-neutral-900 focus:outline-none focus:ring-2 focus:ring-violet-500 cursor-pointer shadow-2xs"
+                                    >
+                                      {AVAILABLE_TOP_SHORTCUTS.map((opt) => (
+                                        <option key={opt.id} value={opt.id}>
+                                          {opt.label} — {opt.description}
+                                        </option>
+                                      ))}
+                                    </select>
+                                  </div>
+                                </div>
+                              )
+                            })}
+                          </div>
+                        </>
+                      )}
+                    </div>
+
+                    {/* 3. Prévia dos cards no celular com adaptação automática */}
+                    <div className="space-y-2 pt-2 border-t border-neutral-100">
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs font-bold text-neutral-800 uppercase tracking-wide flex items-center gap-1.5">
+                          <Eye className="w-3.5 h-3.5 text-neutral-500" />
+                          Prévia dos Cards no Topo (como aparece no celular):
+                        </span>
+                        <span className="text-[10px] text-neutral-400">
+                          {currentFeaturedCount === 0
+                            ? 'Seção desativada na Página Pública'
+                            : 'Adaptação automática ao espaço'}
+                        </span>
+                      </div>
+
+                      {currentFeaturedCount === 0 ? (
+                        <div className="p-5 rounded-2xl bg-neutral-900 border border-neutral-800 text-center space-y-1">
+                          <div className="inline-flex items-center justify-center w-8 h-8 rounded-full bg-neutral-800 text-neutral-400 mb-1">
+                            <EyeOff className="w-4 h-4" />
+                          </div>
+                          <p className="text-xs font-bold text-neutral-200">
+                            Seção de atalhos oculta na Página Pública
+                          </p>
+                          <p className="text-[11px] text-neutral-400 max-w-sm mx-auto">
+                            A capa, o nome da empresa e a descrição serão exibidos diretamente, sem cards sobrepostos.
+                          </p>
+                        </div>
+                      ) : (
+                        <div className="p-4 rounded-2xl bg-neutral-950 border border-neutral-800 shadow-inner">
+                          <div
+                            className={
+                              currentFeaturedCount === 1
+                                ? 'grid grid-cols-1 max-w-[200px] mx-auto'
+                                : currentFeaturedCount === 2
+                                ? 'grid grid-cols-2 max-w-[340px] mx-auto gap-2.5'
+                                : currentFeaturedCount === 3
+                                ? 'grid grid-cols-3 max-w-sm mx-auto gap-2'
+                                : 'grid grid-cols-4 gap-1.5'
+                            }
+                          >
+                            {Array.from({ length: currentFeaturedCount }).map((_, index) => {
+                              const currentSelectedId =
+                                formData.featuredCards?.[index] ||
+                                ['whatsapp', 'location', 'googleReview', 'instagram'][index] ||
+                                'whatsapp'
+                              const shortcutMeta =
+                                AVAILABLE_TOP_SHORTCUTS.find((s) => s.id === currentSelectedId) ||
+                                AVAILABLE_TOP_SHORTCUTS[0]
+                              const IconComp = shortcutMeta.icon
+                              const isCount1or2 = currentFeaturedCount <= 2
+                              const isCount3 = currentFeaturedCount === 3
+
+                              return (
+                                <div
+                                  key={index}
+                                  className={`p-2 rounded-xl bg-neutral-900 border border-neutral-800 flex flex-col items-center justify-center gap-1 text-center shadow-xs select-none ${
+                                    isCount1or2 ? 'h-16' : isCount3 ? 'h-15' : 'h-14'
+                                  }`}
+                                >
+                                  <div className={`rounded-lg p-1 shrink-0 ${shortcutMeta.color}`}>
+                                    <IconComp className={isCount1or2 ? 'w-4.5 h-4.5' : 'w-4 h-4'} />
+                                  </div>
+                                  <span
+                                    className={`font-bold tracking-tight truncate w-full text-white ${
+                                      isCount1or2 ? 'text-xs' : isCount3 ? 'text-[11px]' : 'text-[10px]'
+                                    }`}
+                                  >
+                                    {shortcutMeta.label}
+                                  </span>
+                                </div>
+                              )
+                            })}
+                          </div>
+                        </div>
+                      )}
                       <p className="text-[11px] text-neutral-400">
-                        💡 Esses 4 cards aparecem alinhados um do lado do outro em tamanhos iguais sobre a parte inferior da capa (no lugar da antiga logo flutuante), enquanto a logo fica centralizada no meio da capa. Mais abaixo, todas as seções ativas continuam visíveis normalmente segundo a Ordem da Página Pública.
+                        💡 Na Página Pública, os cards se ajustam perfeitamente na largura do celular logo abaixo da capa e da foto da empresa.
                       </p>
                     </div>
-                  )
-                })()}
-              </div>
+                  </div>
+                )
+              })()}
 
               {/* Próximos Recursos Preview */}
               <div className="pt-4 border-t border-neutral-100 space-y-2.5">

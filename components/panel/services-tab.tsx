@@ -22,8 +22,9 @@ import {
   Check,
   Calendar,
   ArrowUpDown,
+  LayoutGrid,
 } from 'lucide-react'
-import { Company, CompanyService } from '@/types/platform'
+import { Company, CompanyService, ModuleDisplayMode } from '@/types/platform'
 import {
   getCompanyServices,
   saveCompanyServiceOnServerApi,
@@ -31,6 +32,9 @@ import {
   toggleCompanyServiceOnServerApi,
   fetchCompanyServicesFromServer,
   saveCompanyServicesOrderOnServer,
+  saveCompanyLocally,
+  saveCompany,
+  saveCompanyAsync,
   DATA_CHANGE_EVENT,
 } from '@/lib/storage'
 import { uploadCompanyImageFromClient, isBase64Image } from '@/lib/storage-client'
@@ -39,6 +43,7 @@ import { OrganizeItemsModal } from './organize-items-modal'
 interface ServicesTabProps {
   company: Company
   onEnableModule?: () => void
+  onCompanyUpdate?: (updated: Company) => void
 }
 
 const COMMON_CATEGORIES = [
@@ -64,11 +69,42 @@ const DURATION_OPTIONS = [
   { label: '3 horas', value: 180 },
 ]
 
-export const ServicesTab: React.FC<ServicesTabProps> = ({ company, onEnableModule }) => {
+function generateUniqueId(prefix: string): string {
+  if (typeof crypto !== 'undefined' && crypto.randomUUID) {
+    return `${prefix}_${crypto.randomUUID().replace(/-/g, '').slice(0, 12)}`
+  }
+  return `${prefix}_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`
+}
+
+export const ServicesTab: React.FC<ServicesTabProps> = ({ company, onEnableModule, onCompanyUpdate }) => {
   const [services, setServices] = useState<CompanyService[]>(() => getCompanyServices(company.id))
   const [isLoading, setIsLoading] = useState(false)
   const [search, setSearch] = useState('')
   const [selectedCategory, setSelectedCategory] = useState<string>('Todas')
+  const [servicesDisplayMode, setServicesDisplayMode] = useState<ModuleDisplayMode>(
+    company.servicesDisplayMode || 'full'
+  )
+  const [isSavingDisplayMode, setIsSavingDisplayMode] = useState(false)
+
+  const handleSaveDisplayMode = async (mode: ModuleDisplayMode) => {
+    setIsSavingDisplayMode(true)
+    const updatedCompany: Company = {
+      ...company,
+      servicesDisplayMode: mode,
+    }
+    setServicesDisplayMode(mode)
+    saveCompanyLocally(updatedCompany)
+    saveCompany(updatedCompany)
+    if (onCompanyUpdate) onCompanyUpdate(updatedCompany)
+    try {
+      await saveCompanyAsync(updatedCompany)
+      showToast('success', mode === 'card' ? 'Modo "Somente card" ativado!' : 'Modo "Exibir conteúdo" ativado!')
+    } catch {
+      showToast('error', 'Erro ao salvar configuração.')
+    } finally {
+      setIsSavingDisplayMode(false)
+    }
+  }
 
   // Modal State
   const [isModalOpen, setIsModalOpen] = useState(false)
@@ -223,7 +259,7 @@ export const ServicesTab: React.FC<ServicesTabProps> = ({ company, onEnableModul
     const finalCategory = category === 'Outra' ? (customCategory.trim() || 'Geral') : category
 
     const serviceData: CompanyService = {
-      id: editingService ? editingService.id : `srv_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
+      id: editingService ? editingService.id : generateUniqueId('srv'),
       companyId: company.id,
       name: name.trim(),
       category: finalCategory,
@@ -334,6 +370,118 @@ export const ServicesTab: React.FC<ServicesTabProps> = ({ company, onEnableModul
           )}
         </div>
       )}
+
+      {/* Seletor de Modo de Exibição na Página Pública */}
+      <div className="bg-white rounded-3xl border border-neutral-200/80 shadow-xs p-5 sm:p-6 space-y-4">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+          <div className="flex items-center gap-2.5">
+            <div className="w-8 h-8 rounded-xl bg-violet-50 text-violet-700 border border-violet-200 flex items-center justify-center shrink-0">
+              <LayoutGrid className="w-4 h-4" />
+            </div>
+            <div>
+              <h3 className="text-xs sm:text-sm font-bold text-neutral-900">
+                Modo de Exibição na Página Pública
+              </h3>
+              <p className="text-[11px] text-neutral-500">
+                Escolha individualmente como os serviços são apresentados aos seus clientes.
+              </p>
+            </div>
+          </div>
+          {isSavingDisplayMode && (
+            <span className="text-[10px] text-violet-600 font-bold animate-pulse">
+              Salvando...
+            </span>
+          )}
+        </div>
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          {/* Opção 1: Exibir conteúdo */}
+          <div
+            onClick={() => handleSaveDisplayMode('full')}
+            className={`p-4 rounded-2xl border-2 transition-all cursor-pointer ${
+              servicesDisplayMode === 'full'
+                ? 'border-violet-600 bg-violet-50/60 shadow-xs'
+                : 'border-neutral-200 hover:border-neutral-300 bg-white'
+            }`}
+          >
+            <div className="flex items-start justify-between">
+              <div className="flex items-center gap-2.5">
+                <div
+                  className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 ${
+                    servicesDisplayMode === 'full'
+                      ? 'bg-violet-600 text-white'
+                      : 'bg-neutral-100 text-neutral-600'
+                  }`}
+                >
+                  <Scissors className="w-4 h-4" />
+                </div>
+                <div>
+                  <h4 className="text-xs sm:text-sm font-bold text-neutral-900">
+                    1. Exibir conteúdo
+                  </h4>
+                  <p className="text-[11px] text-neutral-500 mt-0.5">
+                    Mostra o conteúdo normalmente na Página Pública (vitrine com procedimentos, fotos e valores).
+                  </p>
+                </div>
+              </div>
+              <div
+                className={`w-5 h-5 rounded-full flex items-center justify-center border transition-all shrink-0 ${
+                  servicesDisplayMode === 'full'
+                    ? 'border-violet-600 bg-violet-600'
+                    : 'border-neutral-300 bg-white'
+                }`}
+              >
+                {servicesDisplayMode === 'full' && (
+                  <Check className="w-2.5 h-2.5 text-white stroke-[3]" />
+                )}
+              </div>
+            </div>
+          </div>
+
+          {/* Opção 2: Somente card */}
+          <div
+            onClick={() => handleSaveDisplayMode('card')}
+            className={`p-4 rounded-2xl border-2 transition-all cursor-pointer ${
+              servicesDisplayMode === 'card'
+                ? 'border-violet-600 bg-violet-50/60 shadow-xs'
+                : 'border-neutral-200 hover:border-neutral-300 bg-white'
+            }`}
+          >
+            <div className="flex items-start justify-between">
+              <div className="flex items-center gap-2.5">
+                <div
+                  className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 ${
+                    servicesDisplayMode === 'card'
+                      ? 'bg-violet-600 text-white'
+                      : 'bg-neutral-100 text-neutral-600'
+                  }`}
+                >
+                  <LayoutGrid className="w-4 h-4" />
+                </div>
+                <div>
+                  <h4 className="text-xs sm:text-sm font-bold text-neutral-900">
+                    2. Somente card
+                  </h4>
+                  <p className="text-[11px] text-neutral-500 mt-0.5">
+                    Mostra apenas um card do módulo na Página Pública. Ao clicar, abre o conteúdo completo internamente na DiretoLink.
+                  </p>
+                </div>
+              </div>
+              <div
+                className={`w-5 h-5 rounded-full flex items-center justify-center border transition-all shrink-0 ${
+                  servicesDisplayMode === 'card'
+                    ? 'border-violet-600 bg-violet-600'
+                    : 'border-neutral-300 bg-white'
+                }`}
+              >
+                {servicesDisplayMode === 'card' && (
+                  <Check className="w-2.5 h-2.5 text-white stroke-[3]" />
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
 
       {/* Top Action Header */}
       <div className="bg-white rounded-3xl border border-neutral-200/80 shadow-xs p-5 sm:p-6 space-y-4">

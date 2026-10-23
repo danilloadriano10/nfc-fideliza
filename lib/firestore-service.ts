@@ -431,6 +431,11 @@ export async function saveFirestoreCompany(
     } else if (existing.featuredCards && Array.isArray(existing.featuredCards)) {
       finalCompany.featuredCards = existing.featuredCards
     }
+    if (company.featuredCardsCount !== undefined) {
+      finalCompany.featuredCardsCount = company.featuredCardsCount
+    } else if (existing.featuredCardsCount !== undefined) {
+      finalCompany.featuredCardsCount = existing.featuredCardsCount
+    }
     if (company.productsOrder && Array.isArray(company.productsOrder)) {
       finalCompany.productsOrder = company.productsOrder
     } else if (existing.productsOrder && Array.isArray(existing.productsOrder)) {
@@ -455,6 +460,31 @@ export async function saveFirestoreCompany(
       finalCompany.productCatalog = company.productCatalog
     } else if (existing.productCatalog !== undefined) {
       finalCompany.productCatalog = existing.productCatalog
+    }
+    if (company.menuDisplayMode !== undefined) {
+      finalCompany.menuDisplayMode = company.menuDisplayMode
+    } else if (existing.menuDisplayMode !== undefined) {
+      finalCompany.menuDisplayMode = existing.menuDisplayMode
+    }
+    if (company.servicesDisplayMode !== undefined) {
+      finalCompany.servicesDisplayMode = company.servicesDisplayMode
+    } else if (existing.servicesDisplayMode !== undefined) {
+      finalCompany.servicesDisplayMode = existing.servicesDisplayMode
+    }
+    if (company.productsDisplayMode !== undefined) {
+      finalCompany.productsDisplayMode = company.productsDisplayMode
+    } else if (existing.productsDisplayMode !== undefined) {
+      finalCompany.productsDisplayMode = existing.productsDisplayMode
+    }
+    if (company.appointmentsDisplayMode !== undefined) {
+      finalCompany.appointmentsDisplayMode = company.appointmentsDisplayMode
+    } else if (existing.appointmentsDisplayMode !== undefined) {
+      finalCompany.appointmentsDisplayMode = existing.appointmentsDisplayMode
+    }
+    if (company.menuConfig !== undefined) {
+      finalCompany.menuConfig = company.menuConfig
+    } else if (existing.menuConfig !== undefined) {
+      finalCompany.menuConfig = existing.menuConfig
     }
     if (company.customThemeConfig !== undefined) {
       finalCompany.customThemeConfig = company.customThemeConfig
@@ -487,6 +517,9 @@ export async function saveFirestoreCompany(
     if (company.featuredCards && Array.isArray(company.featuredCards)) {
       finalCompany.featuredCards = company.featuredCards
     }
+    if (company.featuredCardsCount !== undefined) {
+      finalCompany.featuredCardsCount = company.featuredCardsCount
+    }
     if (company.productsOrder && Array.isArray(company.productsOrder)) {
       finalCompany.productsOrder = company.productsOrder
     }
@@ -495,6 +528,18 @@ export async function saveFirestoreCompany(
     }
     if (company.menuItemsOrder && Array.isArray(company.menuItemsOrder)) {
       finalCompany.menuItemsOrder = company.menuItemsOrder
+    }
+    if (company.menuDisplayMode !== undefined) {
+      finalCompany.menuDisplayMode = company.menuDisplayMode
+    }
+    if (company.servicesDisplayMode !== undefined) {
+      finalCompany.servicesDisplayMode = company.servicesDisplayMode
+    }
+    if (company.productsDisplayMode !== undefined) {
+      finalCompany.productsDisplayMode = company.productsDisplayMode
+    }
+    if (company.appointmentsDisplayMode !== undefined) {
+      finalCompany.appointmentsDisplayMode = company.appointmentsDisplayMode
     }
     if (finalCompany.ownerAuth?.password) {
       const pass = finalCompany.ownerAuth.password.trim()
@@ -1638,6 +1683,37 @@ export async function updateFirestoreAppointmentStatus(
   }
 }
 
+export async function updateFirestoreAppointment(
+  id: string,
+  companyId: string,
+  patch: Partial<Appointment>
+): Promise<{ success: boolean; appointment?: Appointment; error?: string }> {
+  try {
+    await ensureFirestoreInitialized()
+    const docRef = doc(db, APPOINTMENTS_COLLECTION, id)
+    const snap = await getDoc(docRef)
+    if (!snap.exists()) {
+      return { success: false, error: 'Agendamento não encontrado.' }
+    }
+    const data = snap.data() as Appointment
+    if (data.companyId !== companyId) {
+      return { success: false, error: 'Operação não autorizada.' }
+    }
+
+    const updated: Appointment = {
+      ...data,
+      ...patch,
+      updatedAt: new Date().toISOString(),
+    }
+    const cleanPayload = JSON.parse(JSON.stringify(updated))
+    await setDoc(docRef, cleanPayload, { merge: true })
+    return { success: true, appointment: updated }
+  } catch (err) {
+    handleFirestoreError(err, OperationType.WRITE, `${APPOINTMENTS_COLLECTION}/${id}`)
+    return { success: false, error: 'Erro ao atualizar agendamento.' }
+  }
+}
+
 // ==========================================
 // 8. PROFESSIONALS (MULTI-TENANT)
 // ==========================================
@@ -2247,7 +2323,11 @@ export async function getFirestoreTableOrders(companyId: string): Promise<TableO
     const snap = await getDocs(q)
     const list: TableOrder[] = []
     snap.forEach((d) => {
-      list.push(d.data() as TableOrder)
+      const data = d.data() as TableOrder
+      list.push({
+        ...data,
+        items: Array.isArray(data?.items) ? data.items : [],
+      })
     })
 
     if (list.length === 0 && companyId) {
@@ -2276,7 +2356,8 @@ export async function saveFirestoreTableOrder(order: TableOrder): Promise<TableO
       updatedAt: new Date().toISOString(),
     }
     const docRef = doc(db, TABLE_ORDERS_COLLECTION, cleanId)
-    await setDoc(docRef, toSave, { merge: true })
+    const cleanPayload = JSON.parse(JSON.stringify(toSave))
+    await setDoc(docRef, cleanPayload, { merge: true })
     return toSave
   } catch (err) {
     handleFirestoreError(err, OperationType.WRITE, TABLE_ORDERS_COLLECTION)
@@ -2286,18 +2367,79 @@ export async function saveFirestoreTableOrder(order: TableOrder): Promise<TableO
 
 export async function updateFirestoreTableOrderStatus(
   orderId: string,
-  status: TableOrderStatus
+  status: TableOrderStatus,
+  companyId?: string
 ): Promise<void> {
+  const cleanId = (orderId || '').trim()
+  if (!cleanId) return
+
   try {
     await ensureFirestoreInitialized()
-    const docRef = doc(db, TABLE_ORDERS_COLLECTION, orderId)
-    await updateDoc(docRef, {
-      status,
-      updatedAt: new Date().toISOString(),
-    })
+    const docRef = doc(db, TABLE_ORDERS_COLLECTION, cleanId)
+    const snap = await getDoc(docRef)
+    if (snap.exists()) {
+      await updateDoc(docRef, {
+        status,
+        updatedAt: new Date().toISOString(),
+      })
+      return
+    }
+
+    const initialMatch = INITIAL_TABLE_ORDERS.find((o) => o.id === cleanId)
+    if (initialMatch) {
+      const payload = JSON.parse(
+        JSON.stringify({
+          ...initialMatch,
+          status,
+          updatedAt: new Date().toISOString(),
+        })
+      )
+      await setDoc(docRef, payload)
+      return
+    }
+
+    if (companyId) {
+      try {
+        const q = query(collection(db, TABLE_ORDERS_COLLECTION), where('companyId', '==', companyId))
+        const snapQuery = await getDocs(q)
+        const matchingDoc = snapQuery.docs.find((d) => d.id === cleanId || d.data()?.id === cleanId)
+        if (matchingDoc) {
+          await updateDoc(matchingDoc.ref, {
+            status,
+            updatedAt: new Date().toISOString(),
+          })
+          return
+        }
+      } catch (qErr) {
+        console.warn('Could not query tableOrders by companyId:', qErr)
+      }
+    }
+
+    const payload = JSON.parse(
+      JSON.stringify({
+        id: cleanId,
+        ...(companyId ? { companyId } : {}),
+        status,
+        updatedAt: new Date().toISOString(),
+      })
+    )
+    await setDoc(docRef, payload, { merge: true })
   } catch (err) {
-    handleFirestoreError(err, OperationType.UPDATE, TABLE_ORDERS_COLLECTION)
-    throw err
+    console.warn('Firestore updateDoc failed, attempting setDoc merge fallback:', err)
+    try {
+      const docRef = doc(db, TABLE_ORDERS_COLLECTION, cleanId)
+      const payload = JSON.parse(
+        JSON.stringify({
+          id: cleanId,
+          ...(companyId ? { companyId } : {}),
+          status,
+          updatedAt: new Date().toISOString(),
+        })
+      )
+      await setDoc(docRef, payload, { merge: true })
+    } catch (innerErr) {
+      console.warn('Firestore fallback update also failed, keeping local contingency status:', innerErr)
+    }
   }
 }
 

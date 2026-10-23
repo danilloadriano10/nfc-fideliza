@@ -44,6 +44,7 @@ import { FeedbackSheet } from './feedback-sheet'
 import { ServicesSheet } from './services-sheet'
 import { BookingSheet } from './booking-sheet'
 import { ProductsSheet } from './products-sheet'
+import { MenuSheet } from './menu-sheet'
 import { ProductDetailModal } from './product-detail-modal'
 import { MenuItemModal, CartItem } from './menu-item-modal'
 import { MenuCartDrawer } from './menu-cart-drawer'
@@ -139,17 +140,37 @@ export const PublicCompanyView: React.FC<PublicCompanyViewProps> = ({
       : `Mesa ${cleanTableNumber}`
   }, [cleanTableNumber])
 
+  const isMenuShortcutMode = useMemo(() => {
+    return Boolean(company.menuDisplayMode === 'card' || company.menuConfig?.displayMode === 'card')
+  }, [company.menuDisplayMode, company.menuConfig?.displayMode])
+
+  const isServicesShortcutMode = useMemo(() => {
+    return Boolean(company.servicesDisplayMode === 'card')
+  }, [company.servicesDisplayMode])
+
+  const isProductsShortcutMode = useMemo(() => {
+    return Boolean(company.productsDisplayMode === 'card' || company.productCatalog?.displayMode === 'card')
+  }, [company.productsDisplayMode, company.productCatalog?.displayMode])
+
+  const isAppointmentsShortcutMode = useMemo(() => {
+    return Boolean(company.appointmentsDisplayMode === 'card' || company.bookingSettings?.displayMode === 'card')
+  }, [company.appointmentsDisplayMode, company.bookingSettings?.displayMode])
+
+  const [isMenuSheetOpen, setIsMenuSheetOpen] = useState(false)
+
   useEffect(() => {
     if (autoScrollToMenu) {
       const timer = setTimeout(() => {
         const el = document.getElementById('secao-cardapio')
         if (el) {
           el.scrollIntoView({ behavior: 'smooth' })
+        } else if (isMenuShortcutMode) {
+          setIsMenuSheetOpen(true)
         }
       }, 400)
       return () => clearTimeout(timer)
     }
-  }, [autoScrollToMenu])
+  }, [autoScrollToMenu, isMenuShortcutMode])
 
   const primaryColor = useMemo(
     () => sanitizeHex(activeTheme.colors.primary || company.primaryColor, '#6D28D9'),
@@ -314,17 +335,21 @@ export const PublicCompanyView: React.FC<PublicCompanyViewProps> = ({
     }
   }, [company.googleReviewUrl, company.name])
 
-  // Open Menu (External link or Scroll to internal cardápio)
+  // Open Menu (External link, Shortcut modal or Scroll to internal cardápio)
   const handleOpenMenu = useCallback(() => {
     if (isExternalMenu && company.menuUrl) {
       window.open(company.menuUrl, '_blank', 'noopener,noreferrer')
+    } else if (isMenuShortcutMode) {
+      setIsMenuSheetOpen(true)
     } else {
       const el = document.getElementById('secao-cardapio')
       if (el) {
         el.scrollIntoView({ behavior: 'smooth' })
+      } else {
+        setIsMenuSheetOpen(true)
       }
     }
-  }, [isExternalMenu, company.menuUrl])
+  }, [isExternalMenu, company.menuUrl, isMenuShortcutMode, setIsMenuSheetOpen])
 
   // Open Location
   const handleOpenLocation = useCallback(() => {
@@ -840,52 +865,64 @@ export const PublicCompanyView: React.FC<PublicCompanyViewProps> = ({
     secondaryColor,
   ])
 
-  // Resolve os 4 cards de destaque em layout 2x2 no celular
+  // Resolve os cards de destaque do topo (0, 1, 2, 3 ou 4 cards configuráveis)
   const featuredCardsList = useMemo<HighlightCardItem[]>(() => {
-    const configured = company.featuredCards && company.featuredCards.length > 0
-      ? company.featuredCards
-      : ['whatsapp', 'appointments', 'googleReview', 'loyalty']
+    const targetCount =
+      typeof company.featuredCardsCount === 'number' && [0, 1, 2, 3, 4].includes(company.featuredCardsCount)
+        ? company.featuredCardsCount
+        : Array.isArray(company.featuredCards) && company.featuredCards.length >= 0 && company.featuredCards.length <= 4
+        ? company.featuredCards.length
+        : 4
+
+    if (targetCount === 0) {
+      return []
+    }
+
+    const configured =
+      company.featuredCards && company.featuredCards.length > 0
+        ? company.featuredCards.slice(0, targetCount)
+        : ['whatsapp', 'location', 'googleReview', 'instagram'].slice(0, targetCount)
 
     const list: HighlightCardItem[] = []
     const seen = new Set<string>()
 
-    // 1. Prioriza os configurados que estão ativos
+    // 1. Prioriza os configurados
     for (const id of configured) {
       const card = availableHighlightCards[id]
-      if (card && card.isActive && !seen.has(id)) {
+      if (card && !seen.has(id)) {
         list.push(card)
         seen.add(id)
-        if (list.length === 4) break
+        if (list.length === targetCount) break
       }
     }
 
-    // 2. Se houver menos de 4, completa com os primeiros módulos ativos disponíveis
-    if (list.length < 4) {
+    // 2. Se houver menos que targetCount, completa com os primeiros atalhos disponíveis
+    if (list.length < targetCount) {
       const fallbackOrder = [
         'whatsapp',
-        'appointments',
+        'location',
         'googleReview',
+        'instagram',
+        'wifi',
+        'appointments',
         'loyalty',
         'menu',
         'products',
         'services',
-        'location',
-        'wifi',
         'feedback',
-        'instagram',
       ]
       for (const id of fallbackOrder) {
-        if (list.length >= 4) break
+        if (list.length >= targetCount) break
         const card = availableHighlightCards[id]
-        if (card && card.isActive && !seen.has(id)) {
+        if (card && !seen.has(id)) {
           list.push(card)
           seen.add(id)
         }
       }
     }
 
-    return list.slice(0, 4)
-  }, [company.featuredCards, availableHighlightCards])
+    return list.slice(0, targetCount)
+  }, [company.featuredCards, company.featuredCardsCount, availableHighlightCards])
 
   // Calculate loyalty percentage
   const loyaltyProgressPercent = useMemo(() => {
@@ -1034,49 +1071,78 @@ export const PublicCompanyView: React.FC<PublicCompanyViewProps> = ({
           </div>
 
           {/* ======================================================= */}
-          {/* 2. 4 CARDS DE DESTAQUE NO LUGAR DA LOGO FLUTUANTE        */}
-          {/* 4 CARDS UM DO LADO DO OUTRO EM TAMANHOS IGUAIS          */}
+          {/* 2. CARDS DE DESTAQUE NO TOPO (1, 2, 3 OU 4 CARDS)       */}
           {/* ======================================================= */}
           {featuredCardsList.length > 0 && (
             <div className="px-2.5 sm:px-4 -mt-7 sm:-mt-8 relative z-20">
-              <div className="grid grid-cols-4 gap-1.5 sm:gap-2">
-                {featuredCardsList.map((card) => (
-                  <button
-                    key={card.id}
-                    type="button"
-                    onClick={card.onClick}
-                    className="w-full text-center p-1.5 sm:p-2 rounded-2xl border transition-all duration-200 active:scale-95 hover:scale-[1.02] cursor-pointer group flex flex-col items-center justify-center gap-1 sm:gap-1.5 shadow-2xs hover:shadow-md select-none relative overflow-hidden h-[68px] sm:h-[72px]"
-                    style={{
-                      WebkitTapHighlightColor: 'transparent',
-                      backgroundColor: activeTheme.cardBg,
-                      borderColor: activeTheme.cardBorder,
-                    }}
-                  >
-                    {/* Badge flutuante (ex: Prêmio!) */}
-                    {card.badgeText && (
-                      <span className="absolute top-1 right-1 px-1 py-0.2 rounded-full text-[7.5px] font-black bg-amber-500 text-white shadow-2xs leading-none">
-                        {card.badgeText}
+              <div
+                className={
+                  featuredCardsList.length === 1
+                    ? 'grid grid-cols-1 max-w-[210px] sm:max-w-[230px] mx-auto'
+                    : featuredCardsList.length === 2
+                    ? 'grid grid-cols-2 max-w-[340px] sm:max-w-md mx-auto gap-2.5 sm:gap-3'
+                    : featuredCardsList.length === 3
+                    ? 'grid grid-cols-3 max-w-lg mx-auto gap-2 sm:gap-2.5'
+                    : 'grid grid-cols-4 gap-1.5 sm:gap-2'
+                }
+              >
+                {featuredCardsList.map((card) => {
+                  const isSingle = featuredCardsList.length === 1
+                  const isPair = featuredCardsList.length === 2
+                  const isTrio = featuredCardsList.length === 3
+
+                  return (
+                    <button
+                      key={card.id}
+                      type="button"
+                      onClick={card.onClick}
+                      className={`w-full text-center p-1.5 sm:p-2 rounded-2xl border transition-all duration-200 active:scale-95 hover:scale-[1.02] cursor-pointer group flex flex-col items-center justify-center gap-1 sm:gap-1.5 shadow-2xs hover:shadow-md select-none relative overflow-hidden ${
+                        isSingle || isPair
+                          ? 'h-[74px] sm:h-[80px]'
+                          : isTrio
+                          ? 'h-[70px] sm:h-[74px]'
+                          : 'h-[68px] sm:h-[72px]'
+                      }`}
+                      style={{
+                        WebkitTapHighlightColor: 'transparent',
+                        backgroundColor: activeTheme.cardBg,
+                        borderColor: activeTheme.cardBorder,
+                      }}
+                    >
+                      {/* Badge flutuante (ex: Prêmio!) */}
+                      {card.badgeText && (
+                        <span className="absolute top-1 right-1 px-1 py-0.2 rounded-full text-[7.5px] font-black bg-amber-500 text-white shadow-2xs leading-none">
+                          {card.badgeText}
+                        </span>
+                      )}
+
+                      <div
+                        className={`rounded-xl flex items-center justify-center shrink-0 shadow-2xs transition-transform group-hover:scale-105 ${
+                          card.iconContainerClass
+                        } ${
+                          isSingle || isPair
+                            ? 'w-8 h-8 sm:w-9 sm:h-9'
+                            : 'w-7 h-7 sm:w-8 sm:h-8'
+                        }`}
+                        style={card.iconContainerStyle}
+                      >
+                        {card.icon}
+                      </div>
+
+                      <span
+                        className={`font-bold tracking-tight truncate w-full text-center leading-tight block px-0.5 ${
+                          isSingle || isPair
+                            ? 'text-xs sm:text-sm'
+                            : isTrio
+                            ? 'text-[11px] sm:text-xs'
+                            : 'text-[10px] sm:text-xs'
+                        } ${isDark ? 'text-white' : 'text-neutral-900'}`}
+                      >
+                        {card.title}
                       </span>
-                    )}
-
-                    <div
-                      className={`w-7 h-7 sm:w-8 sm:h-8 rounded-xl flex items-center justify-center shrink-0 shadow-2xs transition-transform group-hover:scale-105 ${
-                        card.iconContainerClass
-                      }`}
-                      style={card.iconContainerStyle}
-                    >
-                      {card.icon}
-                    </div>
-
-                    <span
-                      className={`text-[10px] sm:text-xs font-bold tracking-tight truncate w-full text-center leading-tight block px-0.5 ${
-                        isDark ? 'text-white' : 'text-neutral-900'
-                      }`}
-                    >
-                      {card.title}
-                    </span>
-                  </button>
-                ))}
+                    </button>
+                  )
+                })}
               </div>
             </div>
           )}
@@ -1084,7 +1150,11 @@ export const PublicCompanyView: React.FC<PublicCompanyViewProps> = ({
           {/* ======================================================= */}
           {/* 3. IDENTIDADE DA EMPRESA (NOME E DESCRIÇÃO)             */}
           {/* ======================================================= */}
-          <div className="px-4 mt-3 sm:mt-4 relative z-10 flex flex-col items-center text-center">
+          <div
+            className={`px-4 ${
+              featuredCardsList.length > 0 ? 'mt-3 sm:mt-4' : 'mt-4 sm:mt-5'
+            } relative z-10 flex flex-col items-center text-center`}
+          >
             {/* Nome da Empresa */}
             <h1
               className={`text-xl sm:text-2xl font-black tracking-tight leading-tight ${
@@ -1149,7 +1219,52 @@ export const PublicCompanyView: React.FC<PublicCompanyViewProps> = ({
                 </div>
               ) : null,
               services: activeModules.services ? (
-                activeServicesList.length > 0 ? (
+                isServicesShortcutMode ? (
+                  <div
+                    key="services-card"
+                    onClick={() => setIsServicesOpen(true)}
+                    className="group rounded-3xl p-4 sm:p-4.5 border flex items-center justify-between gap-3 shadow-xs hover:shadow-md transition-all cursor-pointer select-none"
+                    style={themedCardStyle}
+                  >
+                    <div className="flex items-center gap-3 min-w-0">
+                      <div
+                        className="w-10 h-10 rounded-2xl flex items-center justify-center text-white shadow-xs shrink-0 group-hover:scale-105 transition-transform"
+                        style={{ backgroundColor: secondaryColor || primaryColor }}
+                      >
+                        <Scissors className="w-5 h-5" />
+                      </div>
+                      <div className="min-w-0">
+                        <div className="flex items-center gap-2">
+                          <h4 className={`text-xs sm:text-sm font-bold truncate ${isDark ? 'text-white' : 'text-neutral-900'}`}>
+                            Nossos Serviços
+                          </h4>
+                          {activeServicesList.length > 0 && (
+                            <span className="text-[10px] font-bold px-2 py-0.2 rounded-full bg-violet-500/10 text-violet-600 dark:text-violet-400">
+                              {activeServicesList.length}
+                            </span>
+                          )}
+                        </div>
+                        <p className={`text-[11px] truncate mt-0.5 ${isDark ? 'text-neutral-400' : 'text-neutral-500'}`}>
+                          {activeServicesList.length > 0
+                            ? `${activeServicesList.length} opções com preços e horários`
+                            : 'Consulte nossa tabela de procedimentos e serviços'}
+                        </p>
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        setIsServicesOpen(true)
+                      }}
+                      className="px-3.5 py-2 rounded-xl text-xs font-bold text-white shadow-xs flex items-center gap-1 shrink-0 transition-all hover:opacity-90 active:scale-95 cursor-pointer"
+                      style={{ backgroundColor: secondaryColor || primaryColor }}
+                    >
+                      <span>Ver Serviços</span>
+                      <ChevronRight className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                ) : activeServicesList.length > 0 ? (
             <div className="space-y-3 pt-1">
               <div className="flex items-center justify-between px-0.5">
                 <div className="flex items-center gap-1.5">
@@ -1405,7 +1520,7 @@ export const PublicCompanyView: React.FC<PublicCompanyViewProps> = ({
               </button>
             </div>
           )) : null,
-              products: (activeProductsList.length > 0 && !isExternalCatalog && company.modules?.products !== false) ? (
+              products: (activeProductsList.length > 0 && !isExternalCatalog && company.modules?.products !== false && !isProductsShortcutMode) ? (
             <div
               className={`rounded-3xl p-4.5 sm:p-5 space-y-4 border ${
                 isDark
@@ -1714,30 +1829,42 @@ export const PublicCompanyView: React.FC<PublicCompanyViewProps> = ({
           ) : activeModules.products ? (
             <div
               key="products-card"
-              className={`rounded-3xl p-4.5 sm:p-5 border flex items-center justify-between gap-3 ${
-                isDark ? 'bg-[#121217] border-white/[0.08] shadow-sm' : 'bg-white border-neutral-200/80 shadow-2xs'
-              }`}
+              onClick={() => setIsProductsSheetOpen(true)}
+              className="group rounded-3xl p-4 sm:p-4.5 border flex items-center justify-between gap-3 shadow-xs hover:shadow-md transition-all cursor-pointer select-none"
+              style={themedCardStyle}
             >
               <div className="flex items-center gap-3 min-w-0">
                 <div
-                  className="w-10 h-10 rounded-2xl flex items-center justify-center text-white shadow-xs shrink-0"
+                  className="w-10 h-10 rounded-2xl flex items-center justify-center text-white shadow-xs shrink-0 group-hover:scale-105 transition-transform"
                   style={{ backgroundColor: primaryColor }}
                 >
                   <Package className="w-5 h-5" />
                 </div>
                 <div className="min-w-0">
-                  <h4 className={`font-black text-xs sm:text-sm truncate ${isDark ? 'text-white' : 'text-neutral-900'}`}>
-                    Catálogo de Produtos
-                  </h4>
+                  <div className="flex items-center gap-2">
+                    <h4 className={`text-xs sm:text-sm font-bold truncate ${isDark ? 'text-white' : 'text-neutral-900'}`}>
+                      Catálogo de Produtos
+                    </h4>
+                    {activeProductsList.length > 0 && (
+                      <span className="text-[10px] font-bold px-2 py-0.2 rounded-full bg-violet-500/10 text-violet-600 dark:text-violet-400">
+                        {activeProductsList.length}
+                      </span>
+                    )}
+                  </div>
                   <p className={`text-[11px] truncate mt-0.5 ${isDark ? 'text-neutral-400' : 'text-neutral-500'}`}>
-                    Conheça nossa seleção de produtos disponíveis
+                    {activeProductsList.length > 0
+                      ? `${activeProductsList.length} produtos disponíveis para conferir`
+                      : 'Conheça nossa seleção de produtos disponíveis'}
                   </p>
                 </div>
               </div>
               <button
                 type="button"
-                onClick={() => setIsProductsSheetOpen(true)}
-                className="px-4 py-2.5 rounded-xl font-bold text-xs text-white shadow-sm flex items-center gap-1.5 shrink-0 transition-opacity hover:opacity-90 active:scale-95 cursor-pointer"
+                onClick={(e) => {
+                  e.stopPropagation()
+                  setIsProductsSheetOpen(true)
+                }}
+                className="px-3.5 py-2 rounded-xl text-xs font-bold text-white shadow-xs flex items-center gap-1 shrink-0 transition-all hover:opacity-90 active:scale-95 cursor-pointer"
                 style={{ backgroundColor: primaryColor }}
               >
                 <span>Ver Produtos</span>
@@ -1746,58 +1873,132 @@ export const PublicCompanyView: React.FC<PublicCompanyViewProps> = ({
             </div>
           ) : null,
               appointments: (activeModules.appointments && (
-                <div
-                  key="appointments"
-                  className="rounded-3xl p-4.5 sm:p-5 border space-y-3.5 transition-all shadow-xs"
-                  style={themedCardStyle}
-                >
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2.5">
+                isAppointmentsShortcutMode ? (
+                  <div
+                    key="appointments-card"
+                    onClick={() => {
+                      setBookingService(null)
+                      setIsBookingOpen(true)
+                    }}
+                    className="group rounded-3xl p-4 sm:p-4.5 border flex items-center justify-between gap-3 shadow-xs hover:shadow-md transition-all cursor-pointer select-none"
+                    style={themedCardStyle}
+                  >
+                    <div className="flex items-center gap-3 min-w-0">
                       <div
-                        className="w-9 h-9 rounded-xl flex items-center justify-center text-white shadow-xs"
+                        className="w-10 h-10 rounded-2xl flex items-center justify-center text-white shadow-xs shrink-0 group-hover:scale-105 transition-transform"
                         style={{ backgroundColor: primaryColor }}
                       >
                         <Calendar className="w-5 h-5" />
                       </div>
-                      <div>
-                        <h3
-                          className={`text-sm font-black tracking-tight ${
-                            isDark ? 'text-white' : 'text-neutral-900'
-                          }`}
-                        >
+                      <div className="min-w-0">
+                        <h4 className={`text-xs sm:text-sm font-bold truncate ${isDark ? 'text-white' : 'text-neutral-900'}`}>
                           Agendamento Online
-                        </h3>
-                        <p
-                          className={`text-[11px] ${
-                            isDark ? 'text-neutral-400' : 'text-neutral-500'
-                          }`}
-                        >
-                          {company.bookingSettings?.mode === 'whatsapp'
-                            ? 'Agende seu horário diretamente pelo WhatsApp da empresa'
-                            : 'Escolha um serviço e reserve seu horário em poucos toques'}
+                        </h4>
+                        <p className={`text-[11px] truncate mt-0.5 ${isDark ? 'text-neutral-400' : 'text-neutral-500'}`}>
+                          Reserve seu horário em poucos toques
                         </p>
                       </div>
                     </div>
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        setBookingService(null)
+                        setIsBookingOpen(true)
+                      }}
+                      className="px-3.5 py-2 rounded-xl text-xs font-bold text-white shadow-xs flex items-center gap-1 shrink-0 transition-all hover:opacity-90 active:scale-95 cursor-pointer"
+                      style={{ backgroundColor: primaryColor }}
+                    >
+                      <span>Agendar</span>
+                      <ChevronRight className="w-3.5 h-3.5" />
+                    </button>
                   </div>
-
-                  <button
-                    type="button"
-                    onClick={() => {
-                      handleInitiateBooking(null)
-                    }}
-                    className="w-full py-2.5 px-4 rounded-xl font-bold text-xs text-white shadow-xs flex items-center justify-center gap-2 cursor-pointer transition-all active:scale-[0.99] hover:opacity-90"
-                    style={{ backgroundColor: primaryColor }}
+                ) : (
+                  <div
+                    key="appointments-full"
+                    className="rounded-3xl p-4.5 sm:p-5 border space-y-3.5 transition-all shadow-xs"
+                    style={themedCardStyle}
                   >
-                    <Calendar className="w-4 h-4" />
-                    <span>
-                      {company.bookingSettings?.mode === 'whatsapp'
-                        ? 'Agendar Horário pelo WhatsApp'
-                        : 'Agendar Horário Agora'}
-                    </span>
-                  </button>
-                </div>
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2.5">
+                        <div
+                          className="w-9 h-9 rounded-xl flex items-center justify-center text-white shadow-xs"
+                          style={{ backgroundColor: primaryColor }}
+                        >
+                          <Calendar className="w-5 h-5" />
+                        </div>
+                        <div>
+                          <h3
+                            className={`text-sm font-black tracking-tight ${
+                              isDark ? 'text-white' : 'text-neutral-900'
+                            }`}
+                          >
+                            Agendamento Online
+                          </h3>
+                          <p
+                            className={`text-[11px] ${
+                              isDark ? 'text-neutral-400' : 'text-neutral-500'
+                            }`}
+                          >
+                            {company.bookingSettings?.mode === 'whatsapp'
+                              ? 'Agende seu horário diretamente pelo WhatsApp da empresa'
+                              : 'Escolha um serviço e reserve seu horário em poucos toques'}
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Serviços em destaque para agendamento direto se houver serviços cadastrados */}
+                    {activeServicesList.length > 0 && (
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-1">
+                        {activeServicesList.slice(0, 4).map((srv) => (
+                          <div
+                            key={srv.id}
+                            onClick={() => handleInitiateBooking(srv)}
+                            className={`p-2.5 rounded-xl border flex items-center justify-between gap-2 cursor-pointer transition-all hover:border-violet-300 ${
+                              isDark ? 'bg-white/[0.03] border-white/10' : 'bg-neutral-50 border-neutral-200/70'
+                            }`}
+                          >
+                            <div className="min-w-0">
+                              <p className={`text-xs font-bold truncate ${isDark ? 'text-white' : 'text-neutral-800'}`}>
+                                {srv.name}
+                              </p>
+                              {srv.price != null && (
+                                <p className="text-[10px] font-mono text-neutral-500">
+                                  R$ {srv.price.toFixed(2).replace('.', ',')}
+                                </p>
+                              )}
+                            </div>
+                            <span
+                              className="text-[10px] font-bold px-2 py-1 rounded-lg text-white shrink-0"
+                              style={{ backgroundColor: primaryColor }}
+                            >
+                              Agendar
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+
+                    <button
+                      type="button"
+                      onClick={() => {
+                        handleInitiateBooking(null)
+                      }}
+                      className="w-full py-2.5 px-4 rounded-xl font-bold text-xs text-white shadow-xs flex items-center justify-center gap-2 cursor-pointer transition-all active:scale-[0.99] hover:opacity-90"
+                      style={{ backgroundColor: primaryColor }}
+                    >
+                      <Calendar className="w-4 h-4" />
+                      <span>
+                        {company.bookingSettings?.mode === 'whatsapp'
+                          ? 'Agendar Horário pelo WhatsApp'
+                          : 'Agendar Horário Agora'}
+                      </span>
+                    </button>
+                  </div>
+                )
               )),
-              menu: (activeModules.menu && !isExternalMenu && activeMenuItemsList.length > 0) ? (
+              menu: (activeModules.menu && !isExternalMenu && !isMenuShortcutMode && activeMenuItemsList.length > 0) ? (
             <div
               id="secao-cardapio"
               className="space-y-3.5 sm:space-y-4 w-full"
@@ -2163,34 +2364,46 @@ export const PublicCompanyView: React.FC<PublicCompanyViewProps> = ({
           ) : activeModules.menu ? (
             <div
               key="menu-card"
-              className={`rounded-3xl p-4.5 sm:p-5 border flex items-center justify-between gap-3 ${
-                isDark ? 'bg-[#121217] border-white/[0.08] shadow-sm' : 'bg-white border-neutral-200/80 shadow-2xs'
-              }`}
+              onClick={handleOpenMenu}
+              className="group rounded-3xl p-4 sm:p-4.5 border flex items-center justify-between gap-3 shadow-xs hover:shadow-md transition-all cursor-pointer select-none"
+              style={themedCardStyle}
             >
               <div className="flex items-center gap-3 min-w-0">
                 <div
-                  className="w-10 h-10 rounded-2xl flex items-center justify-center text-white shadow-xs shrink-0"
-                  style={{ backgroundColor: primaryColor }}
+                  className="w-10 h-10 rounded-2xl flex items-center justify-center text-white shadow-xs shrink-0 group-hover:scale-105 transition-transform"
+                  style={{ backgroundColor: primaryColor || '#7A1228' }}
                 >
                   <UtensilsCrossed className="w-5 h-5" />
                 </div>
                 <div className="min-w-0">
-                  <h4 className={`font-black text-xs sm:text-sm truncate ${isDark ? 'text-white' : 'text-neutral-900'}`}>
-                    Cardápio Digital
-                  </h4>
+                  <div className="flex items-center gap-2">
+                    <h4 className={`text-xs sm:text-sm font-bold truncate ${isDark ? 'text-white' : 'text-neutral-900'}`}>
+                      Cardápio Digital
+                    </h4>
+                    {activeMenuItemsList.length > 0 && (
+                      <span className="text-[10px] font-bold px-2 py-0.2 rounded-full bg-teal-500/10 text-teal-600 dark:text-teal-400">
+                        {activeMenuItemsList.length}
+                      </span>
+                    )}
+                  </div>
                   <p className={`text-[11px] truncate mt-0.5 ${isDark ? 'text-neutral-400' : 'text-neutral-500'}`}>
-                    Confira nossas opções de pratos, porções e bebidas
+                    {activeMenuItemsList.length > 0
+                      ? `${activeMenuItemsList.length} itens disponíveis para pedir agora`
+                      : 'Confira nossas opções de pratos, porções e bebidas'}
                   </p>
                 </div>
               </div>
               <button
                 type="button"
-                onClick={handleOpenMenu}
-                className="px-4 py-2.5 rounded-xl font-bold text-xs text-white shadow-sm flex items-center gap-1.5 shrink-0 transition-opacity hover:opacity-90 active:scale-95 cursor-pointer"
-                style={{ backgroundColor: primaryColor }}
+                onClick={(e) => {
+                  e.stopPropagation()
+                  handleOpenMenu()
+                }}
+                className="px-3.5 py-2 rounded-xl text-xs font-bold text-white shadow-xs flex items-center gap-1 shrink-0 transition-all hover:opacity-90 active:scale-95 cursor-pointer"
+                style={{ backgroundColor: primaryColor || '#7A1228' }}
               >
                 <span>Ver Cardápio</span>
-                <ExternalLink className="w-3.5 h-3.5 opacity-80" />
+                <ChevronRight className="w-3.5 h-3.5" />
               </button>
             </div>
           ) : null,
@@ -2785,6 +2998,19 @@ export const PublicCompanyView: React.FC<PublicCompanyViewProps> = ({
           onClose={() => setIsProductsSheetOpen(false)}
           products={products}
           company={company}
+        />
+
+        {/* Modal do Cardápio Completo (Modo Atalho) */}
+        <MenuSheet
+          isOpen={isMenuSheetOpen}
+          onClose={() => setIsMenuSheetOpen(false)}
+          menuItems={menuItems}
+          company={company}
+          cart={cart}
+          onAddToCart={handleAddToCart}
+          onDirectOrderWhatsApp={handleDirectOrderWhatsApp}
+          onOpenCart={() => setIsCartOpen(true)}
+          tableNumber={displayTableLabel || cleanTableNumber || undefined}
         />
 
         <ProductDetailModal

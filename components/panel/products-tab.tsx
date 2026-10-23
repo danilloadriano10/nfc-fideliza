@@ -15,6 +15,7 @@ import {
   ImageIcon,
   Sparkles,
   Layers,
+  LayoutGrid,
   AlertCircle,
   Package,
   ExternalLink,
@@ -215,6 +216,46 @@ export const ProductsTab: React.FC<ProductsTabProps> = ({
   const showToast = (type: 'success' | 'error', text: string) => {
     setToastMessage({ type, text })
     setTimeout(() => setToastMessage(null), 3500)
+  }
+
+  // Modo de exibição na Página Pública (full | card)
+  const [productsDisplayMode, setProductsDisplayMode] = useState<'full' | 'card'>(
+    company.productsDisplayMode || company.productCatalog?.displayMode || 'full'
+  )
+  const [isSavingDisplayMode, setIsSavingDisplayMode] = useState(false)
+
+  useEffect(() => {
+    setProductsDisplayMode(
+      company.productsDisplayMode || company.productCatalog?.displayMode || 'full'
+    )
+  }, [company.productsDisplayMode, company.productCatalog?.displayMode])
+
+  const handleSaveDisplayMode = async (mode: 'full' | 'card') => {
+    setProductsDisplayMode(mode)
+    setIsSavingDisplayMode(true)
+    const updatedCompany: Company = {
+      ...company,
+      productsDisplayMode: mode,
+      productCatalog: {
+        mode: company.productCatalog?.mode || 'internal',
+        ...(company.productCatalog || {}),
+        displayMode: mode,
+      },
+    }
+    saveCompanyLocally(updatedCompany)
+    saveCompany(updatedCompany)
+    if (onCompanyUpdate) {
+      onCompanyUpdate(updatedCompany)
+    }
+    try {
+      await saveCompanyAsync(updatedCompany)
+      showToast('success', 'Modo de exibição do Catálogo atualizado com sucesso!')
+    } catch (err) {
+      console.error('Erro ao salvar modo de exibição de produtos:', err)
+      showToast('error', 'Salvo localmente, erro ao sincronizar com servidor.')
+    } finally {
+      setIsSavingDisplayMode(false)
+    }
   }
 
   // Variation helpers
@@ -575,6 +616,114 @@ export const ProductsTab: React.FC<ProductsTabProps> = ({
           )}
         </div>
       )}
+
+      {/* Seletor de Modo de Exibição na Página Pública */}
+      <div className="bg-white rounded-3xl border border-neutral-200/80 shadow-xs p-5 sm:p-6 space-y-4">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+          <div className="flex items-center gap-2.5">
+            <div className="w-8 h-8 rounded-xl bg-violet-50 text-violet-700 border border-violet-200 flex items-center justify-center shrink-0">
+              <LayoutGrid className="w-4 h-4" />
+            </div>
+            <div>
+              <h3 className="text-xs sm:text-sm font-bold text-neutral-900">
+                Modo de Exibição na Página Pública
+              </h3>
+              <p className="text-[11px] text-neutral-500">
+                Escolha individualmente como o Catálogo de Produtos é apresentado aos seus clientes.
+              </p>
+            </div>
+          </div>
+          {isSavingDisplayMode && (
+            <span className="text-[10px] text-violet-600 font-bold animate-pulse">
+              Salvando...
+            </span>
+          )}
+        </div>
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          {/* Opção 1: Exibir conteúdo */}
+          <div
+            onClick={() => handleSaveDisplayMode('full')}
+            className={`p-4 rounded-2xl border-2 transition-all cursor-pointer ${
+              productsDisplayMode === 'full'
+                ? 'border-violet-600 bg-violet-50/60 shadow-xs'
+                : 'border-neutral-200 hover:border-neutral-300 bg-white'
+            }`}
+          >
+            <div className="flex items-start justify-between">
+              <div className="flex items-center gap-2.5">
+                <div
+                  className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 ${
+                    productsDisplayMode === 'full'
+                      ? 'bg-violet-600 text-white'
+                      : 'bg-neutral-100 text-neutral-600'
+                  }`}
+                >
+                  <Package className="w-4 h-4" />
+                </div>
+                <div>
+                  <h4 className="text-xs sm:text-sm font-bold text-neutral-900">
+                    1. Exibir conteúdo
+                  </h4>
+                  <p className="text-[11px] text-neutral-500 mt-0.5">
+                    Mostra a vitrine de produtos normalmente na Página Pública (busca, categorias e fotos).
+                  </p>
+                </div>
+              </div>
+              <div
+                className={`w-5 h-5 rounded-full border-2 flex items-center justify-center shrink-0 ml-2 ${
+                  productsDisplayMode === 'full'
+                    ? 'border-violet-600 bg-violet-600 text-white'
+                    : 'border-neutral-300 bg-white'
+                }`}
+              >
+                {productsDisplayMode === 'full' && <Check className="w-3 h-3" />}
+              </div>
+            </div>
+          </div>
+
+          {/* Opção 2: Somente card */}
+          <div
+            onClick={() => handleSaveDisplayMode('card')}
+            className={`p-4 rounded-2xl border-2 transition-all cursor-pointer ${
+              productsDisplayMode === 'card'
+                ? 'border-violet-600 bg-violet-50/60 shadow-xs'
+                : 'border-neutral-200 hover:border-neutral-300 bg-white'
+            }`}
+          >
+            <div className="flex items-start justify-between">
+              <div className="flex items-center gap-2.5">
+                <div
+                  className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 ${
+                    productsDisplayMode === 'card'
+                      ? 'bg-violet-600 text-white'
+                      : 'bg-neutral-100 text-neutral-600'
+                  }`}
+                >
+                  <Layers className="w-4 h-4" />
+                </div>
+                <div>
+                  <h4 className="text-xs sm:text-sm font-bold text-neutral-900">
+                    2. Somente card
+                  </h4>
+                  <p className="text-[11px] text-neutral-500 mt-0.5">
+                    Mostra apenas um card compacto. Ao clicar, abre o Catálogo completo internamente sem sair da DiretoLink.
+                  </p>
+                </div>
+              </div>
+              <div
+                className={`w-5 h-5 rounded-full border-2 flex items-center justify-center shrink-0 ml-2 ${
+                  productsDisplayMode === 'card'
+                    ? 'border-violet-600 bg-violet-600 text-white'
+                    : 'border-neutral-300 bg-white'
+                }`}
+              >
+                {productsDisplayMode === 'card' && <Check className="w-3 h-3" />}
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
 
       {/* Header and Actions */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">

@@ -160,39 +160,63 @@ export const MenuCartDrawer: React.FC<MenuCartDrawerProps> = ({
     // Persist delivery info for customer convenience
     saveDeliveryInfo(deliveryInfo, company.id)
 
-    // Se for consumo no local / mesas, registrar imediatamente no sistema de pedidos do salão da empresa
-    if (deliveryInfo.deliveryType === 'dine_in') {
-      const activeTable = deliveryInfo.tableNumber || autoDetectedTable || 'Mesa do Salão'
-      const tableOrderItems = cart.map((c) => ({
-        id: c.id,
-        menuItemId: c.menuItem.id,
-        name: c.menuItem.name,
-        quantity: c.quantity,
-        unitPrice: c.totalPrice / (c.quantity || 1),
-        totalPrice: c.totalPrice,
-        sizeName: c.options.size?.name,
-        flavors: c.options.flavors,
-        extras: c.options.extras?.map((e) => e.name),
-        removals: c.options.removals,
-        notes: c.options.notes,
-        customSteps: c.options.customSteps?.map((cs) => ({
-          stepTitle: cs.stepTitle,
-          options: cs.selected.map((s) => s.name),
-        })),
-      }))
+    // Registrar imediatamente na Central de Pedidos (Mesa, Retirada ou Entrega)
+    const orderItems = cart.map((c) => ({
+      id: c.id,
+      menuItemId: c.menuItem.id,
+      name: c.menuItem.name,
+      quantity: c.quantity,
+      unitPrice: c.totalPrice / (c.quantity || 1),
+      totalPrice: c.totalPrice,
+      sizeName: c.options.size?.name,
+      flavors: c.options.flavors,
+      extras: c.options.extras?.map((e) => e.name),
+      removals: c.options.removals,
+      notes: c.options.notes,
+      customSteps: c.options.customSteps?.map((cs) => ({
+        stepTitle: cs.stepTitle,
+        options: cs.selected.map((s) => s.name),
+      })),
+    }))
 
-      saveCompanyTableOrderOnServerApi({
-        id: '',
-        companyId: company.id,
-        tableNumber: activeTable,
-        customerName: deliveryInfo.customerName,
-        customerPhone: deliveryInfo.customerPhone,
-        items: tableOrderItems,
-        totalAmount: totalOrder,
-        status: 'novo',
-        createdAt: new Date().toISOString(),
-      }).catch((err) => console.error('Erro ao registrar pedido do salão:', err))
-    }
+    const orderType =
+      deliveryInfo.deliveryType === 'delivery'
+        ? 'entrega'
+        : deliveryInfo.deliveryType === 'pickup'
+        ? 'retirada'
+        : 'mesa'
+
+    const activeTable =
+      orderType === 'mesa'
+        ? deliveryInfo.tableNumber || autoDetectedTable || 'Mesa do Salão'
+        : orderType === 'retirada'
+        ? 'Retirada no Balcão'
+        : 'Entrega Delivery'
+
+    const formattedAddress =
+      orderType === 'entrega'
+        ? `${deliveryInfo.address || ''}, ${deliveryInfo.number || 'S/N'}${
+            deliveryInfo.complement ? ` (${deliveryInfo.complement})` : ''
+          } - ${deliveryInfo.neighborhood || ''}${
+            deliveryInfo.city ? `, ${deliveryInfo.city}` : ''
+          }${deliveryInfo.referencePoint ? ` [Ref: ${deliveryInfo.referencePoint}]` : ''}`
+        : undefined
+
+    saveCompanyTableOrderOnServerApi({
+      id: '',
+      companyId: company.id,
+      orderType,
+      origin: orderType,
+      tableNumber: activeTable,
+      deliveryAddress: formattedAddress,
+      customerName: deliveryInfo.customerName,
+      customerPhone: deliveryInfo.customerPhone,
+      items: orderItems,
+      totalAmount: totalOrder,
+      notes: deliveryInfo.notes,
+      status: 'novo',
+      createdAt: new Date().toISOString(),
+    }).catch((err) => console.error('Erro ao registrar pedido na Central de Pedidos:', err))
 
     const message = buildMenuOrderWhatsAppMessage({
       companyName: company.name,

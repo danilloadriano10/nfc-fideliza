@@ -3,6 +3,7 @@ import {
   getServerAppointments,
   createServerAppointment,
   updateServerAppointmentStatus,
+  updateServerAppointment,
   getServerCompanyById,
   getServerCompanyBySlug,
   getServerProfessionals,
@@ -231,7 +232,7 @@ export async function POST(req: NextRequest) {
       time,
       customerName: customerName.trim(),
       customerPhone: customerPhone.trim(),
-      status: status && ['pending', 'confirmed', 'completed', 'cancelled'].includes(status) ? status : 'pending',
+      status: status && ['pending', 'confirmed', 'in_service', 'completed', 'cancelled'].includes(status) ? status : 'pending',
       notes: notes && typeof notes === 'string' ? notes.trim() : undefined,
       origin: origin === 'manual' ? 'manual' : 'public',
       createdAt: new Date().toISOString(),
@@ -259,7 +260,7 @@ export async function POST(req: NextRequest) {
 export async function PUT(req: NextRequest) {
   try {
     const body = await req.json()
-    const { id, companyId, status, bookingSettings } = body || {}
+    const { id, companyId, status, bookingSettings, patch, action } = body || {}
 
     if (!companyId) {
       return NextResponse.json(
@@ -268,9 +269,30 @@ export async function PUT(req: NextRequest) {
       )
     }
 
-    // 1. Update Appointment Status
+    // 1. Reschedule or full update appointment
+    if (id && (patch || action === 'reschedule' || body.date || body.time)) {
+      const dataToUpdate = patch || {
+        ...(body.date ? { date: body.date } : {}),
+        ...(body.time ? { time: body.time } : {}),
+        ...(body.professionalId !== undefined ? { professionalId: body.professionalId } : {}),
+        ...(body.professionalName !== undefined ? { professionalName: body.professionalName } : {}),
+        ...(body.status ? { status: body.status } : {}),
+        ...(body.notes !== undefined ? { notes: body.notes } : {}),
+      }
+
+      const res = await updateServerAppointment(id, companyId, dataToUpdate)
+      if (!res.success) {
+        return NextResponse.json(
+          { success: false, error: res.error || 'Erro ao atualizar agendamento.' },
+          { status: 400 }
+        )
+      }
+      return NextResponse.json({ success: true, appointment: res.appointment }, { status: 200 })
+    }
+
+    // 2. Update Appointment Status
     if (id && status) {
-      const validStatuses: AppointmentStatus[] = ['pending', 'confirmed', 'completed', 'cancelled']
+      const validStatuses: AppointmentStatus[] = ['pending', 'confirmed', 'in_service', 'completed', 'cancelled']
       if (!validStatuses.includes(status)) {
         return NextResponse.json(
           { success: false, error: 'Status de agendamento inválido.' },
@@ -299,8 +321,11 @@ export async function PUT(req: NextRequest) {
       }
       // Save settings in company doc
       comp.bookingSettings = bookingSettings
+      if (bookingSettings.displayMode) {
+        comp.appointmentsDisplayMode = bookingSettings.displayMode
+      }
       await saveServerCompany(comp)
-      return NextResponse.json({ success: true, bookingSettings }, { status: 200 })
+      return NextResponse.json({ success: true, bookingSettings, appointmentsDisplayMode: comp.appointmentsDisplayMode }, { status: 200 })
     }
 
     return NextResponse.json(

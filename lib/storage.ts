@@ -1432,7 +1432,7 @@ export async function fetchCompanyServicesFromServer(companyId: string): Promise
       }
     }
   } catch (err) {
-    console.error('Error fetching services from server:', err)
+    console.warn('Network issue fetching services from server, using local fallback:', err)
   }
   return getCompanyServices(companyId)
 }
@@ -1616,7 +1616,7 @@ export async function fetchCompanyProductsFromServer(companyId: string): Promise
       }
     }
   } catch (err) {
-    console.error('Error fetching products from server:', err)
+    console.warn('Network issue fetching products from server, using local fallback:', err)
   }
   return getCompanyProducts(companyId)
 }
@@ -1808,7 +1808,7 @@ export async function fetchCompanyMenuItemsFromServer(companyId: string): Promis
       }
     }
   } catch (err) {
-    console.error('Error fetching menu items from server:', err)
+    console.warn('Network issue fetching menu items from server, using local fallback:', err)
   }
   return getCompanyMenuItems(companyId)
 }
@@ -1972,7 +1972,7 @@ export async function fetchCompanyAppointmentsFromServer(
       }
     }
   } catch (err) {
-    console.error('Error fetching appointments:', err)
+    console.warn('Network issue fetching appointments from server, using local fallback:', err)
   }
   return getCompanyAppointments(companyId)
 }
@@ -2007,7 +2007,7 @@ export async function updateAppointmentStatusOnServerApi(
   const all = getCompanyAppointments(companyId)
   const appt = all.find((a) => a.id === id)
   if (appt) {
-    saveCompanyAppointmentLocally({ ...appt, status })
+    saveCompanyAppointmentLocally({ ...appt, status, updatedAt: new Date().toISOString() })
   }
   try {
     const res = await fetch('/api/appointments', {
@@ -2018,6 +2018,37 @@ export async function updateAppointmentStatusOnServerApi(
     return res.ok
   } catch {
     return true
+  }
+}
+
+export async function updateAppointmentOnServerApi(
+  id: string,
+  companyId: string,
+  patch: Partial<Appointment>
+): Promise<{ success: boolean; appointment?: Appointment; error?: string }> {
+  const all = getCompanyAppointments(companyId)
+  const appt = all.find((a) => a.id === id)
+  if (appt) {
+    const updated = { ...appt, ...patch, updatedAt: new Date().toISOString() }
+    saveCompanyAppointmentLocally(updated)
+  }
+  try {
+    const res = await fetch('/api/appointments', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id, companyId, patch }),
+    })
+    if (res.ok) {
+      const data = await res.json()
+      if (data.appointment) {
+        saveCompanyAppointmentLocally(data.appointment)
+      }
+      return { success: true, appointment: data.appointment }
+    }
+    return { success: false, error: 'Erro ao atualizar agendamento.' }
+  } catch (err) {
+    console.warn('Network error updating appointment, kept local change:', err)
+    return { success: true }
   }
 }
 
@@ -2189,7 +2220,7 @@ export async function fetchCompanyTablesFromServer(companyId: string): Promise<C
       }
     }
   } catch (err) {
-    console.error('Error fetching tables from server:', err)
+    console.warn('Network issue fetching tables from server, using local fallback:', err)
   }
   return getCompanyTables(companyId)
 }
@@ -2260,15 +2291,21 @@ export async function deleteCompanyTableOnServerApi(
 
 export function getCompanyTableOrders(companyId: string): TableOrder[] {
   if (!companyId) return []
+  const normalize = (list: TableOrder[]): TableOrder[] =>
+    list.map((o) => ({
+      ...o,
+      items: Array.isArray(o?.items) ? o.items : [],
+    }))
+
   if (isBrowser()) {
     const all = getItem<TableOrder[]>(STORAGE_KEYS.TABLE_ORDERS, memoryTableOrders)
     const list = all.filter((o) => o.companyId === companyId)
     if (list.length > 0) {
-      return list.sort((a, b) => (b.createdAt || '').localeCompare(a.createdAt || ''))
+      return normalize(list).sort((a, b) => (b.createdAt || '').localeCompare(a.createdAt || ''))
     }
   }
   const fallback = memoryTableOrders.filter((o) => o.companyId === companyId)
-  return fallback.sort((a, b) => (b.createdAt || '').localeCompare(a.createdAt || ''))
+  return normalize(fallback).sort((a, b) => (b.createdAt || '').localeCompare(a.createdAt || ''))
 }
 
 export function saveCompanyTableOrderLocally(order: TableOrder): void {
@@ -2277,6 +2314,7 @@ export function saveCompanyTableOrderLocally(order: TableOrder): void {
   const toSave: TableOrder = {
     ...order,
     id: cleanId,
+    items: Array.isArray(order.items) ? order.items : [],
     createdAt: order.createdAt || new Date().toISOString(),
     updatedAt: new Date().toISOString(),
   }
@@ -2297,23 +2335,31 @@ export function saveCompanyTableOrderLocally(order: TableOrder): void {
 export async function fetchCompanyTableOrdersFromServer(companyId: string): Promise<TableOrder[]> {
   if (!companyId) return []
   try {
-    const res = await fetch(`/api/table-orders?companyId=${encodeURIComponent(companyId)}`)
+    const res = await fetch(`/api/table-orders?companyId=${encodeURIComponent(companyId)}`, {
+      cache: 'no-store',
+    })
     if (res.ok) {
       const data = await res.json()
       if (Array.isArray(data.orders)) {
+        const safeOrders: TableOrder[] = data.orders.map((o: TableOrder) => ({
+          ...o,
+          items: Array.isArray(o?.items) ? o.items : [],
+        }))
         if (isBrowser()) {
           const currentAll = getItem<TableOrder[]>(STORAGE_KEYS.TABLE_ORDERS, memoryTableOrders)
           const others = currentAll.filter((o) => o.companyId !== companyId)
-          const merged = [...data.orders, ...others]
+          const merged = [...safeOrders, ...others]
           memoryTableOrders = merged
           setItem(STORAGE_KEYS.TABLE_ORDERS, merged)
           notifyDataChange()
         }
-        return data.orders
+        return safeOrders
       }
+    } else {
+      console.warn(`Server responded with ${res.status} when fetching table orders for ${companyId}`)
     }
   } catch (err) {
-    console.error('Error fetching table orders from server:', err)
+    console.warn('Network issue fetching table orders from server, using local fallback:', err)
   }
   return getCompanyTableOrders(companyId)
 }
@@ -2346,19 +2392,35 @@ export async function updateTableOrderStatusOnServerApi(
   companyId: string,
   status: TableOrderStatus
 ): Promise<boolean> {
-  const all = getCompanyTableOrders(companyId)
-  const current = all.find((o) => o.id === orderId)
+  const cleanId = (orderId || '').trim()
+  if (!cleanId) return false
+
+  const all = isBrowser()
+    ? getItem<TableOrder[]>(STORAGE_KEYS.TABLE_ORDERS, memoryTableOrders)
+    : memoryTableOrders
+  const current = all.find((o) => o.id === cleanId || o.id?.trim() === cleanId)
   if (current) {
     saveCompanyTableOrderLocally({ ...current, status, updatedAt: new Date().toISOString() })
+  } else if (companyId) {
+    const initMatch = INITIAL_TABLE_ORDERS.find((o) => o.id === cleanId)
+    if (initMatch) {
+      saveCompanyTableOrderLocally({ ...initMatch, status, updatedAt: new Date().toISOString() })
+    }
   }
+
   try {
     const res = await fetch('/api/table-orders', {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ id: orderId, companyId, status }),
+      body: JSON.stringify({ id: cleanId, companyId, status }),
     })
-    return res.ok
-  } catch {
+    if (res.ok) {
+      const data = await res.json()
+      return Boolean(data.success)
+    }
+    return false
+  } catch (err) {
+    console.warn('Network error updating table order status, kept local change:', err)
     return true
   }
 }

@@ -5,196 +5,710 @@
       "description": "Registered company / establishment in the multi-tenant TapHub platform.",
       "type": "object",
       "properties": {
-        "id": { "type": "string", "maxLength": 128 },
-        "name": { "type": "string", "maxLength": 150 },
-        "slug": { "type": "string", "maxLength": 100 },
-        "tagline": { "type": "string", "maxLength": 250 },
-        "logoUrl": { "type": "string", "maxLength": 2048 },
-        "coverUrl": { "type": "string", "maxLength": 2048 },
-        "primaryColor": { "type": "string", "maxLength": 30 },
-        "secondaryColor": { "type": "string", "maxLength": 30 },
-        "whatsapp": { "type": "string", "maxLength": 30 },
-        "instagram": { "type": "string", "maxLength": 50 },
-        "googleReviewUrl": { "type": "string", "maxLength": 2048 },
-        "menuUrl": { "type": "string", "maxLength": 2048 },
-        "addressText": { "type": "string", "maxLength": 300 },
-        "locationUrl": { "type": "string", "maxLength": 2048 },
-        "theme": { "type": "string", "enum": ["dark", "light"] },
-        "isActive": { "type": "boolean" },
-        "createdAt": { "type": "string", "format": "date-time" },
-        "updatedAt": { "type": "string", "format": "date-time" }
+        "id": {
+          "type": "string",
+          "maxLength": 128
+        },
+        "name": {
+          "type": "string",
+          "maxLength": 150
+        },
+        "slug": {
+          "type": "string",
+          "maxLength": 100
+        },
+        "tagline": {
+          "type": "string",
+          "maxLength": 250
+        },
+        "logoUrl": {
+          "type": "string",
+          "maxLength": 2048
+        },
+        "coverUrl": {
+          "type": "string",
+          "maxLength": 2048
+        },
+        "primaryColor": {
+          "type": "string",
+          "maxLength": 30
+        },
+        "secondaryColor": {
+          "type": "string",
+          "maxLength": 30
+        },
+        "whatsapp": {
+          "type": "string",
+          "maxLength": 30
+        },
+        "instagram": {
+          "type": "string",
+          "maxLength": 50
+        },
+        "googleReviewUrl": {
+          "type": "string",
+          "maxLength": 2048
+        },
+        "menuUrl": {
+          "type": "string",
+          "maxLength": 2048
+        },
+        "addressText": {
+          "type": "string",
+          "maxLength": 300
+        },
+        "locationUrl": {
+          "type": "string",
+          "maxLength": 2048
+        },
+        "theme": {
+          "type": "string",
+          "enum": [
+            "dark",
+            "light"
+          ]
+        },
+        "isActive": {
+          "type": "boolean"
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time"
+        }
       },
-      "required": ["id", "name", "slug", "primaryColor", "isActive"]
+      "required": [
+        "id",
+        "name",
+        "slug",
+        "primaryColor",
+        "isActive"
+      ]
     },
     "Customer": {
       "title": "Customer",
       "description": "Customer registered in a company loyalty program.",
       "type": "object",
       "properties": {
-        "id": { "type": "string", "maxLength": 128 },
-        "companyId": { "type": "string", "maxLength": 128 },
-        "name": { "type": "string", "maxLength": 150 },
-        "phone": { "type": "string", "maxLength": 30 },
-        "currentPoints": { "type": "number" },
-        "totalVisits": { "type": "number" },
-        "completedCycles": { "type": "number" },
-        "availableRewards": { "type": "number" },
-        "createdAt": { "type": "string", "format": "date-time" },
-        "lastActivityAt": { "type": "string", "format": "date-time" }
+        "id": {
+          "type": "string",
+          "maxLength": 128
+        },
+        "companyId": {
+          "type": "string",
+          "maxLength": 128
+        },
+        "name": {
+          "type": "string",
+          "maxLength": 150
+        },
+        "phone": {
+          "type": "string",
+          "maxLength": 30
+        },
+        "currentPoints": {
+          "type": "number"
+        },
+        "totalVisits": {
+          "type": "number"
+        },
+        "completedCycles": {
+          "type": "number"
+        },
+        "availableRewards": {
+          "type": "number"
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "lastActivityAt": {
+          "type": "string",
+          "format": "date-time"
+        }
       },
-      "required": ["id", "companyId", "name", "phone", "currentPoints"]
+      "required": [
+        "id",
+        "companyId",
+        "name",
+        "phone",
+        "currentPoints"
+      ]
     },
     "PointRequest": {
       "title": "PointRequest",
       "description": "Point request created from NFC customer tap waiting for cashier approval.",
       "type": "object",
       "properties": {
-        "id": { "type": "string", "maxLength": 128 },
-        "companyId": { "type": "string", "maxLength": 128 },
-        "customerId": { "type": "string", "maxLength": 128 },
-        "customerName": { "type": "string", "maxLength": 150 },
-        "customerPhone": { "type": "string", "maxLength": 30 },
-        "status": { "type": "string", "enum": ["pending", "approved", "rejected"] },
-        "createdAt": { "type": "string", "format": "date-time" },
-        "updatedAt": { "type": "string", "format": "date-time" },
-        "resolvedAt": { "type": "string", "format": "date-time" },
-        "resolvedBy": { "type": "string", "maxLength": 100 },
-        "approvedBy": { "type": "string", "maxLength": 100 },
-        "rejectedBy": { "type": "string", "maxLength": 100 }
+        "id": {
+          "type": "string",
+          "maxLength": 128
+        },
+        "companyId": {
+          "type": "string",
+          "maxLength": 128
+        },
+        "customerId": {
+          "type": "string",
+          "maxLength": 128
+        },
+        "customerName": {
+          "type": "string",
+          "maxLength": 150
+        },
+        "customerPhone": {
+          "type": "string",
+          "maxLength": 30
+        },
+        "status": {
+          "type": "string",
+          "enum": [
+            "pending",
+            "approved",
+            "rejected"
+          ]
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "resolvedAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "resolvedBy": {
+          "type": "string",
+          "maxLength": 100
+        },
+        "approvedBy": {
+          "type": "string",
+          "maxLength": 100
+        },
+        "rejectedBy": {
+          "type": "string",
+          "maxLength": 100
+        }
       },
-      "required": ["id", "companyId", "customerId", "customerName", "customerPhone", "status", "createdAt"]
+      "required": [
+        "id",
+        "companyId",
+        "customerId",
+        "customerName",
+        "customerPhone",
+        "status",
+        "createdAt"
+      ]
     },
     "Feedback": {
       "title": "Feedback",
       "description": "Private feedback submitted by customers on the NFC page.",
       "type": "object",
       "properties": {
-        "id": { "type": "string", "maxLength": 128 },
-        "companyId": { "type": "string", "maxLength": 128 },
-        "rating": { "type": "number" },
-        "comment": { "type": "string", "maxLength": 2000 },
-        "authorName": { "type": "string", "maxLength": 150 },
-        "authorPhone": { "type": "string", "maxLength": 30 },
-        "createdAt": { "type": "string", "format": "date-time" },
-        "read": { "type": "boolean" }
+        "id": {
+          "type": "string",
+          "maxLength": 128
+        },
+        "companyId": {
+          "type": "string",
+          "maxLength": 128
+        },
+        "rating": {
+          "type": "number"
+        },
+        "comment": {
+          "type": "string",
+          "maxLength": 2000
+        },
+        "authorName": {
+          "type": "string",
+          "maxLength": 150
+        },
+        "authorPhone": {
+          "type": "string",
+          "maxLength": 30
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "read": {
+          "type": "boolean"
+        }
       },
-      "required": ["id", "companyId", "rating", "comment", "createdAt"]
+      "required": [
+        "id",
+        "companyId",
+        "rating",
+        "comment",
+        "createdAt"
+      ]
     },
     "ActivityLog": {
       "title": "ActivityLog",
       "description": "Audit log for points, redemptions and registrations.",
       "type": "object",
       "properties": {
-        "id": { "type": "string", "maxLength": 128 },
-        "companyId": { "type": "string", "maxLength": 128 },
-        "customerId": { "type": "string", "maxLength": 128 },
-        "customerName": { "type": "string", "maxLength": 150 },
-        "customerPhone": { "type": "string", "maxLength": 30 },
-        "type": { "type": "string", "maxLength": 50 },
-        "description": { "type": "string", "maxLength": 500 },
-        "pointsChange": { "type": "number" },
-        "rewardName": { "type": "string", "maxLength": 150 },
-        "approvedBy": { "type": "string", "maxLength": 100 },
-        "timestamp": { "type": "string", "format": "date-time" }
+        "id": {
+          "type": "string",
+          "maxLength": 128
+        },
+        "companyId": {
+          "type": "string",
+          "maxLength": 128
+        },
+        "customerId": {
+          "type": "string",
+          "maxLength": 128
+        },
+        "customerName": {
+          "type": "string",
+          "maxLength": 150
+        },
+        "customerPhone": {
+          "type": "string",
+          "maxLength": 30
+        },
+        "type": {
+          "type": "string",
+          "maxLength": 50
+        },
+        "description": {
+          "type": "string",
+          "maxLength": 500
+        },
+        "pointsChange": {
+          "type": "number"
+        },
+        "rewardName": {
+          "type": "string",
+          "maxLength": 150
+        },
+        "approvedBy": {
+          "type": "string",
+          "maxLength": 100
+        },
+        "timestamp": {
+          "type": "string",
+          "format": "date-time"
+        }
       },
-      "required": ["id", "companyId", "type", "description", "timestamp"]
+      "required": [
+        "id",
+        "companyId",
+        "type",
+        "description",
+        "timestamp"
+      ]
     },
     "Service": {
       "title": "Service",
       "description": "Establishment services catalog used for booking and public showcase.",
       "type": "object",
       "properties": {
-        "id": { "type": "string", "maxLength": 128 },
-        "companyId": { "type": "string", "maxLength": 128 },
-        "name": { "type": "string", "maxLength": 150 },
-        "photoUrl": { "type": "string", "maxLength": 2048 },
-        "description": { "type": "string", "maxLength": 1000 },
-        "price": { "type": "number" },
-        "durationMinutes": { "type": "number" },
-        "category": { "type": "string", "maxLength": 100 },
-        "isActive": { "type": "boolean" },
-        "createdAt": { "type": "string", "format": "date-time" }
+        "id": {
+          "type": "string",
+          "maxLength": 128
+        },
+        "companyId": {
+          "type": "string",
+          "maxLength": 128
+        },
+        "name": {
+          "type": "string",
+          "maxLength": 150
+        },
+        "photoUrl": {
+          "type": "string",
+          "maxLength": 2048
+        },
+        "description": {
+          "type": "string",
+          "maxLength": 1000
+        },
+        "price": {
+          "type": "number"
+        },
+        "durationMinutes": {
+          "type": "number"
+        },
+        "category": {
+          "type": "string",
+          "maxLength": 100
+        },
+        "isActive": {
+          "type": "boolean"
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        }
       },
-      "required": ["id", "companyId", "name", "isActive"]
+      "required": [
+        "id",
+        "companyId",
+        "name",
+        "isActive"
+      ]
     },
     "Appointment": {
       "title": "Appointment",
       "description": "Customer scheduling reservation scoped per companyId.",
       "type": "object",
       "properties": {
-        "id": { "type": "string", "maxLength": 128 },
-        "companyId": { "type": "string", "maxLength": 128 },
-        "serviceId": { "type": "string", "maxLength": 128 },
-        "serviceName": { "type": "string", "maxLength": 150 },
-        "professionalId": { "type": "string", "maxLength": 128 },
-        "date": { "type": "string", "maxLength": 20 },
-        "time": { "type": "string", "maxLength": 10 },
-        "customerName": { "type": "string", "maxLength": 150 },
-        "customerPhone": { "type": "string", "maxLength": 30 },
-        "status": { "type": "string", "enum": ["pending", "confirmed", "completed", "cancelled"] },
-        "createdAt": { "type": "string", "format": "date-time" }
+        "id": {
+          "type": "string",
+          "maxLength": 128
+        },
+        "companyId": {
+          "type": "string",
+          "maxLength": 128
+        },
+        "serviceId": {
+          "type": "string",
+          "maxLength": 128
+        },
+        "serviceName": {
+          "type": "string",
+          "maxLength": 150
+        },
+        "professionalId": {
+          "type": "string",
+          "maxLength": 128
+        },
+        "date": {
+          "type": "string",
+          "maxLength": 20
+        },
+        "time": {
+          "type": "string",
+          "maxLength": 10
+        },
+        "customerName": {
+          "type": "string",
+          "maxLength": 150
+        },
+        "customerPhone": {
+          "type": "string",
+          "maxLength": 30
+        },
+        "status": {
+          "type": "string",
+          "enum": [
+            "pending",
+            "confirmed",
+            "in_service",
+            "completed",
+            "cancelled"
+          ]
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        }
       },
-      "required": ["id", "companyId", "serviceId", "date", "time", "customerName", "customerPhone", "status"]
+      "required": [
+        "id",
+        "companyId",
+        "serviceId",
+        "date",
+        "time",
+        "customerName",
+        "customerPhone",
+        "status"
+      ]
     },
     "CompanyProfessional": {
       "title": "CompanyProfessional",
       "description": "Professional team member linked to services for booking.",
       "type": "object",
       "properties": {
-        "id": { "type": "string", "maxLength": 128 },
-        "companyId": { "type": "string", "maxLength": 128 },
-        "name": { "type": "string", "maxLength": 150 },
-        "role": { "type": "string", "maxLength": 100 },
-        "isActive": { "type": "boolean" }
+        "id": {
+          "type": "string",
+          "maxLength": 128
+        },
+        "companyId": {
+          "type": "string",
+          "maxLength": 128
+        },
+        "name": {
+          "type": "string",
+          "maxLength": 150
+        },
+        "role": {
+          "type": "string",
+          "maxLength": 100
+        },
+        "isActive": {
+          "type": "boolean"
+        }
       },
-      "required": ["id", "companyId", "name", "isActive"]
+      "required": [
+        "id",
+        "companyId",
+        "name",
+        "isActive"
+      ]
     },
     "Product": {
       "title": "Product",
       "description": "Establishment products catalog for showcase and external sales.",
       "type": "object",
       "properties": {
-        "id": { "type": "string", "maxLength": 128 },
-        "companyId": { "type": "string", "maxLength": 128 },
-        "name": { "type": "string", "maxLength": 150 },
-        "photoUrl": { "type": "string", "maxLength": 2048 },
-        "category": { "type": "string", "maxLength": 100 },
-        "description": { "type": "string", "maxLength": 1000 },
-        "price": { "type": "number" },
-        "priceType": { "type": "string", "enum": ["fixed", "consult"] },
-        "promotionalPrice": { "type": "number" },
-        "isAvailable": { "type": "boolean" },
-        "purchaseUrl": { "type": "string", "maxLength": 2048 },
-        "order": { "type": "number" },
-        "isActive": { "type": "boolean" },
-        "createdAt": { "type": "string", "format": "date-time" },
-        "updatedAt": { "type": "string", "format": "date-time" }
+        "id": {
+          "type": "string",
+          "maxLength": 128
+        },
+        "companyId": {
+          "type": "string",
+          "maxLength": 128
+        },
+        "name": {
+          "type": "string",
+          "maxLength": 150
+        },
+        "photoUrl": {
+          "type": "string",
+          "maxLength": 2048
+        },
+        "category": {
+          "type": "string",
+          "maxLength": 100
+        },
+        "description": {
+          "type": "string",
+          "maxLength": 1000
+        },
+        "price": {
+          "type": "number"
+        },
+        "priceType": {
+          "type": "string",
+          "enum": [
+            "fixed",
+            "consult"
+          ]
+        },
+        "promotionalPrice": {
+          "type": "number"
+        },
+        "isAvailable": {
+          "type": "boolean"
+        },
+        "purchaseUrl": {
+          "type": "string",
+          "maxLength": 2048
+        },
+        "order": {
+          "type": "number"
+        },
+        "isActive": {
+          "type": "boolean"
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time"
+        }
       },
-      "required": ["id", "companyId", "name", "isActive"]
+      "required": [
+        "id",
+        "companyId",
+        "name",
+        "isActive"
+      ]
     },
     "MenuItem": {
       "title": "MenuItem",
       "description": "Establishment digital menu item with customizable options and multi-step builder.",
       "type": "object",
       "properties": {
-        "id": { "type": "string", "maxLength": 128 },
-        "companyId": { "type": "string", "maxLength": 128 },
-        "name": { "type": "string", "maxLength": 150 },
-        "photoUrl": { "type": "string", "maxLength": 2048 },
-        "category": { "type": "string", "maxLength": 100 },
-        "description": { "type": "string", "maxLength": 1000 },
-        "price": { "type": "number" },
-        "priceType": { "type": "string", "enum": ["fixed", "consult"] },
-        "promotionalPrice": { "type": "number" },
-        "isAvailable": { "type": "boolean" },
-        "isFeatured": { "type": "boolean" },
-        "order": { "type": "number" },
-        "isCustomBuilder": { "type": "boolean" },
-        "isActive": { "type": "boolean" },
-        "createdAt": { "type": "string", "format": "date-time" },
-        "updatedAt": { "type": "string", "format": "date-time" }
+        "id": {
+          "type": "string",
+          "maxLength": 128
+        },
+        "companyId": {
+          "type": "string",
+          "maxLength": 128
+        },
+        "name": {
+          "type": "string",
+          "maxLength": 150
+        },
+        "photoUrl": {
+          "type": "string",
+          "maxLength": 2048
+        },
+        "category": {
+          "type": "string",
+          "maxLength": 100
+        },
+        "description": {
+          "type": "string",
+          "maxLength": 1000
+        },
+        "price": {
+          "type": "number"
+        },
+        "priceType": {
+          "type": "string",
+          "enum": [
+            "fixed",
+            "consult"
+          ]
+        },
+        "promotionalPrice": {
+          "type": "number"
+        },
+        "isAvailable": {
+          "type": "boolean"
+        },
+        "isFeatured": {
+          "type": "boolean"
+        },
+        "order": {
+          "type": "number"
+        },
+        "isCustomBuilder": {
+          "type": "boolean"
+        },
+        "isActive": {
+          "type": "boolean"
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time"
+        }
       },
-      "required": ["id", "companyId", "name", "isAvailable", "isActive"]
+      "required": [
+        "id",
+        "companyId",
+        "name",
+        "isAvailable",
+        "isActive"
+      ]
+    },
+    "Table": {
+      "title": "Table",
+      "description": "Stores tables/mesas inside the establishment for local dining.",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "maxLength": 128
+        },
+        "companyId": {
+          "type": "string",
+          "maxLength": 128
+        },
+        "name": {
+          "type": "string",
+          "maxLength": 100
+        },
+        "identifier": {
+          "type": "string",
+          "maxLength": 50
+        },
+        "isActive": {
+          "type": "boolean"
+        },
+        "notes": {
+          "type": "string",
+          "maxLength": 500
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "id",
+        "companyId",
+        "name",
+        "identifier",
+        "isActive"
+      ]
+    },
+    "TableOrder": {
+      "title": "TableOrder",
+      "description": "Orders placed by table guests for local consumption in the restaurant.",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "maxLength": 128
+        },
+        "companyId": {
+          "type": "string",
+          "maxLength": 128
+        },
+        "tableNumber": {
+          "type": "string",
+          "maxLength": 100
+        },
+        "tableId": {
+          "type": "string",
+          "maxLength": 128
+        },
+        "customerName": {
+          "type": "string",
+          "maxLength": 150
+        },
+        "customerPhone": {
+          "type": "string",
+          "maxLength": 50
+        },
+        "status": {
+          "type": "string",
+          "enum": [
+            "novo",
+            "aceito",
+            "preparo",
+            "pronto",
+            "finalizado",
+            "entregue"
+          ]
+        },
+        "totalAmount": {
+          "type": "number"
+        },
+        "notes": {
+          "type": "string",
+          "maxLength": 1000
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "id",
+        "companyId",
+        "tableNumber",
+        "status",
+        "totalAmount"
+      ]
     }
   },
   "firestore": {
@@ -237,6 +751,14 @@
     "/professionals/{profId}": {
       "schema": "CompanyProfessional",
       "description": "Company professionals for booking assignment."
+    },
+    "/tables/{tableId}": {
+      "schema": "Table",
+      "description": "Establishment dining tables for on-site ordering and QR codes."
+    },
+    "/tableOrders/{orderId}": {
+      "schema": "TableOrder",
+      "description": "Table orders created by local dining customers."
     }
   }
 }

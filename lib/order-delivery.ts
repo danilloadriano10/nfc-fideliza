@@ -13,6 +13,9 @@ export interface OrderDeliveryInfo {
   neighborhood: string
   complement?: string
   reference?: string
+  referencePoint?: string
+  city?: string
+  notes?: string
   locationCoordinates?: {
     lat: number
     lng: number

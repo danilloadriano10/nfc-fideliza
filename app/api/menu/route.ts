@@ -225,6 +225,12 @@ export async function PUT(req: NextRequest) {
       if (typeof menuUrl === 'string') {
         company.menuUrl = menuUrl.trim()
       }
+      if (body.menuDisplayMode) {
+        company.menuDisplayMode = body.menuDisplayMode
+      }
+      if (body.menuConfig) {
+        company.menuConfig = { ...(company.menuConfig || {}), ...body.menuConfig }
+      }
       company.modules = { ...(company.modules || {}), menu: true }
       await saveServerCompany(company)
       return NextResponse.json({ success: true, company }, { status: 200 })
