@@ -296,7 +296,7 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
                       <img
                         src={activePhoto}
                         alt={product.name}
-                        className="w-full h-full object-cover"
+                        className="w-full h-full object-contain"
                         loading="lazy"
                         referrerPolicy="no-referrer"
                       />

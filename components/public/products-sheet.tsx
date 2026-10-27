@@ -11,6 +11,7 @@ import {
   Layers,
   ChevronRight,
   Filter,
+  MessageCircle,
 } from 'lucide-react'
 import { Company, CompanyProduct } from '@/types/platform'
 import { getPublicTheme } from '@/lib/public-themes'
@@ -260,7 +261,7 @@ export const ProductsSheet: React.FC<ProductsSheetProps> = ({
           </div>
 
           {/* Grid de Cards de Produtos */}
-          <div className="overflow-y-auto flex-1 p-3.5 sm:p-5">
+          <div className="overflow-y-auto flex-1 p-2.5 sm:p-4">
             {filteredProducts.length === 0 ? (
               <div
                 className={`text-center py-16 px-4 rounded-3xl border flex flex-col items-center justify-center ${
@@ -298,7 +299,7 @@ export const ProductsSheet: React.FC<ProductsSheetProps> = ({
                 )}
               </div>
             ) : (
-              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-3 lg:grid-cols-4 gap-3 sm:gap-4">
+              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-3 lg:grid-cols-4 gap-2 sm:gap-3">
                 {filteredProducts.map((item) => {
                   const isConsult = item.priceType === 'consult' || item.price == null
                   const hasPromo =
@@ -319,69 +320,66 @@ export const ProductsSheet: React.FC<ProductsSheetProps> = ({
                     <div
                       key={item.id}
                       onClick={() => setSelectedProduct(item)}
-                      className={`group rounded-2xl p-2.5 sm:p-3 border flex flex-col justify-between transition-all duration-200 cursor-pointer relative overflow-hidden select-none active:scale-[0.98] hover:shadow-lg ${
-                        isDark
-                          ? 'bg-[#181820] hover:bg-[#1f1f2a] border-white/[0.07] hover:border-white/20'
-                          : 'bg-white hover:bg-neutral-50 border-neutral-200/90 hover:border-neutral-300 shadow-2xs'
-                      }`}
+                      className="group flex flex-col justify-between transition-all cursor-pointer relative select-none active:scale-[0.99]"
                     >
                       <div>
-                        {/* Foto do Produto em Grade */}
-                        <div
-                          className={`relative w-full aspect-square rounded-xl overflow-hidden mb-2.5 border flex items-center justify-center shrink-0 ${
-                            isDark
-                              ? 'bg-neutral-900 border-white/5'
-                              : 'bg-neutral-100 border-neutral-200'
-                          }`}
-                        >
+                        {/* Foto do Produto em Grade - Sem container cinza, aproveitando 100% da largura da coluna com object-contain */}
+                        <div className="relative w-full aspect-square mb-2 flex items-center justify-center overflow-hidden">
                           {itemPhoto ? (
                             /* eslint-disable-next-line @next/next/no-img-element */
                             <img
                               src={itemPhoto}
                               alt={item.name}
-                              className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                              className="w-full h-full object-contain"
                               loading="lazy"
                               referrerPolicy="no-referrer"
                             />
                           ) : (
-                            <div className="flex flex-col items-center justify-center text-neutral-400 gap-1">
-                              <Package className="w-8 h-8 opacity-40" />
+                            <div
+                              className={`w-full h-full rounded-2xl flex flex-col items-center justify-center ${
+                                isDark ? 'bg-white/[0.04] text-neutral-500' : 'bg-neutral-100/80 text-neutral-400'
+                              }`}
+                            >
+                              <Package className="w-8 h-8 opacity-40 mb-1" />
                               <span className="text-[10px] font-medium text-neutral-500">Sem foto</span>
                             </div>
                           )}
 
                           {/* Badge de Promoção */}
                           {hasPromo && (
-                            <span className="absolute top-1.5 left-1.5 px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider bg-rose-600 text-white shadow-xs">
+                            <span className="absolute top-1.5 left-1.5 px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider bg-rose-600 text-white shadow-xs z-10">
                               {discountPercent ? `-${discountPercent}%` : 'Promo'}
                             </span>
                           )}
 
                           {/* Badge Esgotado */}
                           {isSoldOut && (
-                            <span className="absolute inset-x-1.5 bottom-1.5 text-center px-1.5 py-0.5 rounded-md text-[9px] font-black uppercase tracking-wider bg-black/80 text-rose-300 backdrop-blur-xs border border-rose-500/30">
-                              Esgotado
-                            </span>
+                            <div className="absolute inset-0 bg-black/70 backdrop-blur-2xs rounded-xl flex items-center justify-center p-1 text-center z-20">
+                              <span className="text-[10px] font-black uppercase tracking-wider text-rose-300">
+                                Esgotado
+                              </span>
+                            </div>
                           )}
                         </div>
 
-                        {/* Categoria e Nome */}
-                        <div className="space-y-1">
+                        {/* Nome e Categoria diretamente abaixo da imagem */}
+                        <div className="space-y-0.5 px-0.5">
                           {item.category && (
-                            <span className="text-[9px] font-bold uppercase tracking-wider text-violet-400 block truncate">
+                            <span className="text-[10px] font-bold uppercase tracking-wider text-neutral-400 dark:text-neutral-500 block truncate">
                               {item.category}
                             </span>
                           )}
 
                           <h4
-                            className={`font-bold text-xs sm:text-sm leading-snug line-clamp-2 ${
+                            className={`font-semibold sm:font-bold text-xs sm:text-sm leading-snug line-clamp-2 ${
                               isDark ? 'text-white' : 'text-neutral-900'
                             }`}
+                            title={item.name}
                           >
                             {item.name}
                           </h4>
 
-                          {/* Tamanhos / Variações Hint */}
+                          {/* Variações */}
                           {item.variations && item.variations.length > 0 && (
                             <div className="flex items-center gap-1 pt-0.5">
                               <span
@@ -396,23 +394,23 @@ export const ProductsSheet: React.FC<ProductsSheetProps> = ({
                         </div>
                       </div>
 
-                      {/* Preço e Botão Detalhes */}
-                      <div className="pt-2 mt-2 border-t border-neutral-100 dark:border-white/[0.06] flex items-center justify-between gap-1">
+                      {/* Preço e Botão de Ação diretamente abaixo */}
+                      <div className="pt-1.5 px-0.5 space-y-2">
                         <div className="min-w-0">
                           {isConsult ? (
-                            <span className="text-xs font-bold text-amber-500 block truncate">
+                            <span className="text-xs font-bold text-amber-500 dark:text-amber-400 block truncate">
                               Consultar
                             </span>
                           ) : hasPromo ? (
-                            <div>
+                            <div className="flex items-baseline gap-1.5 flex-wrap">
                               <span
-                                className="text-xs sm:text-sm font-black font-mono block leading-tight"
+                                className="text-xs sm:text-sm font-black font-mono leading-tight"
                                 style={{ color: activeTheme.colors.priceColor }}
                               >
                                 {formatPrice(item.promotionalPrice)}
                               </span>
                               <span
-                                className={`text-[10px] line-through font-mono block leading-tight ${
+                                className={`text-[10px] line-through font-mono leading-tight ${
                                   isDark ? 'text-neutral-500' : 'text-neutral-400'
                                 }`}
                               >
@@ -421,7 +419,7 @@ export const ProductsSheet: React.FC<ProductsSheetProps> = ({
                             </div>
                           ) : (
                             <span
-                              className="text-xs sm:text-sm font-black font-mono block leading-tight"
+                              className="text-xs sm:text-sm font-black font-mono leading-tight block"
                               style={{ color: activeTheme.colors.priceColor }}
                             >
                               {formatPrice(item.price)}
@@ -429,15 +427,48 @@ export const ProductsSheet: React.FC<ProductsSheetProps> = ({
                           )}
                         </div>
 
-                        <div
-                          className={`px-2 py-1 rounded-lg text-[10px] font-bold flex items-center gap-0.5 shrink-0 transition-colors ${
-                            isDark
-                              ? 'bg-white/10 hover:bg-white/20 text-white'
-                              : 'bg-neutral-100 hover:bg-neutral-200 text-neutral-800'
-                          }`}
-                        >
-                          <span>Ver</span>
-                          <ChevronRight className="w-3 h-3" />
+                        {/* Botão de Ação Direto */}
+                        <div className="flex items-center gap-1.5 w-full">
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              setSelectedProduct(item)
+                            }}
+                            className="flex-1 py-1.5 px-2 rounded-xl text-[11px] sm:text-xs font-bold flex items-center justify-center gap-1 transition-all cursor-pointer shadow-2xs active:scale-[0.98]"
+                            style={{
+                              backgroundColor: activeTheme.colors.buttonBg,
+                              color: activeTheme.colors.buttonText,
+                            }}
+                          >
+                            <span>Ver produto</span>
+                            <ChevronRight className="w-3 h-3" />
+                          </button>
+
+                          {company.whatsapp && (
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation()
+                                const raw = company.whatsapp || ''
+                                const clean = raw.replace(/\D/g, '')
+                                const phoneWithDdi = clean.startsWith('55') ? clean : `55${clean}`
+                                const msg = encodeURIComponent(
+                                  `Olá! Gostei do produto "${item.name}" no DiretoLink e gostaria de saber mais.`
+                                )
+                                window.open(
+                                  `https://wa.me/${phoneWithDdi}?text=${msg}`,
+                                  '_blank',
+                                  'noopener,noreferrer'
+                                )
+                              }}
+                              className="p-1.5 rounded-xl bg-[#25D366] hover:bg-[#20ba59] text-white flex items-center justify-center transition-transform active:scale-95 shadow-xs cursor-pointer shrink-0"
+                              title="Pedir no WhatsApp"
+                              aria-label="Pedir no WhatsApp"
+                            >
+                              <MessageCircle className="w-3.5 h-3.5 fill-white" />
+                            </button>
+                          )}
                         </div>
                       </div>
                     </div>

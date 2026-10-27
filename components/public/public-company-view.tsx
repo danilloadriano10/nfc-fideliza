@@ -38,6 +38,7 @@ import {
   Cake,
 } from 'lucide-react'
 import { Company, CompanyService, CompanyProduct, MenuItem } from '@/types/platform'
+import { PublicCard } from './action-card'
 import { LoyaltySheet } from './loyalty-sheet'
 import { WifiSheet } from './wifi-sheet'
 import { FeedbackSheet } from './feedback-sheet'
@@ -1071,72 +1072,55 @@ export const PublicCompanyView: React.FC<PublicCompanyViewProps> = ({
           </div>
 
           {/* ======================================================= */}
-          {/* 2. CARDS DE DESTAQUE NO TOPO (1, 2, 3 OU 4 CARDS)       */}
+          {/* 2. ATALHOS FLUTUANTES NO TOPO (0, 1, 2, 3 OU 4 ITENS)   */}
           {/* ======================================================= */}
           {featuredCardsList.length > 0 && (
-            <div className="px-2.5 sm:px-4 -mt-7 sm:-mt-8 relative z-20">
+            <div className="px-2.5 sm:px-4 -mt-6 sm:-mt-7 relative z-20">
               <div
                 className={
                   featuredCardsList.length === 1
-                    ? 'grid grid-cols-1 max-w-[210px] sm:max-w-[230px] mx-auto'
+                    ? 'grid grid-cols-1 max-w-[140px] mx-auto'
                     : featuredCardsList.length === 2
-                    ? 'grid grid-cols-2 max-w-[340px] sm:max-w-md mx-auto gap-2.5 sm:gap-3'
+                    ? 'grid grid-cols-2 max-w-[280px] mx-auto gap-4'
                     : featuredCardsList.length === 3
-                    ? 'grid grid-cols-3 max-w-lg mx-auto gap-2 sm:gap-2.5'
-                    : 'grid grid-cols-4 gap-1.5 sm:gap-2'
+                    ? 'grid grid-cols-3 max-w-[360px] mx-auto gap-2.5 sm:gap-3'
+                    : 'grid grid-cols-4 gap-2 sm:gap-2.5'
                 }
               >
                 {featuredCardsList.map((card) => {
-                  const isSingle = featuredCardsList.length === 1
-                  const isPair = featuredCardsList.length === 2
-                  const isTrio = featuredCardsList.length === 3
-
                   return (
                     <button
                       key={card.id}
                       type="button"
                       onClick={card.onClick}
-                      className={`w-full text-center p-1.5 sm:p-2 rounded-2xl border transition-all duration-200 active:scale-95 hover:scale-[1.02] cursor-pointer group flex flex-col items-center justify-center gap-1 sm:gap-1.5 shadow-2xs hover:shadow-md select-none relative overflow-hidden ${
-                        isSingle || isPair
-                          ? 'h-[74px] sm:h-[80px]'
-                          : isTrio
-                          ? 'h-[70px] sm:h-[74px]'
-                          : 'h-[68px] sm:h-[72px]'
-                      }`}
+                      className="w-full text-center p-1 cursor-pointer group flex flex-col items-center justify-center gap-1.5 select-none transition-transform active:scale-95 bg-transparent border-0 shadow-none hover:bg-transparent"
                       style={{
                         WebkitTapHighlightColor: 'transparent',
-                        backgroundColor: activeTheme.cardBg,
-                        borderColor: activeTheme.cardBorder,
                       }}
                     >
-                      {/* Badge flutuante (ex: Prêmio!) */}
-                      {card.badgeText && (
-                        <span className="absolute top-1 right-1 px-1 py-0.2 rounded-full text-[7.5px] font-black bg-amber-500 text-white shadow-2xs leading-none">
-                          {card.badgeText}
-                        </span>
-                      )}
+                      {/* Ícone Flutuante com Sombra Elevada e Efeito ao Toque */}
+                      <div className="relative">
+                        <div
+                          className={`w-12 h-12 sm:w-13 sm:h-13 rounded-2xl flex items-center justify-center shrink-0 shadow-md transition-transform duration-200 group-hover:scale-105 ${
+                            card.iconContainerClass
+                          }`}
+                          style={card.iconContainerStyle}
+                        >
+                          {card.icon}
+                        </div>
 
-                      <div
-                        className={`rounded-xl flex items-center justify-center shrink-0 shadow-2xs transition-transform group-hover:scale-105 ${
-                          card.iconContainerClass
-                        } ${
-                          isSingle || isPair
-                            ? 'w-8 h-8 sm:w-9 sm:h-9'
-                            : 'w-7 h-7 sm:w-8 sm:h-8'
-                        }`}
-                        style={card.iconContainerStyle}
-                      >
-                        {card.icon}
+                        {/* Badge flutuante sobre o ícone (ex: Prêmio!) */}
+                        {card.badgeText && (
+                          <span className="absolute -top-1.5 -right-1.5 px-1.5 py-0.5 rounded-full text-[8.5px] font-black bg-amber-500 text-white shadow-xs leading-none z-10">
+                            {card.badgeText}
+                          </span>
+                        )}
                       </div>
 
+                      {/* Nome do Atalho */}
                       <span
-                        className={`font-bold tracking-tight truncate w-full text-center leading-tight block px-0.5 ${
-                          isSingle || isPair
-                            ? 'text-xs sm:text-sm'
-                            : isTrio
-                            ? 'text-[11px] sm:text-xs'
-                            : 'text-[10px] sm:text-xs'
-                        } ${isDark ? 'text-white' : 'text-neutral-900'}`}
+                        className="font-bold tracking-tight truncate w-full text-center leading-tight text-[11px] sm:text-xs block px-0.5"
+                        style={{ color: activeTheme.colors.titleColor || (isDark ? '#ffffff' : '#171717') }}
                       >
                         {card.title}
                       </span>
@@ -1190,349 +1174,256 @@ export const PublicCompanyView: React.FC<PublicCompanyViewProps> = ({
           {(() => {
             const sectionElements: Record<string, React.ReactNode> = {
               whatsapp: activeModules.whatsapp ? (
-                <div
+                <PublicCard
                   key="whatsapp"
-                  className="rounded-3xl p-4 sm:p-4.5 border flex items-center justify-between gap-3 shadow-xs"
-                  style={themedCardStyle}
-                >
-                  <div className="flex items-center gap-3 min-w-0">
-                    <div className="w-10 h-10 rounded-2xl bg-emerald-500/15 text-emerald-400 border border-emerald-500/30 flex items-center justify-center shrink-0">
-                      <MessageCircle className="w-5 h-5 text-[#25D366]" />
-                    </div>
-                    <div className="min-w-0">
-                      <h4 className={`text-xs sm:text-sm font-bold truncate ${isDark ? 'text-white' : 'text-neutral-900'}`}>
-                        WhatsApp Oficial
-                      </h4>
-                      <p className={`text-[11px] truncate mt-0.5 ${isDark ? 'text-neutral-400' : 'text-neutral-500'}`}>
-                        {company.whatsapp ? `Atendimento: ${company.whatsapp}` : 'Fale diretamente com nossa equipe'}
-                      </p>
-                    </div>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={handleOpenWhatsApp}
-                    className="px-3.5 py-2 rounded-xl text-xs font-bold bg-emerald-600 hover:bg-emerald-500 active:scale-95 text-white shrink-0 cursor-pointer shadow-xs transition-all flex items-center gap-1.5"
-                  >
-                    <MessageCircle className="w-3.5 h-3.5" />
-                    <span>Conversar</span>
-                  </button>
-                </div>
+                  icon={<MessageCircle className="w-5 h-5 text-[#25D366]" />}
+                  iconContainerClass={
+                    isDark
+                      ? 'bg-emerald-500/15 border border-emerald-500/30'
+                      : 'bg-emerald-50 border border-emerald-200/80'
+                  }
+                  title="WhatsApp Oficial"
+                  subtitle={
+                    company.whatsapp
+                      ? `Atendimento: ${company.whatsapp}`
+                      : 'Fale diretamente com nossa equipe'
+                  }
+                  actionText="Conversar"
+                  actionIcon={<MessageCircle className="w-3.5 h-3.5" />}
+                  actionVariant="whatsapp"
+                  onAction={handleOpenWhatsApp}
+                  onClick={handleOpenWhatsApp}
+                  isDark={isDark}
+                  cardStyle={themedCardStyle}
+                  primaryColor={primaryColor}
+                />
               ) : null,
               services: activeModules.services ? (
                 isServicesShortcutMode ? (
-                  <div
+                  <PublicCard
                     key="services-card"
-                    onClick={() => setIsServicesOpen(true)}
-                    className="group rounded-3xl p-4 sm:p-4.5 border flex items-center justify-between gap-3 shadow-xs hover:shadow-md transition-all cursor-pointer select-none"
-                    style={themedCardStyle}
-                  >
-                    <div className="flex items-center gap-3 min-w-0">
-                      <div
-                        className="w-10 h-10 rounded-2xl flex items-center justify-center text-white shadow-xs shrink-0 group-hover:scale-105 transition-transform"
-                        style={{ backgroundColor: secondaryColor || primaryColor }}
-                      >
-                        <Scissors className="w-5 h-5" />
-                      </div>
-                      <div className="min-w-0">
-                        <div className="flex items-center gap-2">
-                          <h4 className={`text-xs sm:text-sm font-bold truncate ${isDark ? 'text-white' : 'text-neutral-900'}`}>
-                            Nossos Serviços
-                          </h4>
-                          {activeServicesList.length > 0 && (
-                            <span className="text-[10px] font-bold px-2 py-0.2 rounded-full bg-violet-500/10 text-violet-600 dark:text-violet-400">
-                              {activeServicesList.length}
-                            </span>
-                          )}
-                        </div>
-                        <p className={`text-[11px] truncate mt-0.5 ${isDark ? 'text-neutral-400' : 'text-neutral-500'}`}>
-                          {activeServicesList.length > 0
-                            ? `${activeServicesList.length} opções com preços e horários`
-                            : 'Consulte nossa tabela de procedimentos e serviços'}
-                        </p>
-                      </div>
-                    </div>
-                    <button
-                      type="button"
-                      onClick={(e) => {
-                        e.stopPropagation()
-                        setIsServicesOpen(true)
-                      }}
-                      className="px-3.5 py-2 rounded-xl text-xs font-bold text-white shadow-xs flex items-center gap-1 shrink-0 transition-all hover:opacity-90 active:scale-95 cursor-pointer"
-                      style={{ backgroundColor: secondaryColor || primaryColor }}
-                    >
-                      <span>Ver Serviços</span>
-                      <ChevronRight className="w-3.5 h-3.5" />
-                    </button>
-                  </div>
-                ) : activeServicesList.length > 0 ? (
-            <div className="space-y-3 pt-1">
-              <div className="flex items-center justify-between px-0.5">
-                <div className="flex items-center gap-1.5">
-                  <span
-                    className="w-1.5 h-3 rounded-full"
-                    style={{ backgroundColor: primaryColor }}
-                  />
-                  <h3
-                    className={`text-sm font-black tracking-tight ${
-                      isDark ? 'text-white' : 'text-neutral-900'
-                    }`}
-                  >
-                    Nossos Serviços
-                  </h3>
-                  <span
-                    className={`text-[11px] font-bold px-2 py-0.2 rounded-full ${
-                      isDark ? 'border border-white/[0.08]' : ''
-                    }`}
-                    style={{
-                      backgroundColor: hexToRgba(primaryColor, isDark ? 0.2 : 0.1),
-                      color: isDark ? '#ffffff' : primaryColor,
+                    icon={<Scissors className="w-5 h-5 text-white" />}
+                    iconContainerStyle={{ backgroundColor: secondaryColor || primaryColor }}
+                    title="Nossos Serviços"
+                    badgeText={activeServicesList.length > 0 ? `${activeServicesList.length}` : undefined}
+                    badgeVariant="violet"
+                    subtitle={
+                      activeServicesList.length > 0
+                        ? `${activeServicesList.length} opções com preços e horários`
+                        : 'Consulte nossa tabela de procedimentos e serviços'
+                    }
+                    actionText="Ver Serviços"
+                    actionIcon={<ChevronRight className="w-3.5 h-3.5" />}
+                    actionVariant="theme"
+                    actionStyle={{
+                      backgroundColor: secondaryColor || primaryColor,
+                      color: '#ffffff',
                     }}
-                  >
-                    {activeServicesList.length}
-                  </span>
-                </div>
+                    onAction={() => setIsServicesOpen(true)}
+                    onClick={() => setIsServicesOpen(true)}
+                    isDark={isDark}
+                    cardStyle={themedCardStyle}
+                    primaryColor={primaryColor}
+                    buttonBgColor={secondaryColor || primaryColor}
+                    buttonTextColor="#ffffff"
+                  />
+                ) : activeServicesList.length > 0 ? (
+                  <div className="space-y-2.5 pt-1">
+                    <div className="flex items-center justify-between px-0.5">
+                      <div className="flex items-center gap-1.5">
+                        <span
+                          className="w-1.5 h-3 rounded-full"
+                          style={{ backgroundColor: primaryColor }}
+                        />
+                        <h3
+                          className={`text-sm font-black tracking-tight ${
+                            isDark ? 'text-white' : 'text-neutral-900'
+                          }`}
+                        >
+                          Nossos Serviços
+                        </h3>
+                        <span
+                          className={`text-[11px] font-bold px-2 py-0.2 rounded-full ${
+                            isDark ? 'border border-white/[0.08]' : ''
+                          }`}
+                          style={{
+                            backgroundColor: hexToRgba(primaryColor, isDark ? 0.2 : 0.1),
+                            color: isDark ? '#ffffff' : primaryColor,
+                          }}
+                        >
+                          {activeServicesList.length}
+                        </span>
+                      </div>
 
-                <button
-                  type="button"
-                  onClick={() => setIsServicesOpen(true)}
-                  className="text-xs font-bold flex items-center gap-0.5 cursor-pointer hover:opacity-80 transition-opacity"
-                  style={{ color: primaryColor }}
-                >
-                  <span>Ver todos</span>
-                  <ChevronRight className="w-3.5 h-3.5" />
-                </button>
-              </div>
+                      <button
+                        type="button"
+                        onClick={() => setIsServicesOpen(true)}
+                        className="text-xs font-bold flex items-center gap-0.5 cursor-pointer hover:opacity-80 transition-opacity"
+                        style={{ color: primaryColor }}
+                      >
+                        <span>Ver todos</span>
+                        <ChevronRight className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
 
-              {/* Vitrine de Serviços: Cards Visuais com Fotos Maiores e Layout Moderno */}
-              <div className="space-y-3">
-                {activeServicesList.slice(0, 4).map((srv) => {
-                  const srvPhoto = srv.photoUrl || (srv as unknown as { imageUrl?: string }).imageUrl || ''
-                  const isConsult = srv.priceType === 'consult' || srv.price == null
+                    {/* Vitrine de Serviços padronizada no formato horizontal compacto */}
+                    <div className="space-y-2.5">
+                      {activeServicesList.slice(0, 4).map((srv) => {
+                        const srvPhoto =
+                          srv.photoUrl ||
+                          (srv as unknown as { imageUrl?: string }).imageUrl ||
+                          ''
+                        const isConsult = srv.priceType === 'consult' || srv.price == null
 
-                  return (
-                    <div
-                      key={srv.id}
-                      className="rounded-3xl p-3 sm:p-3.5 flex flex-col sm:flex-row gap-3 transition-all cursor-pointer group relative overflow-hidden border shadow-sm hover:shadow-md"
-                      style={{
-                        backgroundColor: activeTheme.cardBg,
-                        borderColor: activeTheme.cardBorder,
-                        boxShadow: isDark
-                          ? `0 6px 20px -4px rgba(0,0,0,0.5)`
-                          : `0 4px 16px -4px ${hexToRgba(primaryColor, 0.08)}`,
-                      }}
-                      onClick={() => {
-                        if (activeModules.appointments) {
-                          handleInitiateBooking(srv)
-                        } else {
-                          setIsServicesOpen(true)
-                        }
-                      }}
-                    >
-                      <div className="flex items-start gap-3.5 w-full">
-                        {/* Foto Maior em Destaque Visual (Estilo Vitrine Comercial) */}
-                        {srvPhoto ? (
-                          <div
-                            className={`relative w-24 h-24 sm:w-26 sm:h-26 rounded-2xl overflow-hidden shrink-0 shadow-xs ${
-                              isDark
-                                ? 'bg-[#1a1a22] border border-white/[0.08]'
-                                : 'bg-neutral-100 border border-neutral-200/80'
-                            }`}
-                          >
-                            {/* eslint-disable-next-line @next/next/no-img-element */}
-                            <img
-                              src={srvPhoto}
-                              alt={srv.name}
-                              className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-                              loading="lazy"
-                            />
-                            {srv.durationMinutes && (
-                              <div className="absolute bottom-1.5 left-1.5 px-1.5 py-0.5 rounded-md bg-black/70 backdrop-blur-xs text-[10px] font-bold text-white flex items-center gap-1 shadow-2xs">
-                                <Clock className="w-2.5 h-2.5" />
-                                <span>{srv.durationMinutes}m</span>
-                              </div>
-                            )}
-                          </div>
-                        ) : (
-                          <div
-                            className="w-24 h-24 sm:w-26 sm:h-26 rounded-2xl flex flex-col items-center justify-center shrink-0 border"
-                            style={{
-                              backgroundColor: hexToRgba(primaryColor, isDark ? 0.15 : 0.08),
-                              borderColor: hexToRgba(primaryColor, isDark ? 0.3 : 0.2),
-                              color: primaryColor,
-                            }}
-                          >
-                            <Scissors className="w-7 h-7 opacity-85 mb-1" />
-                            {srv.durationMinutes && (
-                              <span className="text-[10px] font-bold opacity-80">
-                                {srv.durationMinutes} min
-                              </span>
-                            )}
-                          </div>
-                        )}
-
-                        {/* Informações Essenciais do Serviço: Nome, Duração, Preço e Botão */}
-                        <div className="min-w-0 flex-1 flex flex-col justify-between self-stretch py-0.5">
-                          <div>
-                            <h4
-                              className={`font-black text-sm sm:text-base leading-snug transition-colors line-clamp-2 ${
-                                isDark
-                                  ? 'text-white group-hover:text-neutral-100'
-                                  : 'text-neutral-900 group-hover:text-neutral-950'
-                              }`}
-                            >
-                              {srv.name}
-                            </h4>
-                            {srv.durationMinutes && (
-                              <div
-                                className={`inline-flex items-center gap-1 text-[11px] font-medium mt-1 ${
-                                  isDark ? 'text-neutral-400' : 'text-neutral-500'
-                                }`}
-                              >
-                                <Clock className="w-3 h-3" />
-                                <span>{srv.durationMinutes} min</span>
-                              </div>
-                            )}
-                          </div>
-
-                          {/* Preço e Botão de Agendamento */}
-                          <div
-                            className={`flex items-center justify-between gap-2 mt-2 pt-2 ${
-                              isDark ? 'border-t border-white/[0.06]' : 'border-t border-neutral-100'
-                            }`}
-                          >
-                            <div>
-                              <span
-                                className={`text-[10px] block font-medium ${
-                                  isDark ? 'text-neutral-500' : 'text-neutral-400'
-                                }`}
-                              >
-                                A partir de
-                              </span>
-                              {isConsult ? (
-                                <span
-                                  className="text-xs font-bold"
-                                  style={{ color: primaryColor }}
-                                >
-                                  Sob Consulta
-                                </span>
+                        return (
+                          <PublicCard
+                            key={srv.id}
+                            icon={
+                              srvPhoto ? (
+                                /* eslint-disable-next-line @next/next/no-img-element */
+                                <img
+                                  src={srvPhoto}
+                                  alt={srv.name}
+                                  className="w-full h-full object-cover rounded-xl"
+                                  loading="lazy"
+                                />
                               ) : (
+                                <Scissors
+                                  className="w-5 h-5"
+                                  style={{ color: secondaryColor || primaryColor }}
+                                />
+                              )
+                            }
+                            iconContainerClass="overflow-hidden border"
+                            iconContainerStyle={{
+                              backgroundColor: hexToRgba(secondaryColor || primaryColor, isDark ? 0.2 : 0.08),
+                              borderColor: hexToRgba(secondaryColor || primaryColor, isDark ? 0.35 : 0.2),
+                            }}
+                            title={srv.name}
+                            subtitle={
+                              <div className="flex items-center gap-1.5 text-[11px] truncate">
+                                {srv.durationMinutes && (
+                                  <span className="flex items-center gap-0.5">
+                                    <Clock className="w-3 h-3 text-neutral-400" />
+                                    <span>{srv.durationMinutes} min</span>
+                                    <span>•</span>
+                                  </span>
+                                )}
                                 <span
-                                  className="text-sm sm:text-base font-black font-mono"
+                                  className="font-bold font-mono"
                                   style={{ color: activeTheme.colors.priceColor }}
                                 >
-                                  R$ {srv.price?.toFixed(2).replace('.', ',')}
+                                  {isConsult
+                                    ? 'Sob Consulta'
+                                    : `R$ ${srv.price?.toFixed(2).replace('.', ',')}`}
                                 </span>
-                              )}
-                            </div>
-
-                            {/* Botão de Agendar */}
-                            {activeModules.appointments ? (
-                              <button
-                                type="button"
-                                onClick={(e) => {
-                                  e.stopPropagation()
-                                  handleInitiateBooking(srv)
-                                }}
-                                className="px-3.5 py-1.5 rounded-xl text-xs font-extrabold shadow-xs hover:opacity-90 active:scale-95 transition-all flex items-center gap-1.5 cursor-pointer"
-                                style={{
-                                  backgroundColor: activeTheme.colors.buttonBg,
-                                  color: activeTheme.colors.buttonText,
-                                  boxShadow: `0 4px 12px -2px ${hexToRgba(activeTheme.colors.buttonBg, 0.45)}`,
-                                }}
-                              >
-                                <Calendar className="w-3 h-3" />
-                                <span>Agendar</span>
-                              </button>
-                            ) : (
-                              <div
-                                className="text-[11px] font-bold flex items-center gap-0.5"
-                                style={{ color: primaryColor }}
-                              >
-                                <span>Ver Mais</span>
-                                <ChevronRight className="w-3 h-3" />
                               </div>
-                            )}
-                          </div>
-                        </div>
-                      </div>
+                            }
+                            actionText={activeModules.appointments ? 'Agendar' : 'Ver'}
+                            actionIcon={
+                              activeModules.appointments ? (
+                                <Calendar className="w-3.5 h-3.5" />
+                              ) : (
+                                <ChevronRight className="w-3.5 h-3.5" />
+                              )
+                            }
+                            actionVariant="theme"
+                            onAction={() => {
+                              if (activeModules.appointments) {
+                                handleInitiateBooking(srv)
+                              } else {
+                                setIsServicesOpen(true)
+                              }
+                            }}
+                            onClick={() => {
+                              if (activeModules.appointments) {
+                                handleInitiateBooking(srv)
+                              } else {
+                                setIsServicesOpen(true)
+                              }
+                            }}
+                            isDark={isDark}
+                            cardStyle={themedCardStyle}
+                            primaryColor={primaryColor}
+                            buttonBgColor={activeTheme.colors.buttonBg}
+                            buttonTextColor={activeTheme.colors.buttonText}
+                          />
+                        )
+                      })}
                     </div>
-                  )
-                })}
-              </div>
 
-              {/* Botão de Ver Catálogo Completo */}
-              {activeServicesList.length > 4 && (
-                <button
-                  type="button"
-                  onClick={() => setIsServicesOpen(true)}
-                  className={`w-full py-2.5 rounded-2xl border text-xs font-bold flex items-center justify-center gap-1.5 transition-colors cursor-pointer ${
-                    isDark
-                      ? 'hover:bg-white/[0.05]'
-                      : 'hover:bg-neutral-100'
-                  }`}
-                  style={{
-                    backgroundColor: hexToRgba(primaryColor, isDark ? 0.1 : 0.04),
-                    borderColor: hexToRgba(primaryColor, isDark ? 0.3 : 0.2),
-                    color: isDark ? '#ffffff' : primaryColor,
-                  }}
-                >
-                  <span>Ver todos os {activeServicesList.length} serviços</span>
-                  <ChevronRight className="w-3.5 h-3.5" />
-                </button>
-              )}
-            </div>
-          ) : (
-            <div
-              key="services-card"
-              className="rounded-3xl p-4.5 sm:p-5 border space-y-3 shadow-xs"
-              style={themedCardStyle}
-            >
-              <div className="flex items-center gap-2.5">
-                <div
-                  className="w-9 h-9 rounded-xl flex items-center justify-center text-white shadow-xs"
-                  style={{ backgroundColor: primaryColor }}
-                >
-                  <Scissors className="w-5 h-5" />
-                </div>
-                <div>
-                  <h3 className={`text-sm font-black tracking-tight ${isDark ? 'text-white' : 'text-neutral-900'}`}>
-                    Nossos Serviços
-                  </h3>
-                  <p className={`text-[11px] ${isDark ? 'text-neutral-400' : 'text-neutral-500'}`}>
-                    Consulte nossos serviços e agende seu atendimento
-                  </p>
-                </div>
-              </div>
-              <button
-                type="button"
-                onClick={() => {
-                  if (activeModules.appointments) {
-                    handleInitiateBooking(null)
-                  } else {
-                    handleOpenWhatsApp()
-                  }
-                }}
-                className="w-full py-2.5 px-4 rounded-xl text-xs font-bold text-white shadow-xs flex items-center justify-center gap-2 cursor-pointer transition-all active:scale-[0.99]"
-                style={{ backgroundColor: primaryColor }}
-              >
-                <Scissors className="w-3.5 h-3.5" />
-                <span>Consultar Serviços</span>
-              </button>
-            </div>
-          )) : null,
+                    {activeServicesList.length > 4 && (
+                      <button
+                        type="button"
+                        onClick={() => setIsServicesOpen(true)}
+                        className={`w-full py-2.5 rounded-2xl border text-xs font-bold flex items-center justify-center gap-1.5 transition-colors cursor-pointer ${
+                          isDark ? 'hover:bg-white/[0.05]' : 'hover:bg-neutral-100'
+                        }`}
+                        style={{
+                          backgroundColor: hexToRgba(primaryColor, isDark ? 0.1 : 0.04),
+                          borderColor: hexToRgba(primaryColor, isDark ? 0.3 : 0.2),
+                          color: isDark ? '#ffffff' : primaryColor,
+                        }}
+                      >
+                        <span>Ver todos os {activeServicesList.length} serviços</span>
+                        <ChevronRight className="w-3.5 h-3.5" />
+                      </button>
+                    )}
+                  </div>
+                ) : (
+                  <PublicCard
+                    key="services-card"
+                    icon={
+                      <Scissors
+                        className="w-5 h-5"
+                        style={{ color: secondaryColor || primaryColor }}
+                      />
+                    }
+                    iconContainerClass="border"
+                    iconContainerStyle={{
+                      backgroundColor: hexToRgba(secondaryColor || primaryColor, isDark ? 0.2 : 0.08),
+                      borderColor: hexToRgba(secondaryColor || primaryColor, isDark ? 0.35 : 0.2),
+                    }}
+                    title="Nossos Serviços"
+                    subtitle="Consulte nossos serviços e agende seu atendimento"
+                    actionText="Consultar"
+                    actionIcon={<Scissors className="w-3.5 h-3.5" />}
+                    actionVariant="theme"
+                    onAction={() => {
+                      if (activeModules.appointments) {
+                        handleInitiateBooking(null)
+                      } else {
+                        handleOpenWhatsApp()
+                      }
+                    }}
+                    onClick={() => {
+                      if (activeModules.appointments) {
+                        handleInitiateBooking(null)
+                      } else {
+                        handleOpenWhatsApp()
+                      }
+                    }}
+                    isDark={isDark}
+                    cardStyle={themedCardStyle}
+                    primaryColor={primaryColor}
+                    buttonBgColor={activeTheme.colors.buttonBg}
+                    buttonTextColor={activeTheme.colors.buttonText}
+                  />
+                )
+              ) : null,
               products: (activeProductsList.length > 0 && !isExternalCatalog && company.modules?.products !== false && !isProductsShortcutMode) ? (
             <div
-              className={`rounded-3xl p-4.5 sm:p-5 space-y-4 border ${
+              className={`rounded-3xl p-3 sm:p-4.5 space-y-3.5 border ${
                 isDark
                   ? 'bg-[#121217] border-white/[0.08] shadow-sm'
                   : 'bg-white border-neutral-200/80 shadow-2xs'
               }`}
             >
               {/* Cabeçalho da Vitrine */}
-              <div className="flex items-center justify-between">
+              <div className="flex items-center justify-between px-0.5">
                 <div className="flex items-center gap-2.5">
                   <div
-                    className="w-9 h-9 rounded-xl flex items-center justify-center shadow-xs text-white"
+                    className="w-9 h-9 rounded-xl flex items-center justify-center shadow-xs text-white shrink-0"
                     style={{ backgroundColor: primaryColor }}
                   >
                     <Package className="w-5 h-5" />
@@ -1602,8 +1493,8 @@ export const PublicCompanyView: React.FC<PublicCompanyViewProps> = ({
                 </div>
               )}
 
-              {/* Vitrine Visual de Produtos: Cards em Grid de 2 colunas */}
-              <div className="grid grid-cols-2 gap-3">
+              {/* Vitrine Visual de Produtos: Cards em Grid de 2 colunas moderno, sem bordas e imagens ampliadas */}
+              <div className="grid grid-cols-2 gap-2 sm:gap-3">
                 {displayedVitrineProducts.slice(0, 6).map((prod) => {
                   const isConsult = prod.priceType === 'consult' || prod.price == null
                   const hasPromo = !isConsult && prod.promotionalPrice != null && prod.promotionalPrice > 0
@@ -1622,53 +1513,58 @@ export const PublicCompanyView: React.FC<PublicCompanyViewProps> = ({
                     <div
                       key={prod.id}
                       onClick={() => setSelectedProductDetail(prod)}
-                      className="group rounded-2xl border p-2.5 flex flex-col justify-between transition-all cursor-pointer shadow-xs hover:shadow-md"
-                      style={themedCardStyle}
+                      className="group flex flex-col justify-between transition-all cursor-pointer relative select-none active:scale-[0.99]"
                     >
-                      {/* Foto do Produto */}
-                      <div
-                        className={`relative w-full aspect-square rounded-xl overflow-hidden mb-2.5 border flex items-center justify-center ${
-                          isDark ? 'bg-neutral-900 border-white/5' : 'bg-white border-neutral-200'
-                        }`}
-                      >
-                        {prodPhoto ? (
-                          /* eslint-disable-next-line @next/next/no-img-element */
-                          <img
-                            src={prodPhoto}
-                            alt={prod.name}
-                            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-                            loading="lazy"
-                            referrerPolicy="no-referrer"
-                          />
-                        ) : (
-                          <Package className="w-8 h-8 text-neutral-400 opacity-60" />
-                        )}
+                      <div>
+                        {/* Foto do Produto - Sem container cinza, aproveitando 100% da largura da coluna com object-contain */}
+                        <div className="relative w-full aspect-square mb-2 flex items-center justify-center overflow-hidden">
+                          {prodPhoto ? (
+                            /* eslint-disable-next-line @next/next/no-img-element */
+                            <img
+                              src={prodPhoto}
+                              alt={prod.name}
+                              className="w-full h-full object-contain"
+                              loading="lazy"
+                              referrerPolicy="no-referrer"
+                            />
+                          ) : (
+                            <div
+                              className={`w-full h-full rounded-2xl flex flex-col items-center justify-center ${
+                                isDark ? 'bg-white/[0.04] text-neutral-500' : 'bg-neutral-100/80 text-neutral-400'
+                              }`}
+                            >
+                              <Package className="w-8 h-8 opacity-40 mb-1" />
+                              <span className="text-[10px] font-medium">Sem foto</span>
+                            </div>
+                          )}
 
-                        {hasPromo && (
-                          <span className="absolute top-1.5 left-1.5 px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider bg-rose-600 text-white shadow-xs">
-                            {discountPercent ? `-${discountPercent}%` : 'Promo'}
-                          </span>
-                        )}
+                          {hasPromo && (
+                            <span className="absolute top-1.5 left-1.5 px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider bg-rose-600 text-white shadow-xs z-10">
+                              {discountPercent ? `-${discountPercent}%` : 'Promo'}
+                            </span>
+                          )}
 
-                        {prod.isAvailable === false && (
-                          <span className="absolute bottom-1.5 left-1.5 px-2 py-0.5 rounded-full text-[9px] font-extrabold uppercase tracking-wider bg-black/75 text-rose-300 border border-rose-500/30">
-                            Esgotado
-                          </span>
-                        )}
-                      </div>
+                          {prod.isAvailable === false && (
+                            <div className="absolute inset-0 bg-black/70 backdrop-blur-2xs rounded-xl flex items-center justify-center p-1 text-center z-20">
+                              <span className="text-[10px] font-black uppercase tracking-wider text-rose-300">
+                                Esgotado
+                              </span>
+                            </div>
+                          )}
+                        </div>
 
-                      {/* Nome, Categoria & Preço */}
-                      <div className="space-y-1 flex-1 flex flex-col justify-between">
-                        <div>
+                        {/* Nome e Categoria diretamente abaixo da imagem */}
+                        <div className="space-y-0.5 px-0.5">
                           {prod.category && (
-                            <span className="text-[9px] font-bold uppercase tracking-wider text-neutral-400 block truncate">
+                            <span className="text-[10px] font-bold uppercase tracking-wider text-neutral-400 dark:text-neutral-500 block truncate">
                               {prod.category}
                             </span>
                           )}
                           <h4
-                            className={`font-bold text-xs leading-snug line-clamp-2 ${
+                            className={`font-semibold sm:font-bold text-xs sm:text-sm leading-snug line-clamp-2 ${
                               isDark ? 'text-white' : 'text-neutral-900'
                             }`}
+                            title={prod.name}
                           >
                             {prod.name}
                           </h4>
@@ -1682,22 +1578,25 @@ export const PublicCompanyView: React.FC<PublicCompanyViewProps> = ({
                             </p>
                           )}
                         </div>
+                      </div>
 
-                        <div className="pt-1.5">
+                      {/* Preço e Botão de Ação diretamente abaixo */}
+                      <div className="pt-1.5 px-0.5 space-y-2">
+                        <div className="min-w-0">
                           {isConsult ? (
-                            <span className="text-xs font-bold text-amber-400 block truncate">
+                            <span className="text-xs font-bold text-amber-500 dark:text-amber-400 block truncate">
                               Sob consulta
                             </span>
                           ) : hasPromo ? (
                             <div className="flex items-baseline gap-1.5 flex-wrap">
                               <span
-                                className="text-xs font-black font-mono"
+                                className="text-xs sm:text-sm font-black font-mono leading-tight"
                                 style={{ color: activeTheme.colors.priceColor }}
                               >
                                 R$ {prod.promotionalPrice?.toFixed(2).replace('.', ',')}
                               </span>
                               <span
-                                className={`text-[10px] line-through font-mono ${
+                                className={`text-[10px] line-through font-mono leading-tight ${
                                   isDark ? 'text-neutral-500' : 'text-neutral-400'
                                 }`}
                               >
@@ -1706,57 +1605,57 @@ export const PublicCompanyView: React.FC<PublicCompanyViewProps> = ({
                             </div>
                           ) : (
                             <span
-                              className="text-xs font-black font-mono block"
+                              className="text-xs sm:text-sm font-black font-mono leading-tight block"
                               style={{ color: activeTheme.colors.priceColor }}
                             >
                               R$ {prod.price?.toFixed(2).replace('.', ',')}
                             </span>
                           )}
                         </div>
-                      </div>
 
-                      {/* Botões de Ação do Card */}
-                      <div className="flex items-center gap-1.5 mt-2.5">
-                        <button
-                          type="button"
-                          onClick={(e) => {
-                            e.stopPropagation()
-                            setSelectedProductDetail(prod)
-                          }}
-                          className={`flex-1 py-1.5 px-2 rounded-xl text-[11px] font-bold flex items-center justify-center gap-1 transition-all cursor-pointer ${
-                            isDark
-                              ? 'bg-white/10 hover:bg-white/15 text-white'
-                              : 'bg-neutral-100 hover:bg-neutral-200 text-neutral-900 border border-neutral-200/80'
-                          }`}
-                        >
-                          <span>Detalhes</span>
-                          <ChevronRight className="w-3 h-3" />
-                        </button>
-
-                        {company.whatsapp && (
+                        {/* Botões de Ação do Card */}
+                        <div className="flex items-center gap-1.5 w-full">
                           <button
                             type="button"
                             onClick={(e) => {
                               e.stopPropagation()
-                              const raw = company.whatsapp || ''
-                              const clean = raw.replace(/\D/g, '')
-                              const phoneWithDdi = clean.startsWith('55') ? clean : `55${clean}`
-                              const msg = encodeURIComponent(
-                                `Olá! Gostei do produto "${prod.name}" no DiretoLink e gostaria de saber mais.`
-                              )
-                              window.open(
-                                `https://wa.me/${phoneWithDdi}?text=${msg}`,
-                                '_blank',
-                                'noopener,noreferrer'
-                              )
+                              setSelectedProductDetail(prod)
                             }}
-                            className="p-1.5 rounded-xl bg-[#25D366] hover:bg-[#20ba59] text-white flex items-center justify-center transition-transform active:scale-95 shadow-xs cursor-pointer"
-                            title="Pedir no WhatsApp"
-                            aria-label="Pedir no WhatsApp"
+                            className="flex-1 py-1.5 px-2 rounded-xl text-[11px] sm:text-xs font-bold flex items-center justify-center gap-1 transition-all cursor-pointer shadow-2xs active:scale-[0.98]"
+                            style={{
+                              backgroundColor: activeTheme.colors.buttonBg,
+                              color: activeTheme.colors.buttonText,
+                            }}
                           >
-                            <MessageCircle className="w-3.5 h-3.5 fill-white" />
+                            <span>Ver produto</span>
+                            <ChevronRight className="w-3 h-3" />
                           </button>
-                        )}
+
+                          {company.whatsapp && (
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation()
+                                const raw = company.whatsapp || ''
+                                const clean = raw.replace(/\D/g, '')
+                                const phoneWithDdi = clean.startsWith('55') ? clean : `55${clean}`
+                                const msg = encodeURIComponent(
+                                  `Olá! Gostei do produto "${prod.name}" no DiretoLink e gostaria de saber mais.`
+                                )
+                                window.open(
+                                  `https://wa.me/${phoneWithDdi}?text=${msg}`,
+                                  '_blank',
+                                  'noopener,noreferrer'
+                                )
+                              }}
+                              className="p-1.5 rounded-xl bg-[#25D366] hover:bg-[#20ba59] text-white flex items-center justify-center transition-transform active:scale-95 shadow-xs cursor-pointer shrink-0"
+                              title="Pedir no WhatsApp"
+                              aria-label="Pedir no WhatsApp"
+                            >
+                              <MessageCircle className="w-3.5 h-3.5 fill-white" />
+                            </button>
+                          )}
+                        </div>
                       </div>
                     </div>
                   )
@@ -1784,220 +1683,76 @@ export const PublicCompanyView: React.FC<PublicCompanyViewProps> = ({
               )}
             </div>
           ) : (activeModules.products && isExternalCatalog && company.productCatalog?.externalUrl) ? (
-            <div
-              className={`rounded-3xl p-4.5 sm:p-5 border flex items-center justify-between gap-3 ${
-                isDark
-                  ? 'bg-[#121217] border-white/[0.08] shadow-sm'
-                  : 'bg-white border-neutral-200/80 shadow-2xs'
-              }`}
-            >
-              <div className="flex items-center gap-3 min-w-0">
-                <div
-                  className="w-10 h-10 rounded-2xl flex items-center justify-center text-white shadow-xs shrink-0"
-                  style={{ backgroundColor: primaryColor }}
-                >
-                  <ShoppingBag className="w-5 h-5" />
-                </div>
-                <div className="min-w-0">
-                  <h4
-                    className={`font-black text-xs sm:text-sm truncate ${
-                      isDark ? 'text-white' : 'text-neutral-900'
-                    }`}
-                  >
-                    {company.productCatalog?.externalButtonText || 'Ver Catálogo'}
-                  </h4>
-                  <p
-                    className={`text-[11px] truncate mt-0.5 ${
-                      isDark ? 'text-neutral-400' : 'text-neutral-500'
-                    }`}
-                  >
-                    Acesse nossa loja oficial e veja todos os produtos disponíveis
-                  </p>
-                </div>
-              </div>
-
-              <button
-                type="button"
-                onClick={handleOpenCatalogExternal}
-                className="px-4 py-2.5 rounded-xl font-bold text-xs text-white shadow-sm flex items-center gap-1.5 shrink-0 transition-opacity hover:opacity-90 active:scale-95 cursor-pointer"
-                style={{ backgroundColor: primaryColor }}
-              >
-                <span>{company.productCatalog?.externalButtonText || 'Ver Catálogo'}</span>
-                <ExternalLink className="w-3.5 h-3.5 opacity-80" />
-              </button>
-            </div>
+            <PublicCard
+              key="products-external"
+              icon={<ShoppingBag className="w-5 h-5 text-white" />}
+              iconContainerStyle={{ backgroundColor: primaryColor }}
+              title={company.productCatalog?.externalButtonText || 'Ver Catálogo'}
+              subtitle="Acesse nossa loja oficial e veja todos os produtos"
+              actionText={company.productCatalog?.externalButtonText || 'Ver Catálogo'}
+              actionIcon={<ExternalLink className="w-3.5 h-3.5" />}
+              actionVariant="theme"
+              onAction={handleOpenCatalogExternal}
+              onClick={handleOpenCatalogExternal}
+              isDark={isDark}
+              cardStyle={themedCardStyle}
+              primaryColor={primaryColor}
+              buttonBgColor={primaryColor}
+              buttonTextColor="#ffffff"
+            />
           ) : activeModules.products ? (
-            <div
+            <PublicCard
               key="products-card"
+              icon={<Package className="w-5 h-5 text-white" />}
+              iconContainerStyle={{ backgroundColor: primaryColor }}
+              title="Catálogo de Produtos"
+              badgeText={activeProductsList.length > 0 ? `${activeProductsList.length}` : undefined}
+              badgeVariant="violet"
+              subtitle={
+                activeProductsList.length > 0
+                  ? `${activeProductsList.length} produtos disponíveis para conferir`
+                  : 'Conheça nossa seleção de produtos disponíveis'
+              }
+              actionText="Ver Produtos"
+              actionIcon={<ChevronRight className="w-3.5 h-3.5" />}
+              actionVariant="theme"
+              onAction={() => setIsProductsSheetOpen(true)}
               onClick={() => setIsProductsSheetOpen(true)}
-              className="group rounded-3xl p-4 sm:p-4.5 border flex items-center justify-between gap-3 shadow-xs hover:shadow-md transition-all cursor-pointer select-none"
-              style={themedCardStyle}
-            >
-              <div className="flex items-center gap-3 min-w-0">
-                <div
-                  className="w-10 h-10 rounded-2xl flex items-center justify-center text-white shadow-xs shrink-0 group-hover:scale-105 transition-transform"
-                  style={{ backgroundColor: primaryColor }}
-                >
-                  <Package className="w-5 h-5" />
-                </div>
-                <div className="min-w-0">
-                  <div className="flex items-center gap-2">
-                    <h4 className={`text-xs sm:text-sm font-bold truncate ${isDark ? 'text-white' : 'text-neutral-900'}`}>
-                      Catálogo de Produtos
-                    </h4>
-                    {activeProductsList.length > 0 && (
-                      <span className="text-[10px] font-bold px-2 py-0.2 rounded-full bg-violet-500/10 text-violet-600 dark:text-violet-400">
-                        {activeProductsList.length}
-                      </span>
-                    )}
-                  </div>
-                  <p className={`text-[11px] truncate mt-0.5 ${isDark ? 'text-neutral-400' : 'text-neutral-500'}`}>
-                    {activeProductsList.length > 0
-                      ? `${activeProductsList.length} produtos disponíveis para conferir`
-                      : 'Conheça nossa seleção de produtos disponíveis'}
-                  </p>
-                </div>
-              </div>
-              <button
-                type="button"
-                onClick={(e) => {
-                  e.stopPropagation()
-                  setIsProductsSheetOpen(true)
-                }}
-                className="px-3.5 py-2 rounded-xl text-xs font-bold text-white shadow-xs flex items-center gap-1 shrink-0 transition-all hover:opacity-90 active:scale-95 cursor-pointer"
-                style={{ backgroundColor: primaryColor }}
-              >
-                <span>Ver Produtos</span>
-                <ChevronRight className="w-3.5 h-3.5" />
-              </button>
-            </div>
+              isDark={isDark}
+              cardStyle={themedCardStyle}
+              primaryColor={primaryColor}
+              buttonBgColor={primaryColor}
+              buttonTextColor="#ffffff"
+            />
           ) : null,
-              appointments: (activeModules.appointments && (
-                isAppointmentsShortcutMode ? (
-                  <div
-                    key="appointments-card"
-                    onClick={() => {
-                      setBookingService(null)
-                      setIsBookingOpen(true)
-                    }}
-                    className="group rounded-3xl p-4 sm:p-4.5 border flex items-center justify-between gap-3 shadow-xs hover:shadow-md transition-all cursor-pointer select-none"
-                    style={themedCardStyle}
-                  >
-                    <div className="flex items-center gap-3 min-w-0">
-                      <div
-                        className="w-10 h-10 rounded-2xl flex items-center justify-center text-white shadow-xs shrink-0 group-hover:scale-105 transition-transform"
-                        style={{ backgroundColor: primaryColor }}
-                      >
-                        <Calendar className="w-5 h-5" />
-                      </div>
-                      <div className="min-w-0">
-                        <h4 className={`text-xs sm:text-sm font-bold truncate ${isDark ? 'text-white' : 'text-neutral-900'}`}>
-                          Agendamento Online
-                        </h4>
-                        <p className={`text-[11px] truncate mt-0.5 ${isDark ? 'text-neutral-400' : 'text-neutral-500'}`}>
-                          Reserve seu horário em poucos toques
-                        </p>
-                      </div>
-                    </div>
-                    <button
-                      type="button"
-                      onClick={(e) => {
-                        e.stopPropagation()
-                        setBookingService(null)
-                        setIsBookingOpen(true)
-                      }}
-                      className="px-3.5 py-2 rounded-xl text-xs font-bold text-white shadow-xs flex items-center gap-1 shrink-0 transition-all hover:opacity-90 active:scale-95 cursor-pointer"
-                      style={{ backgroundColor: primaryColor }}
-                    >
-                      <span>Agendar</span>
-                      <ChevronRight className="w-3.5 h-3.5" />
-                    </button>
-                  </div>
-                ) : (
-                  <div
-                    key="appointments-full"
-                    className="rounded-3xl p-4.5 sm:p-5 border space-y-3.5 transition-all shadow-xs"
-                    style={themedCardStyle}
-                  >
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-2.5">
-                        <div
-                          className="w-9 h-9 rounded-xl flex items-center justify-center text-white shadow-xs"
-                          style={{ backgroundColor: primaryColor }}
-                        >
-                          <Calendar className="w-5 h-5" />
-                        </div>
-                        <div>
-                          <h3
-                            className={`text-sm font-black tracking-tight ${
-                              isDark ? 'text-white' : 'text-neutral-900'
-                            }`}
-                          >
-                            Agendamento Online
-                          </h3>
-                          <p
-                            className={`text-[11px] ${
-                              isDark ? 'text-neutral-400' : 'text-neutral-500'
-                            }`}
-                          >
-                            {company.bookingSettings?.mode === 'whatsapp'
-                              ? 'Agende seu horário diretamente pelo WhatsApp da empresa'
-                              : 'Escolha um serviço e reserve seu horário em poucos toques'}
-                          </p>
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Serviços em destaque para agendamento direto se houver serviços cadastrados */}
-                    {activeServicesList.length > 0 && (
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-1">
-                        {activeServicesList.slice(0, 4).map((srv) => (
-                          <div
-                            key={srv.id}
-                            onClick={() => handleInitiateBooking(srv)}
-                            className={`p-2.5 rounded-xl border flex items-center justify-between gap-2 cursor-pointer transition-all hover:border-violet-300 ${
-                              isDark ? 'bg-white/[0.03] border-white/10' : 'bg-neutral-50 border-neutral-200/70'
-                            }`}
-                          >
-                            <div className="min-w-0">
-                              <p className={`text-xs font-bold truncate ${isDark ? 'text-white' : 'text-neutral-800'}`}>
-                                {srv.name}
-                              </p>
-                              {srv.price != null && (
-                                <p className="text-[10px] font-mono text-neutral-500">
-                                  R$ {srv.price.toFixed(2).replace('.', ',')}
-                                </p>
-                              )}
-                            </div>
-                            <span
-                              className="text-[10px] font-bold px-2 py-1 rounded-lg text-white shrink-0"
-                              style={{ backgroundColor: primaryColor }}
-                            >
-                              Agendar
-                            </span>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-
-                    <button
-                      type="button"
-                      onClick={() => {
-                        handleInitiateBooking(null)
-                      }}
-                      className="w-full py-2.5 px-4 rounded-xl font-bold text-xs text-white shadow-xs flex items-center justify-center gap-2 cursor-pointer transition-all active:scale-[0.99] hover:opacity-90"
-                      style={{ backgroundColor: primaryColor }}
-                    >
-                      <Calendar className="w-4 h-4" />
-                      <span>
-                        {company.bookingSettings?.mode === 'whatsapp'
-                          ? 'Agendar Horário pelo WhatsApp'
-                          : 'Agendar Horário Agora'}
-                      </span>
-                    </button>
-                  </div>
-                )
-              )),
+              appointments: activeModules.appointments ? (
+                <PublicCard
+                  key="appointments"
+                  icon={<Calendar className="w-5 h-5 text-indigo-400" />}
+                  iconContainerClass={
+                    isDark
+                      ? 'bg-indigo-500/15 border border-indigo-500/25'
+                      : 'bg-indigo-50 border border-indigo-200/80'
+                  }
+                  iconContainerStyle={{ color: '#6366F1' }}
+                  title="Agendamento Online"
+                  subtitle={
+                    company.bookingSettings?.mode === 'whatsapp'
+                      ? 'Agende seu horário pelo WhatsApp'
+                      : 'Reserve seu horário em poucos toques'
+                  }
+                  actionText="Agendar"
+                  actionIcon={<Calendar className="w-3.5 h-3.5" />}
+                  actionVariant="theme"
+                  onAction={() => handleInitiateBooking(null)}
+                  onClick={() => handleInitiateBooking(null)}
+                  isDark={isDark}
+                  cardStyle={themedCardStyle}
+                  primaryColor={primaryColor}
+                  buttonBgColor={activeTheme.colors.buttonBg}
+                  buttonTextColor={activeTheme.colors.buttonText}
+                />
+              ) : null,
               menu: (activeModules.menu && !isExternalMenu && !isMenuShortcutMode && activeMenuItemsList.length > 0) ? (
             <div
               id="secao-cardapio"
@@ -2319,418 +2074,194 @@ export const PublicCompanyView: React.FC<PublicCompanyViewProps> = ({
               </div>
             </div>
           ) : (activeModules.menu && isExternalMenu && company.menuUrl) ? (
-            <div
-              className={`rounded-3xl p-4.5 sm:p-5 border flex items-center justify-between gap-3 ${
-                isDark
-                  ? 'bg-[#121217] border-white/[0.08] shadow-sm'
-                  : 'bg-white border-neutral-200/80 shadow-2xs'
-              }`}
-            >
-              <div className="flex items-center gap-3 min-w-0">
-                <div
-                  className="w-10 h-10 rounded-2xl flex items-center justify-center text-white shadow-xs shrink-0"
-                  style={{ backgroundColor: primaryColor }}
-                >
-                  <BookOpen className="w-5 h-5" />
-                </div>
-                <div className="min-w-0">
-                  <h4
-                    className={`font-black text-xs sm:text-sm truncate ${
-                      isDark ? 'text-white' : 'text-neutral-900'
-                    }`}
-                  >
-                    Cardápio Digital
-                  </h4>
-                  <p
-                    className={`text-[11px] truncate mt-0.5 ${
-                      isDark ? 'text-neutral-400' : 'text-neutral-500'
-                    }`}
-                  >
-                    Acesse nosso cardápio completo e confira todas as opções
-                  </p>
-                </div>
-              </div>
-
-              <button
-                type="button"
-                onClick={handleOpenMenu}
-                className="px-4 py-2.5 rounded-xl font-bold text-xs text-white shadow-sm flex items-center gap-1.5 shrink-0 transition-opacity hover:opacity-90 active:scale-95 cursor-pointer"
-                style={{ backgroundColor: primaryColor }}
-              >
-                <span>Abrir Cardápio</span>
-                <ExternalLink className="w-3.5 h-3.5 opacity-80" />
-              </button>
-            </div>
-          ) : activeModules.menu ? (
-            <div
-              key="menu-card"
+            <PublicCard
+              key="menu-external"
+              icon={<BookOpen className="w-5 h-5 text-white" />}
+              iconContainerStyle={{ backgroundColor: primaryColor }}
+              title="Cardápio Digital"
+              subtitle="Acesse nosso cardápio completo e confira todas as opções"
+              actionText="Abrir Cardápio"
+              actionIcon={<ExternalLink className="w-3.5 h-3.5" />}
+              actionVariant="theme"
+              onAction={handleOpenMenu}
               onClick={handleOpenMenu}
-              className="group rounded-3xl p-4 sm:p-4.5 border flex items-center justify-between gap-3 shadow-xs hover:shadow-md transition-all cursor-pointer select-none"
-              style={themedCardStyle}
-            >
-              <div className="flex items-center gap-3 min-w-0">
-                <div
-                  className="w-10 h-10 rounded-2xl flex items-center justify-center text-white shadow-xs shrink-0 group-hover:scale-105 transition-transform"
-                  style={{ backgroundColor: primaryColor || '#7A1228' }}
-                >
-                  <UtensilsCrossed className="w-5 h-5" />
-                </div>
-                <div className="min-w-0">
-                  <div className="flex items-center gap-2">
-                    <h4 className={`text-xs sm:text-sm font-bold truncate ${isDark ? 'text-white' : 'text-neutral-900'}`}>
-                      Cardápio Digital
-                    </h4>
-                    {activeMenuItemsList.length > 0 && (
-                      <span className="text-[10px] font-bold px-2 py-0.2 rounded-full bg-teal-500/10 text-teal-600 dark:text-teal-400">
-                        {activeMenuItemsList.length}
-                      </span>
-                    )}
-                  </div>
-                  <p className={`text-[11px] truncate mt-0.5 ${isDark ? 'text-neutral-400' : 'text-neutral-500'}`}>
-                    {activeMenuItemsList.length > 0
-                      ? `${activeMenuItemsList.length} itens disponíveis para pedir agora`
-                      : 'Confira nossas opções de pratos, porções e bebidas'}
-                  </p>
-                </div>
-              </div>
-              <button
-                type="button"
-                onClick={(e) => {
-                  e.stopPropagation()
-                  handleOpenMenu()
-                }}
-                className="px-3.5 py-2 rounded-xl text-xs font-bold text-white shadow-xs flex items-center gap-1 shrink-0 transition-all hover:opacity-90 active:scale-95 cursor-pointer"
-                style={{ backgroundColor: primaryColor || '#7A1228' }}
-              >
-                <span>Ver Cardápio</span>
-                <ChevronRight className="w-3.5 h-3.5" />
-              </button>
-            </div>
+              isDark={isDark}
+              cardStyle={themedCardStyle}
+              primaryColor={primaryColor}
+              buttonBgColor={primaryColor}
+              buttonTextColor="#ffffff"
+            />
+          ) : activeModules.menu ? (
+            <PublicCard
+              key="menu-card"
+              icon={<UtensilsCrossed className="w-5 h-5 text-white" />}
+              iconContainerStyle={{ backgroundColor: primaryColor || '#7A1228' }}
+              title="Cardápio Digital"
+              badgeText={activeMenuItemsList.length > 0 ? `${activeMenuItemsList.length}` : undefined}
+              badgeVariant="theme"
+              subtitle={
+                activeMenuItemsList.length > 0
+                  ? `${activeMenuItemsList.length} itens disponíveis para pedir agora`
+                  : 'Confira nossas opções de pratos, porções e bebidas'
+              }
+              actionText="Ver Cardápio"
+              actionIcon={<ChevronRight className="w-3.5 h-3.5" />}
+              actionVariant="theme"
+              onAction={handleOpenMenu}
+              onClick={handleOpenMenu}
+              isDark={isDark}
+              cardStyle={themedCardStyle}
+              primaryColor={primaryColor}
+              buttonBgColor={primaryColor || '#7A1228'}
+              buttonTextColor="#ffffff"
+            />
           ) : null,
               loyalty: activeModules.loyalty ? (
-            <div
-              className={`rounded-3xl p-4.5 sm:p-5 border relative overflow-hidden space-y-3.5 ${
-                isDark
-                  ? 'border-white/[0.08] shadow-sm'
-                  : 'shadow-2xs'
-              }`}
-              style={{
-                background: isDark
-                  ? `linear-gradient(135deg, ${hexToRgba(primaryColor, 0.16)} 0%, ${activeTheme.cardBg} 50%, ${hexToRgba(secondaryColor, 0.1)} 100%)`
-                  : `linear-gradient(135deg, ${hexToRgba(primaryColor, 0.05)} 0%, ${activeTheme.cardBg} 50%, ${hexToRgba(secondaryColor, 0.07)} 100%)`,
-                borderColor: hexToRgba(primaryColor, isDark ? 0.28 : 0.2),
-              }}
-            >
-              {/* Efeito decorativo sutil */}
-              <div
-                className="absolute top-0 right-0 w-32 h-32 rounded-full blur-2xl pointer-events-none opacity-20"
-                style={{ backgroundColor: primaryColor }}
-              />
-
-              <div className="flex items-center justify-between relative z-10">
-                <div className="flex items-center gap-2.5">
-                  <div
-                    className="w-9 h-9 rounded-xl flex items-center justify-center shadow-xs text-white"
-                    style={{
-                      background: gradientBg,
-                      color: contrastText,
-                    }}
-                  >
-                    <Gift className="w-5 h-5" />
-                  </div>
-                  <div>
-                    <span
-                      className="text-[10px] font-bold uppercase tracking-wider block"
-                      style={{ color: primaryColor }}
-                    >
-                      Programa de Fidelidade
-                    </span>
-                    <h3
-                      className={`text-sm font-black tracking-tight ${
-                        isDark ? 'text-white' : 'text-neutral-900'
-                      }`}
-                    >
-                      {loyaltyProgram.campaignName || 'Cartão Fidelidade'}
-                    </h3>
-                  </div>
-                </div>
-
-                {hasAvailableReward ? (
-                  <span className="px-2.5 py-1 rounded-full bg-emerald-500/20 text-emerald-300 text-[10px] font-extrabold uppercase tracking-wide border border-emerald-500/40 flex items-center gap-1">
-                    <Award className="w-3 h-3" />
-                    <span>Prêmio Pronto!</span>
-                  </span>
-                ) : (
-                  <span
-                    className="text-[11px] font-bold font-mono px-2 py-0.5 rounded-full"
-                    style={{
-                      backgroundColor: hexToRgba(primaryColor, isDark ? 0.2 : 0.1),
-                      color: isDark ? '#ffffff' : primaryColor,
-                    }}
-                  >
-                    Meta: {loyaltyProgram.goalPoints} pts
-                  </span>
-                )}
-              </div>
-
-              {loyaltyProgram.rewardDescription && (
-                <p
-                  className={`text-xs leading-relaxed relative z-10 ${
-                    isDark ? 'text-neutral-300' : 'text-neutral-600'
-                  }`}
-                >
-                  Acumule pontos em cada visita e ganhe <strong className="font-bold" style={{ color: isDark ? '#fcd34d' : primaryColor }}>&ldquo;{loyaltyProgram.rewardDescription}&rdquo;</strong>.
-                </p>
-              )}
-
-              {/* Botão de Ação: Ver Meu Cartão */}
-              <button
-                type="button"
-                onClick={() => setIsLoyaltyOpen(true)}
-                className="w-full py-2.5 px-4 rounded-xl text-xs font-bold shadow-xs hover:opacity-95 active:scale-[0.99] transition-all flex items-center justify-center gap-2 cursor-pointer relative z-10"
-                style={{
-                  background: gradientBg,
-                  color: contrastText,
-                }}
-              >
-                <Gift className="w-3.5 h-3.5" />
-                <span>
-                  {hasAvailableReward ? 'Resgatar Prêmio Disponível' : 'Ver Meu Cartão Fidelidade'}
-                </span>
-                <ChevronRight className="w-3.5 h-3.5 opacity-80" />
-              </button>
-            </div>
-          ) : null,
-              googleReview: activeModules.googleReview ? (
-            <div
-              className="rounded-3xl p-4.5 sm:p-5 space-y-3.5 border shadow-xs"
-              style={themedCardStyle}
-            >
-              <div className="flex items-center justify-between">
-                {/* Badge Oficial Google */}
-                <div className="flex items-center gap-2">
-                  <div
-                    className={`w-7 h-7 rounded-lg flex items-center justify-center shadow-2xs ${
-                      isDark
-                        ? 'bg-neutral-800/90 border border-white/10'
-                        : 'bg-neutral-100 border border-neutral-200/60'
-                    }`}
-                  >
-                    <GoogleColoredIcon className="w-4 h-4 shrink-0" />
-                  </div>
-                  <div>
-                    <span
-                      className={`text-xs font-bold tracking-tight block ${
-                        isDark ? 'text-neutral-200' : 'text-neutral-800'
-                      }`}
-                    >
-                      Avaliações do Google
-                    </span>
-                    <div className="flex items-center gap-0.5 mt-0.5">
-                      {[...Array(5)].map((_, i) => (
-                        <Star
-                          key={i}
-                          className="w-3 h-3 fill-amber-400 text-amber-400"
-                        />
-                      ))}
-                    </div>
-                  </div>
-                </div>
-
-                <div className="text-right">
-                  <span
-                    className={`text-sm font-black block leading-none ${
-                      isDark ? 'text-white' : 'text-neutral-900'
-                    }`}
-                  >
-                    {company.rating ? company.rating.toFixed(1) : '4.9'}
-                  </span>
-                  <span
-                    className={`text-[10px] font-normal ${
-                      isDark ? 'text-neutral-400' : 'text-neutral-400'
-                    }`}
-                  >
-                    {company.reviewCount || '120+'} opiniões
-                  </span>
-                </div>
-              </div>
-
-              <div>
-                <h4
-                  className={`text-sm font-black tracking-tight ${
-                    isDark ? 'text-white' : 'text-neutral-900'
-                  }`}
-                >
-                  Sua opinião faz a diferença!
-                </h4>
-                <p
-                  className={`text-xs mt-0.5 leading-relaxed ${
-                    isDark ? 'text-neutral-400' : 'text-neutral-500'
-                  }`}
-                >
-                  Avalie sua experiência na {company.name} no Google. Leva menos de 1 minuto e nos ajuda muito a continuar evoluindo.
-                </p>
-              </div>
-
-              {/* Botão de Avaliar no Google */}
-              <button
-                type="button"
-                onClick={handleGoogleReview}
-                className="w-full py-2.5 px-4 rounded-xl bg-amber-500 hover:bg-amber-600 active:scale-[0.99] text-white font-bold text-xs flex items-center justify-center gap-2 shadow-xs transition-all cursor-pointer"
-              >
-                <Star className="w-3.5 h-3.5 fill-white text-white" />
-                <span>Avaliar no Google</span>
-                <ExternalLink className="w-3.5 h-3.5 opacity-80" />
-              </button>
-            </div>
-          ) : null,
-              location: activeModules.location ? (
-            <div key="location" className="pt-1">
-              <div
-                onClick={handleOpenLocation}
-                className="w-full rounded-2xl p-3 flex items-center justify-between gap-3 active:scale-[0.99] transition-all cursor-pointer group border shadow-2xs hover:shadow-xs"
-                style={{
-                  WebkitTapHighlightColor: 'transparent',
-                  backgroundColor: activeTheme.cardBg,
-                  borderColor: activeTheme.cardBorder,
-                }}
-              >
-                <div className="flex items-center gap-2.5 min-w-0">
-                  <div
-                    className={`w-8 h-8 rounded-xl flex items-center justify-center shrink-0 border ${
-                      isDark
-                        ? 'bg-rose-950/40 text-rose-400 border-rose-500/20'
-                        : 'bg-rose-50 text-rose-600 border-rose-100'
-                    }`}
-                  >
-                    <MapPin className="w-4 h-4" />
-                  </div>
-                  <div className="min-w-0">
-                    <p
-                      className={`text-xs font-bold truncate ${
-                        isDark ? 'text-white' : 'text-neutral-900'
-                      }`}
-                    >
-                      Localização e Endereço
-                    </p>
-                    <p
-                      className={`text-[11px] truncate mt-0.5 ${
-                        isDark ? 'text-neutral-400' : 'text-neutral-500'
-                      }`}
-                    >
-                      {company.addressText || 'Como chegar ao nosso estabelecimento'}
-                    </p>
-                  </div>
-                </div>
-                <div
-                  className={`shrink-0 px-2.5 py-1 rounded-lg text-[11px] font-bold transition-colors flex items-center gap-1 ${
+                <PublicCard
+                  key="loyalty"
+                  icon={<Gift className="w-5 h-5 text-orange-400" />}
+                  iconContainerClass={
                     isDark
-                      ? 'bg-rose-950/40 text-rose-300 border border-rose-500/30 group-hover:bg-rose-900/50'
-                      : 'bg-rose-50 text-rose-700 group-hover:bg-rose-100'
-                  }`}
-                >
-                  <Navigation className="w-3 h-3" />
-                  <span>Como Chegar</span>
-                </div>
-              </div>
-            </div>
-          ) : null,
-              wifi: (activeModules.wifi && (
-                <div
+                      ? 'bg-orange-500/15 border border-orange-500/25'
+                      : 'bg-orange-50 border border-orange-200/80'
+                  }
+                  iconContainerStyle={{ color: '#F97316' }}
+                  title={loyaltyProgram.campaignName || 'Programa de Fidelidade'}
+                  badgeText={hasAvailableReward ? 'Prêmio!' : `Meta: ${loyaltyProgram.goalPoints} pts`}
+                  badgeVariant={hasAvailableReward ? 'emerald' : 'amber'}
+                  subtitle={
+                    hasAvailableReward
+                      ? 'Prêmio pronto para resgate!'
+                      : customerPoints !== null
+                      ? `${customerPoints}/${loyaltyProgram.goalPoints} pontos acumulados`
+                      : loyaltyProgram.rewardDescription
+                      ? `Ganhe: ${loyaltyProgram.rewardDescription}`
+                      : 'Ganhe prêmios e bônus a cada visita'
+                  }
+                  actionText={hasAvailableReward ? 'Resgatar' : 'Ver Cartão'}
+                  actionIcon={<Gift className="w-3.5 h-3.5" />}
+                  actionVariant="theme"
+                  onAction={() => setIsLoyaltyOpen(true)}
+                  onClick={() => setIsLoyaltyOpen(true)}
+                  isDark={isDark}
+                  cardStyle={themedCardStyle}
+                  primaryColor={primaryColor}
+                  buttonBgColor={activeTheme.colors.buttonBg}
+                  buttonTextColor={activeTheme.colors.buttonText}
+                />
+              ) : null,
+              googleReview: activeModules.googleReview ? (
+                <PublicCard
+                  key="googleReview"
+                  icon={<GoogleColoredIcon className="w-5 h-5 shrink-0" />}
+                  iconContainerClass={
+                    isDark
+                      ? 'bg-neutral-800/90 border border-white/10'
+                      : 'bg-white border border-neutral-200/80 shadow-2xs'
+                  }
+                  title="Avaliações do Google"
+                  badgeText={`${company.rating ? company.rating.toFixed(1) : '5.0'}★`}
+                  badgeVariant="amber"
+                  subtitle={`${company.reviewCount || '120+'} avaliações • Avalie sua experiência`}
+                  actionText="Avaliar"
+                  actionIcon={<ExternalLink className="w-3.5 h-3.5" />}
+                  actionVariant="google"
+                  onAction={handleGoogleReview}
+                  onClick={handleGoogleReview}
+                  isDark={isDark}
+                  cardStyle={themedCardStyle}
+                  primaryColor={primaryColor}
+                />
+              ) : null,
+              location: activeModules.location ? (
+                <PublicCard
+                  key="location"
+                  icon={<Navigation className="w-5 h-5 text-rose-500" />}
+                  iconContainerClass={
+                    isDark
+                      ? 'bg-rose-950/40 border border-rose-500/30'
+                      : 'bg-rose-50 border border-rose-100'
+                  }
+                  title="Localização e Endereço"
+                  subtitle={company.addressText || 'Como chegar ao nosso estabelecimento'}
+                  actionText="Como Chegar"
+                  actionIcon={<Navigation className="w-3.5 h-3.5" />}
+                  actionVariant="rose"
+                  onAction={handleOpenLocation}
+                  onClick={handleOpenLocation}
+                  isDark={isDark}
+                  cardStyle={themedCardStyle}
+                  primaryColor={primaryColor}
+                />
+              ) : null,
+              wifi: activeModules.wifi ? (
+                <PublicCard
                   key="wifi"
-                  className="rounded-3xl p-4 sm:p-4.5 border flex items-center justify-between gap-3 shadow-xs"
-                  style={themedCardStyle}
-                >
-                  <div className="flex items-center gap-3 min-w-0">
-                    <div className="w-9 h-9 rounded-xl bg-cyan-500/15 text-cyan-400 border border-cyan-500/30 flex items-center justify-center shrink-0">
-                      <Wifi className="w-5 h-5" />
-                    </div>
-                    <div className="min-w-0">
-                      <h4 className={`text-xs font-bold truncate ${isDark ? 'text-white' : 'text-neutral-900'}`}>
-                        {company.wifi?.ssid ? `Wi-Fi Grátis: ${company.wifi.ssid}` : 'Wi-Fi Grátis Disponível'}
-                      </h4>
-                      <p className={`text-[11px] truncate ${isDark ? 'text-neutral-400' : 'text-neutral-500'}`}>
-                        Toque para ver a senha e conectar
-                      </p>
-                    </div>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => setIsWifiOpen(true)}
-                    className="px-3.5 py-1.5 rounded-xl text-xs font-bold bg-cyan-600 hover:bg-cyan-500 text-white shrink-0 cursor-pointer shadow-xs active:scale-95 transition-all"
-                  >
-                    Conectar
-                  </button>
-                </div>
-              )),
-              feedback: (activeModules.feedback && (
-                <div
+                  icon={<Wifi className="w-5 h-5 text-sky-400" />}
+                  iconContainerClass={
+                    isDark
+                      ? 'bg-sky-500/15 border border-sky-500/25'
+                      : 'bg-sky-50 border border-sky-200/80'
+                  }
+                  iconContainerStyle={{ color: '#0284C7' }}
+                  title="Wi-Fi Grátis"
+                  subtitle={company.wifi?.ssid ? `Rede: ${company.wifi.ssid}` : 'Toque para ver a senha e conectar'}
+                  actionText="Conectar"
+                  actionIcon={<Wifi className="w-3.5 h-3.5" />}
+                  actionVariant="wifi"
+                  onAction={handleOpenWifi}
+                  onClick={handleOpenWifi}
+                  isDark={isDark}
+                  cardStyle={themedCardStyle}
+                  primaryColor={primaryColor}
+                />
+              ) : null,
+              feedback: activeModules.feedback ? (
+                <PublicCard
                   key="feedback"
-                  className="rounded-3xl p-4 sm:p-4.5 border flex items-center justify-between gap-3 shadow-xs"
-                  style={themedCardStyle}
-                >
-                  <div className="flex items-center gap-3 min-w-0">
-                    <div
-                      className="w-9 h-9 rounded-xl border flex items-center justify-center shrink-0"
-                      style={{
-                        backgroundColor: hexToRgba(primaryColor, isDark ? 0.15 : 0.08),
-                        borderColor: hexToRgba(primaryColor, isDark ? 0.3 : 0.2),
-                        color: primaryColor,
-                      }}
-                    >
-                      <MessageSquareHeart className="w-5 h-5" />
-                    </div>
-                    <div className="min-w-0">
-                      <h4 className={`text-xs font-bold truncate ${isDark ? 'text-white' : 'text-neutral-900'}`}>
-                        Feedback Privado
-                      </h4>
-                      <p className={`text-[11px] truncate ${isDark ? 'text-neutral-400' : 'text-neutral-500'}`}>
-                        Envie sua mensagem direta à administração
-                      </p>
-                    </div>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => setIsFeedbackOpen(true)}
-                    className="px-3.5 py-1.5 rounded-xl text-xs font-bold shrink-0 cursor-pointer shadow-xs active:scale-95 transition-all hover:opacity-90"
-                    style={{
-                      backgroundColor: activeTheme.colors.buttonBg,
-                      color: activeTheme.colors.buttonText,
-                    }}
-                  >
-                    Opinar
-                  </button>
-                </div>
-              )),
-              instagram: (activeModules.instagram && (
-                <div
+                  icon={<MessageSquareHeart className="w-5 h-5 text-pink-400" />}
+                  iconContainerClass={
+                    isDark
+                      ? 'bg-pink-500/15 border border-pink-500/25'
+                      : 'bg-pink-50 border border-pink-200/80'
+                  }
+                  iconContainerStyle={{ color: '#EC4899' }}
+                  title="Feedback Privado"
+                  subtitle="Envie sua mensagem direta à administração"
+                  actionText="Opinar"
+                  actionIcon={<MessageSquareHeart className="w-3.5 h-3.5" />}
+                  actionVariant="theme"
+                  onAction={() => setIsFeedbackOpen(true)}
+                  onClick={() => setIsFeedbackOpen(true)}
+                  isDark={isDark}
+                  cardStyle={themedCardStyle}
+                  primaryColor={primaryColor}
+                  buttonBgColor={activeTheme.colors.buttonBg}
+                  buttonTextColor={activeTheme.colors.buttonText}
+                />
+              ) : null,
+              instagram: activeModules.instagram ? (
+                <PublicCard
                   key="instagram"
-                  className="rounded-3xl p-4 sm:p-4.5 border flex items-center justify-between gap-3 shadow-xs"
-                  style={themedCardStyle}
-                >
-                  <div className="flex items-center gap-3 min-w-0">
-                    <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-amber-500 via-rose-500 to-purple-600 text-white flex items-center justify-center shrink-0 shadow-xs">
-                      <Instagram className="w-5 h-5" />
-                    </div>
-                    <div className="min-w-0">
-                      <h4 className={`text-xs font-bold truncate ${isDark ? 'text-white' : 'text-neutral-900'}`}>
-                        {company.instagram ? `@${company.instagram.replace(/^@/, '')}` : 'Instagram Oficial'}
-                      </h4>
-                      <p className={`text-[11px] truncate ${isDark ? 'text-neutral-400' : 'text-neutral-500'}`}>
-                        Siga nosso perfil oficial no Instagram
-                      </p>
-                    </div>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={handleOpenInstagram}
-                    className="px-3.5 py-1.5 rounded-xl text-xs font-bold bg-pink-600 hover:bg-pink-500 text-white shrink-0 cursor-pointer shadow-xs active:scale-95 transition-all flex items-center gap-1"
-                  >
-                    <span>Seguir</span>
-                    <ExternalLink className="w-3.5 h-3.5" />
-                  </button>
-                </div>
-              )),
+                  icon={<Instagram className="w-5 h-5 text-white" />}
+                  iconContainerClass="shadow-xs border border-white/10"
+                  iconContainerStyle={{
+                    background:
+                      'linear-gradient(45deg, #f09433 0%, #e6683c 25%, #dc2743 50%, #cc2366 75%, #bc1888 100%)',
+                    color: '#ffffff',
+                  }}
+                  title={company.instagram ? `@${company.instagram.replace(/^@/, '')}` : 'Instagram Oficial'}
+                  subtitle="Siga nosso perfil oficial no Instagram"
+                  actionText="Seguir"
+                  actionIcon={<ExternalLink className="w-3.5 h-3.5" />}
+                  actionVariant="instagram"
+                  onAction={handleOpenInstagram}
+                  onClick={handleOpenInstagram}
+                  isDark={isDark}
+                  cardStyle={themedCardStyle}
+                  primaryColor={primaryColor}
+                />
+              ) : null,
             }
 
             return effectivePageOrder.map((sectionKey) => {
