@@ -288,6 +288,7 @@ export const MenuSheet: React.FC<MenuSheetProps> = ({
                               sizes="(max-width: 640px) 80px, 90px"
                               className="object-cover"
                               referrerPolicy="no-referrer"
+                              unoptimized={Boolean(typeof item.photoUrl === 'string' && item.photoUrl.includes('ibb.co'))}
                             />
                             {hasPromotional && !isSoldOut && (
                               <div className="absolute top-1 left-1 px-1.5 py-0.5 rounded-md bg-rose-600 text-white font-black text-[9px] shadow-xs flex items-center gap-0.5">

@@ -259,6 +259,20 @@ export interface AdvancedColorsConfig {
   borderColor?: string // Cor das bordas/detalhes
 }
 
+export type PixKeyType = 'cpf_cnpj' | 'phone' | 'email' | 'random'
+
+export interface CompanyPaymentConfig {
+  acceptPix: boolean
+  acceptCash: boolean
+  acceptDebitCard: boolean
+  acceptCreditCard: boolean
+  acceptMealVoucher: boolean
+  pixReceiverName?: string
+  pixKey?: string
+  pixKeyType?: PixKeyType
+  pixShowUpfront?: boolean // "Exibir Pix para pagamento antecipado"
+}
+
 export interface Company {
   id: string
   slug: string
@@ -301,6 +315,15 @@ export interface Company {
   rating?: number
   reviewCount?: number
   bookingSettings?: BookingSettings
+  paymentConfig?: CompanyPaymentConfig // Configurações de formas de pagamento e Pix
+  // Ajustes de enquadramento da foto de capa
+  coverFit?: 'cover' | 'contain'
+  coverPositionX?: 'left' | 'center' | 'right' | string
+  coverPositionY?: 'top' | 'center' | 'bottom' | string
+  coverZoom?: number
+  // Configurações da Central de Pedidos
+  autoAcceptOrders?: boolean // Aceitar pedidos automaticamente (vai direto para Em Preparo)
+  soundAlertNewOrders?: boolean // Alerta sonoro quando chegar novo pedido
   ownerAuth?: CompanyOwnerAuth
   origin?: 'admin' | 'self_service'
   onboardingCompleted?: boolean
@@ -392,9 +415,38 @@ export interface CompanyTable {
   updatedAt?: string
 }
 
-export type TableOrderStatus = 'novo' | 'aceito' | 'preparo' | 'pronto' | 'finalizado' | 'entregue'
+export type TableOrderStatus =
+  | 'novo'
+  | 'aceito'
+  | 'preparo'
+  | 'pronto'
+  | 'pronto_retirada'
+  | 'servido'
+  | 'saiu_entrega'
+  | 'entregue'
+  | 'finalizado'
+  | 'cancelado'
 
 export type OrderOrigin = 'mesa' | 'retirada' | 'entrega'
+
+export interface TableOrderHistoryEvent {
+  id: string
+  timestamp: string
+  action: string
+  description?: string
+  performedBy?: string
+}
+
+export interface CompanyCourier {
+  id: string
+  companyId: string
+  name: string
+  phone: string
+  isActive: boolean
+  notes?: string
+  createdAt?: string
+  updatedAt?: string
+}
 
 export interface TableOrderItem {
   id: string
@@ -411,6 +463,14 @@ export interface TableOrderItem {
   customSteps?: Array<{ stepTitle: string; options: string[] }>
 }
 
+export type OrderPaymentStatus =
+  | 'pending'
+  | 'awaiting_confirmation'
+  | 'paid'
+  | 'not_found'
+  | 'payment_on_delivery'
+  | 'cancelled'
+
 export interface TableOrder {
   id: string
   companyId: string
@@ -422,10 +482,37 @@ export interface TableOrder {
   customerPhone?: string
   deliveryAddress?: string
   address?: string
-  items: TableOrderItem[]
+  addressNumber?: string
+  neighborhood?: string
+  complement?: string
+  referencePoint?: string
+  city?: string
+  locationUrl?: string | null
+  // Forma e status do pagamento (independente do status operacional do pedido)
+  paymentMethod?: string // 'pix' | 'dinheiro' | 'cartao_debito' | 'cartao_credito' | 'vale_refeicao' | etc.
+  paymentStatus?: OrderPaymentStatus
+  paymentChangeFor?: number | null // Troco para R$
+  receiptUrl?: string // Comprovante em anexo (imagem base64 ou URL)
+  paymentReceiptUrl?: string // Alias para compatibilidade
+  receiptName?: string // Nome do arquivo do comprovante (ex: comprovante_pix.png)
+  receiptUploadedAt?: string // Data/hora do upload do comprovante
+  receiptType?: string // MIME type (image/png, image/jpeg, application/pdf)
+  subtotal?: number
+  discount?: number
+  surcharge?: number // Acréscimo / Taxa de entrega
   totalAmount: number
+  total?: number // Alias para compatibilidade
+  items: TableOrderItem[]
   notes?: string
   status: TableOrderStatus
+  cancellationReason?: string
+  // Motoboy / Entregador selecionado
+  courierId?: string
+  courierName?: string
+  courierPhone?: string
+  // Histórico de eventos operacionais
+  history?: TableOrderHistoryEvent[]
+  isManualOrder?: boolean // Pedido lançado manualmente pelo estabelecimento (balcão/telefone)
   createdAt: string
   updatedAt?: string
 }

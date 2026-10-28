@@ -709,6 +709,51 @@
         "status",
         "totalAmount"
       ]
+    },
+    "CompanyCourier": {
+      "title": "CompanyCourier",
+      "description": "Delivery courier / motoboy registered for an establishment.",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "maxLength": 128
+        },
+        "companyId": {
+          "type": "string",
+          "maxLength": 128
+        },
+        "name": {
+          "type": "string",
+          "maxLength": 120
+        },
+        "phone": {
+          "type": "string",
+          "maxLength": 30
+        },
+        "isActive": {
+          "type": "boolean"
+        },
+        "notes": {
+          "type": "string",
+          "maxLength": 300
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "id",
+        "companyId",
+        "name",
+        "phone",
+        "isActive"
+      ]
     }
   },
   "firestore": {
@@ -759,6 +804,10 @@
     "/tableOrders/{orderId}": {
       "schema": "TableOrder",
       "description": "Table orders created by local dining customers."
+    },
+    "/couriers/{courierId}": {
+      "schema": "CompanyCourier",
+      "description": "Couriers and motoboys assigned to delivery orders."
     }
   }
 }

@@ -14,6 +14,8 @@ import {
   CompanyTable,
   TableOrder,
   TableOrderStatus,
+  CompanyCourier,
+  TableOrderHistoryEvent,
 } from '@/types/platform'
 import {
   INITIAL_COMPANIES,
@@ -42,6 +44,7 @@ const STORAGE_KEYS = {
   PROFESSIONALS: 'nfc_tenant_professionals_v1',
   TABLES: 'nfc_tenant_tables_v1',
   TABLE_ORDERS: 'nfc_tenant_table_orders_v1',
+  COURIERS: 'nfc_tenant_couriers_v1',
   DELETED_COMPANIES: 'nfc_tenant_deleted_companies_v1',
   CURRENT_CUSTOMER_PREFIX: 'nfc_client_session_',
 }
@@ -72,6 +75,7 @@ let memoryAppointments: Appointment[] = []
 let memoryProfessionals: CompanyProfessional[] = [...INITIAL_PROFESSIONALS]
 let memoryTables: CompanyTable[] = [...INITIAL_TABLES]
 let memoryTableOrders: TableOrder[] = [...INITIAL_TABLE_ORDERS]
+let memoryCouriers: CompanyCourier[] = []
 
 function isBrowser(): boolean {
   return typeof window !== 'undefined'
@@ -2390,7 +2394,8 @@ export async function saveCompanyTableOrderOnServerApi(
 export async function updateTableOrderStatusOnServerApi(
   orderId: string,
   companyId: string,
-  status: TableOrderStatus
+  status: TableOrderStatus,
+  historyEvent?: TableOrderHistoryEvent
 ): Promise<boolean> {
   const cleanId = (orderId || '').trim()
   if (!cleanId) return false
@@ -2400,11 +2405,25 @@ export async function updateTableOrderStatusOnServerApi(
     : memoryTableOrders
   const current = all.find((o) => o.id === cleanId || o.id?.trim() === cleanId)
   if (current) {
-    saveCompanyTableOrderLocally({ ...current, status, updatedAt: new Date().toISOString() })
+    const updatedHistory = historyEvent
+      ? [...(current.history || []), historyEvent]
+      : current.history
+    saveCompanyTableOrderLocally({
+      ...current,
+      status,
+      history: updatedHistory,
+      updatedAt: new Date().toISOString(),
+    })
   } else if (companyId) {
     const initMatch = INITIAL_TABLE_ORDERS.find((o) => o.id === cleanId)
     if (initMatch) {
-      saveCompanyTableOrderLocally({ ...initMatch, status, updatedAt: new Date().toISOString() })
+      const updatedHistory = historyEvent ? [historyEvent] : []
+      saveCompanyTableOrderLocally({
+        ...initMatch,
+        status,
+        history: updatedHistory,
+        updatedAt: new Date().toISOString(),
+      })
     }
   }
 
@@ -2412,7 +2431,7 @@ export async function updateTableOrderStatusOnServerApi(
     const res = await fetch('/api/table-orders', {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ id: cleanId, companyId, status }),
+      body: JSON.stringify({ id: cleanId, companyId, status, historyEvent }),
     })
     if (res.ok) {
       const data = await res.json()
@@ -2421,6 +2440,149 @@ export async function updateTableOrderStatusOnServerApi(
     return false
   } catch (err) {
     console.warn('Network error updating table order status, kept local change:', err)
+    return true
+  }
+}
+
+export async function updateTableOrderOnServerApi(
+  order: TableOrder
+): Promise<{ success: boolean; order?: TableOrder; error?: string }> {
+  if (!order || !order.id || !order.companyId) {
+    return { success: false, error: 'Dados do pedido inválidos.' }
+  }
+
+  saveCompanyTableOrderLocally(order)
+
+  try {
+    const res = await fetch('/api/table-orders', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ order, companyId: order.companyId }),
+    })
+    if (res.ok) {
+      const data = await res.json()
+      if (data.order) {
+        saveCompanyTableOrderLocally(data.order)
+      }
+      return { success: true, order: data.order || order }
+    }
+    return { success: true, order }
+  } catch (err) {
+    console.warn('Network error updating table order, kept local change:', err)
+    return { success: true, order }
+  }
+}
+
+// ==========================================
+// 14. MOTOBOYS / ENTREGADORES (COURIERS)
+// ==========================================
+
+export function getCompanyCouriers(companyId: string): CompanyCourier[] {
+  if (!companyId) return []
+  if (isBrowser()) {
+    const all = getItem<CompanyCourier[]>(STORAGE_KEYS.COURIERS, memoryCouriers) || []
+    const list = all.filter((c) => c.companyId === companyId)
+    if (list.length > 0) {
+      return list.sort((a, b) => (a.name || '').localeCompare(b.name || ''))
+    }
+  }
+  return memoryCouriers
+    .filter((c) => c.companyId === companyId)
+    .sort((a, b) => (a.name || '').localeCompare(b.name || ''))
+}
+
+export function saveCompanyCourierLocally(courier: CompanyCourier): void {
+  if (!courier || !courier.companyId) return
+  const cleanId = courier.id || `courier_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`
+  const toSave: CompanyCourier = {
+    ...courier,
+    id: cleanId,
+    createdAt: courier.createdAt || new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+  }
+
+  const all = isBrowser() ? getItem<CompanyCourier[]>(STORAGE_KEYS.COURIERS, memoryCouriers) : memoryCouriers
+  const filtered = all.filter((c) => c.id !== toSave.id)
+  const updated = [toSave, ...filtered]
+
+  memoryCouriers = updated
+  if (isBrowser()) {
+    setItem(STORAGE_KEYS.COURIERS, updated)
+  }
+  notifyDataChange()
+}
+
+export function deleteCompanyCourierLocally(courierId: string, companyId: string): void {
+  const all = isBrowser() ? getItem<CompanyCourier[]>(STORAGE_KEYS.COURIERS, memoryCouriers) : memoryCouriers
+  const updated = all.filter((c) => !(c.id === courierId && c.companyId === companyId))
+  memoryCouriers = updated
+  if (isBrowser()) {
+    setItem(STORAGE_KEYS.COURIERS, updated)
+  }
+  notifyDataChange()
+}
+
+export async function fetchCompanyCouriersFromServer(companyId: string): Promise<CompanyCourier[]> {
+  if (!companyId) return []
+  try {
+    const res = await fetch(`/api/couriers?companyId=${encodeURIComponent(companyId)}`, {
+      cache: 'no-store',
+    })
+    if (res.ok) {
+      const data = await res.json()
+      if (Array.isArray(data.couriers)) {
+        if (isBrowser()) {
+          const currentAll = getItem<CompanyCourier[]>(STORAGE_KEYS.COURIERS, memoryCouriers)
+          const others = currentAll.filter((c) => c.companyId !== companyId)
+          const merged = [...data.couriers, ...others]
+          memoryCouriers = merged
+          setItem(STORAGE_KEYS.COURIERS, merged)
+          notifyDataChange()
+        }
+        return data.couriers
+      }
+    }
+  } catch (err) {
+    console.warn('Network issue fetching couriers from server, using local fallback:', err)
+  }
+  return getCompanyCouriers(companyId)
+}
+
+export async function saveCompanyCourierOnServerApi(
+  courier: CompanyCourier
+): Promise<{ success: boolean; courier?: CompanyCourier; error?: string }> {
+  saveCompanyCourierLocally(courier)
+  try {
+    const res = await fetch('/api/couriers', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(courier),
+    })
+    const data = await res.json()
+    if (res.ok && data.success) {
+      if (data.courier) {
+        saveCompanyCourierLocally(data.courier)
+      }
+      return { success: true, courier: data.courier || courier }
+    }
+    return { success: false, error: data.error || 'Erro ao salvar motoboy.' }
+  } catch {
+    return { success: true, courier }
+  }
+}
+
+export async function deleteCompanyCourierOnServerApi(
+  courierId: string,
+  companyId: string
+): Promise<boolean> {
+  deleteCompanyCourierLocally(courierId, companyId)
+  try {
+    const res = await fetch(
+      `/api/couriers?id=${encodeURIComponent(courierId)}&companyId=${encodeURIComponent(companyId)}`,
+      { method: 'DELETE' }
+    )
+    return res.ok
+  } catch {
     return true
   }
 }

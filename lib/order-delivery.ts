@@ -1,5 +1,6 @@
 import { CartItem } from '@/components/public/menu-item-modal'
 import { formatPhone, getWhatsappLink, normalizePhone } from './utils'
+import { Company, CompanyPaymentConfig } from '@/types/platform'
 
 export type DeliveryType = 'pickup' | 'delivery' | 'dine_in'
 
@@ -21,6 +22,28 @@ export interface OrderDeliveryInfo {
     lng: number
   } | null
   locationUrl?: string | null
+  // Formas de Pagamento
+  paymentMethod?: 'pix' | 'dinheiro' | 'cartao_debito' | 'cartao_credito' | 'vale_refeicao' | string
+  needsChange?: boolean
+  paymentChangeFor?: number | null
+  receiptUrl?: string
+  receiptName?: string
+  receiptType?: string
+}
+
+export function getDefaultCompanyPaymentConfig(company?: Partial<Company>): CompanyPaymentConfig {
+  const existing = company?.paymentConfig
+  return {
+    acceptPix: existing?.acceptPix ?? true,
+    acceptCash: existing?.acceptCash ?? true,
+    acceptDebitCard: existing?.acceptDebitCard ?? true,
+    acceptCreditCard: existing?.acceptCreditCard ?? true,
+    acceptMealVoucher: existing?.acceptMealVoucher ?? false,
+    pixReceiverName: existing?.pixReceiverName || company?.name || 'DiretoLink Pagamentos',
+    pixKey: existing?.pixKey || company?.whatsapp || '',
+    pixKeyType: existing?.pixKeyType || 'phone',
+    pixShowUpfront: existing?.pixShowUpfront ?? true,
+  }
 }
 
 const STORAGE_DELIVERY_KEY = 'nfc_customer_last_delivery_v2'
@@ -183,6 +206,33 @@ export function buildMenuOrderWhatsAppMessage(options: {
     }
   }
 
+  if (deliveryInfo.paymentMethod) {
+    msg += `\n💳 *FORMA DE PAGAMENTO:*\n`
+    if (deliveryInfo.paymentMethod === 'pix') {
+      msg += `• Pix`
+      if (deliveryInfo.receiptUrl) {
+        msg += ` (Comprovante anexado no pedido)\n`
+      } else {
+        msg += ` (Pendente de confirmação)\n`
+      }
+    } else if (deliveryInfo.paymentMethod === 'dinheiro') {
+      msg += `• Dinheiro (${deliveryInfo.deliveryType === 'delivery' ? 'na entrega' : deliveryInfo.deliveryType === 'pickup' ? 'na retirada' : 'no local'})\n`
+      if (deliveryInfo.needsChange && deliveryInfo.paymentChangeFor) {
+        msg += `• Troco para: ${formatMoneyBRL(deliveryInfo.paymentChangeFor)}\n`
+      } else {
+        msg += `• Troco: Não precisa de troco\n`
+      }
+    } else if (deliveryInfo.paymentMethod === 'cartao_credito') {
+      msg += `• Cartão de Crédito (${deliveryInfo.deliveryType === 'delivery' ? 'na entrega' : deliveryInfo.deliveryType === 'pickup' ? 'na retirada' : 'no local'})\n`
+    } else if (deliveryInfo.paymentMethod === 'cartao_debito') {
+      msg += `• Cartão de Débito (${deliveryInfo.deliveryType === 'delivery' ? 'na entrega' : deliveryInfo.deliveryType === 'pickup' ? 'na retirada' : 'no local'})\n`
+    } else if (deliveryInfo.paymentMethod === 'vale_refeicao') {
+      msg += `• Vale-Refeição (${deliveryInfo.deliveryType === 'delivery' ? 'na entrega' : deliveryInfo.deliveryType === 'pickup' ? 'na retirada' : 'no local'})\n`
+    } else {
+      msg += `• ${deliveryInfo.paymentMethod}\n`
+    }
+  }
+
   msg += `\nPor favor, confirme o recebimento do pedido e o tempo estimado! Obrigado.`
 
   return msg
@@ -264,5 +314,107 @@ export function buildProductOrderWhatsAppMessage(options: {
  */
 export function openOrderInWhatsApp(companyWhatsapp: string | undefined | null, message: string): void {
   const url = getWhatsappLink(companyWhatsapp || '', message)
-  window.open(url, '_blank', 'noopener,noreferrer')
+  if (typeof window !== 'undefined') {
+    window.open(url, '_blank', 'noopener,noreferrer')
+  }
+}
+
+/**
+ * Constrói a mensagem pronta para envio ao MOTOBOY / ENTREGADOR via WhatsApp
+ */
+export function buildCourierDeliveryWhatsAppMessage(options: {
+  companyName: string
+  order: any // TableOrder
+}): string {
+  const { companyName, order } = options
+  const orderNum = (order.id || '').slice(-6).toUpperCase()
+
+  let msg = `🛵 *NOVA ENTREGA DISPONÍVEL*\n`
+  msg += `🏢 *${companyName}*\n`
+  msg += `📦 *Pedido #${orderNum}*\n\n`
+
+  msg += `👤 *DADOS DO CLIENTE:*\n`
+  msg += `• Nome: ${order.customerName?.trim() || 'Não informado'}\n`
+  if (order.customerPhone) {
+    msg += `• Telefone: ${formatPhone(order.customerPhone) || order.customerPhone}\n`
+  }
+
+  msg += `\n📍 *ENDEREÇO DE ENTREGA:*\n`
+  if (order.address || order.deliveryAddress) {
+    const rawAddress = order.address || order.deliveryAddress
+    msg += `• ${rawAddress}\n`
+    if (order.addressNumber) {
+      msg += `• Nº: ${order.addressNumber}\n`
+    }
+    if (order.neighborhood) {
+      msg += `• Bairro: ${order.neighborhood}\n`
+    }
+    if (order.complement) {
+      msg += `• Complemento: ${order.complement}\n`
+    }
+    if (order.referencePoint) {
+      msg += `• Referência: ${order.referencePoint}\n`
+    }
+  } else {
+    msg += `• Endereço a confirmar com o estabelecimento\n`
+  }
+
+  // Google Maps link
+  if (order.locationUrl && order.locationUrl.trim()) {
+    msg += `• 🗺️ Google Maps: ${order.locationUrl.trim()}\n`
+  } else if (order.address || order.deliveryAddress) {
+    const queryAddress = encodeURIComponent(order.address || order.deliveryAddress)
+    msg += `• 🗺️ Google Maps: https://www.google.com/maps/search/?api=1&query=${queryAddress}\n`
+  }
+
+  msg += `\n💰 *VALOR DO PEDIDO:* ${formatMoneyBRL(order.totalAmount)}\n\n`
+  
+  if (order.paymentMethod === 'pix') {
+    if (order.paymentStatus === 'paid') {
+      msg += `💳 *FORMA DE PAGAMENTO:*\n`
+      msg += `✅ *PIX PAGO*\n`
+      msg += `⚠️ *ATENÇÃO MOTOBOY: NÃO COBRAR DO CLIENTE (Já pago via Pix)*\n`
+    } else {
+      const stLabel =
+        order.paymentStatus === 'awaiting_confirmation'
+          ? 'Comprovante em análise na loja'
+          : order.paymentStatus === 'not_found'
+          ? 'Não localizado pela loja'
+          : 'Pendente de confirmação'
+      msg += `💳 *FORMA DE PAGAMENTO:*\n`
+      msg += `💠 *PIX (${stLabel})*\n`
+      msg += `⚠️ *Atenção: Conferir com a loja antes de liberar a entrega!*\n`
+    }
+  } else if (order.paymentMethod === 'dinheiro') {
+    msg += `💳 *FORMA DE PAGAMENTO:*\n`
+    msg += `💵 *DINHEIRO NA ENTREGA*\n`
+    msg += `• Total a cobrar: ${formatMoneyBRL(order.totalAmount)}\n`
+    if (order.paymentChangeFor && Number(order.paymentChangeFor) > 0) {
+      msg += `• Levar troco para: ${formatMoneyBRL(order.paymentChangeFor)}\n`
+    } else {
+      msg += `• Troco: Não precisa de troco (valor exato)\n`
+    }
+  } else if (order.paymentMethod === 'cartao_credito') {
+    msg += `💳 *FORMA DE PAGAMENTO:*\n`
+    msg += `💳 *CARTÃO DE CRÉDITO NA ENTREGA*\n`
+    msg += `• Total a cobrar na maquininha: ${formatMoneyBRL(order.totalAmount)}\n`
+  } else if (order.paymentMethod === 'cartao_debito') {
+    msg += `💳 *FORMA DE PAGAMENTO:*\n`
+    msg += `💳 *CARTÃO DE DÉBITO NA ENTREGA*\n`
+    msg += `• Total a cobrar na maquininha: ${formatMoneyBRL(order.totalAmount)}\n`
+  } else if (order.paymentMethod === 'vale_refeicao') {
+    msg += `💳 *FORMA DE PAGAMENTO:*\n`
+    msg += `💳 *VALE-REFEIÇÃO NA ENTREGA*\n`
+    msg += `• Total a cobrar na maquininha: ${formatMoneyBRL(order.totalAmount)}\n`
+  } else if (order.paymentMethod) {
+    msg += `💳 *FORMA DE PAGAMENTO:* ${order.paymentMethod}\n`
+  }
+
+  if (order.notes && order.notes.trim()) {
+    msg += `\n📝 *OBSERVAÇÕES DA ENTREGA:*\n"${order.notes.trim()}"\n`
+  }
+
+  msg += `\nPor favor, confirme se pode retirar e realizar esta entrega!`
+
+  return msg
 }

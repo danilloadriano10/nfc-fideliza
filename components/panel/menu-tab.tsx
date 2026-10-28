@@ -53,6 +53,7 @@ import {
 import { uploadCompanyImageFromClient, isBase64Image } from '@/lib/storage-client'
 import { INITIAL_MENU_ITEMS } from '@/lib/initial-data'
 import { OrganizeItemsModal } from './organize-items-modal'
+import { PaymentSettingsSection } from './payment-settings-section'
 
 interface MenuTabProps {
   company: Company
@@ -1191,6 +1192,12 @@ export const MenuTab: React.FC<MenuTabProps> = ({ company, onCompanyUpdate }) =>
           )}
         </div>
       )}
+
+      {/* SEÇÃO: FORMAS DE PAGAMENTO DO ESTABELECIMENTO */}
+      <PaymentSettingsSection
+        company={company}
+        onCompanyUpdate={onCompanyUpdate}
+      />
 
       {/* MODAL: CRIAR / EDITAR ITEM DO CARDÁPIO */}
       {isModalOpen && (

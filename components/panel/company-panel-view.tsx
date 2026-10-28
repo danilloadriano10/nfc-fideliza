@@ -104,6 +104,7 @@ import { MenuTab } from './menu-tab'
 import { TablesTab } from './tables-tab'
 import { TableOrdersTab } from './table-orders-tab'
 import { PageThemeSelector } from './page-theme-selector'
+import { CoverAdjustModal } from './cover-adjust-modal'
 
 const PRESET_BANNERS = [
   { label: '☕ Cafeteria / Café', url: '/images/cafe_central_banner_1791003956057.jpg' },
@@ -472,8 +473,35 @@ export const CompanyPanelView: React.FC<CompanyPanelViewProps> = ({
   )
   const [isUploadingLogo, setIsUploadingLogo] = useState(false)
   const [isUploadingCover, setIsUploadingCover] = useState(false)
+  const [isCoverAdjustOpen, setIsCoverAdjustOpen] = useState(false)
   const [logoMode, setLogoMode] = useState<'upload' | 'url'>('upload')
   const [coverMode, setCoverMode] = useState<'upload' | 'presets' | 'url'>('upload')
+
+  const handleSaveCoverAdjustments = async (adjustments: {
+    coverFit: 'cover' | 'contain'
+    coverPositionX: string
+    coverPositionY: string
+    coverZoom: number
+  }) => {
+    const updatedCompany: Company = {
+      ...company,
+      ...formData,
+      ...adjustments,
+    }
+    setCompany(updatedCompany)
+    setFormData((prev) => ({
+      ...prev,
+      ...adjustments,
+    }))
+    saveCompanyLocally(updatedCompany)
+    saveCompany(updatedCompany)
+    try {
+      await saveCompanyAsync(updatedCompany)
+      showToast('success', 'Enquadramento da foto de capa salvo com sucesso!')
+    } catch {
+      showToast('success', 'Enquadramento salvo com sucesso!')
+    }
+  }
 
   const handleLogoFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
@@ -1341,6 +1369,10 @@ export const CompanyPanelView: React.FC<CompanyPanelViewProps> = ({
           <TableOrdersTab
             company={company}
             onOpenTables={() => setActiveTab('tables')}
+            onCompanyUpdate={(updated) => {
+              setCompany(updated)
+              setFormData(updated)
+            }}
           />
         )}
 
@@ -2064,21 +2096,48 @@ export const CompanyPanelView: React.FC<CompanyPanelViewProps> = ({
                     </div>
 
                     {coverMode === 'upload' && (
-                      <div className="flex items-center justify-between gap-3">
-                        <label className="inline-flex items-center gap-2 px-3.5 py-2 rounded-xl bg-neutral-900 hover:bg-neutral-800 text-white text-xs font-semibold cursor-pointer transition-colors shadow-sm">
-                          <Upload className="w-3.5 h-3.5" />
-                          <span>{coverPreview ? 'Trocar Foto de Capa' : 'Escolher Foto de Capa'}</span>
-                          <input
-                            type="file"
-                            accept="image/*"
-                            disabled={isUploadingCover}
-                            onChange={handleCoverFileChange}
-                            className="hidden"
-                          />
-                        </label>
+                      <div className="flex flex-wrap items-center justify-between gap-3">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <label className="inline-flex items-center gap-2 px-3.5 py-2 rounded-xl bg-neutral-900 hover:bg-neutral-800 text-white text-xs font-semibold cursor-pointer transition-colors shadow-sm">
+                            <Upload className="w-3.5 h-3.5" />
+                            <span>{coverPreview ? 'Trocar Foto de Capa' : 'Escolher Foto de Capa'}</span>
+                            <input
+                              type="file"
+                              accept="image/*"
+                              disabled={isUploadingCover}
+                              onChange={handleCoverFileChange}
+                              className="hidden"
+                            />
+                          </label>
+
+                          {coverPreview && (
+                            <button
+                              type="button"
+                              onClick={() => setIsCoverAdjustOpen(true)}
+                              className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-violet-600 hover:bg-violet-700 text-white text-xs font-bold cursor-pointer transition-colors shadow-xs"
+                              title="Ajustar enquadramento, modo e zoom da capa"
+                            >
+                              <SlidersHorizontal className="w-3.5 h-3.5" />
+                              <span>Ajustar Capa</span>
+                            </button>
+                          )}
+                        </div>
                         <p className="text-[10px] text-neutral-400">
                           Resolução recomendada: 1200×600 px.
                         </p>
+                      </div>
+                    )}
+
+                    {coverMode !== 'upload' && coverPreview && (
+                      <div className="flex items-center justify-end">
+                        <button
+                          type="button"
+                          onClick={() => setIsCoverAdjustOpen(true)}
+                          className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-violet-600 hover:bg-violet-700 text-white text-xs font-bold cursor-pointer transition-colors shadow-xs"
+                        >
+                          <SlidersHorizontal className="w-3.5 h-3.5" />
+                          <span>Ajustar Enquadramento</span>
+                        </button>
                       </div>
                     )}
 
@@ -3655,6 +3714,17 @@ export const CompanyPanelView: React.FC<CompanyPanelViewProps> = ({
           showToast('success', 'Configurações da DiretoLink salvas!')
         }}
       />
+
+      {/* Modal de Ajuste de Enquadramento da Foto de Capa */}
+      {isCoverAdjustOpen && (
+        <CoverAdjustModal
+          company={company}
+          coverUrl={coverPreview || company.coverUrl}
+          isOpen={isCoverAdjustOpen}
+          onClose={() => setIsCoverAdjustOpen(false)}
+          onSave={handleSaveCoverAdjustments}
+        />
+      )}
     </div>
   )
 }

@@ -1029,9 +1029,14 @@ export const PublicCompanyView: React.FC<PublicCompanyViewProps> = ({
                   alt={company.name}
                   fill
                   priority
-                  className="object-cover"
+                  className={company.coverFit === 'contain' ? 'object-contain' : 'object-cover'}
+                  style={{
+                    objectPosition: `${company.coverPositionX || 'center'} ${company.coverPositionY || 'center'}`,
+                    transform: company.coverZoom && company.coverZoom !== 1 ? `scale(${company.coverZoom})` : undefined,
+                  }}
                   sizes="(max-width: 480px) 100vw, 448px"
                   referrerPolicy="no-referrer"
+                  unoptimized={Boolean(typeof company.coverUrl === 'string' && company.coverUrl.includes('ibb.co'))}
                   onError={() => setCoverError(true)}
                 />
                 {/* Gradiente concentrado na base da foto para transição suave com o fundo do tema */}
@@ -1190,12 +1195,14 @@ export const PublicCompanyView: React.FC<PublicCompanyViewProps> = ({
                   }
                   actionText="Conversar"
                   actionIcon={<MessageCircle className="w-3.5 h-3.5" />}
-                  actionVariant="whatsapp"
+                  actionVariant="theme"
                   onAction={handleOpenWhatsApp}
                   onClick={handleOpenWhatsApp}
                   isDark={isDark}
                   cardStyle={themedCardStyle}
                   primaryColor={primaryColor}
+                  buttonBgColor={activeTheme.colors.buttonBg || primaryColor}
+                  buttonTextColor={activeTheme.colors.buttonText}
                 />
               ) : null,
               services: activeModules.services ? (
@@ -1213,19 +1220,15 @@ export const PublicCompanyView: React.FC<PublicCompanyViewProps> = ({
                         : 'Consulte nossa tabela de procedimentos e serviços'
                     }
                     actionText="Ver Serviços"
-                    actionIcon={<ChevronRight className="w-3.5 h-3.5" />}
+                    actionIcon={<Scissors className="w-3.5 h-3.5" />}
                     actionVariant="theme"
-                    actionStyle={{
-                      backgroundColor: secondaryColor || primaryColor,
-                      color: '#ffffff',
-                    }}
                     onAction={() => setIsServicesOpen(true)}
                     onClick={() => setIsServicesOpen(true)}
                     isDark={isDark}
                     cardStyle={themedCardStyle}
                     primaryColor={primaryColor}
-                    buttonBgColor={secondaryColor || primaryColor}
-                    buttonTextColor="#ffffff"
+                    buttonBgColor={activeTheme.colors.buttonBg || primaryColor}
+                    buttonTextColor={activeTheme.colors.buttonText}
                   />
                 ) : activeServicesList.length > 0 ? (
                   <div className="space-y-2.5 pt-1">
@@ -1324,7 +1327,7 @@ export const PublicCompanyView: React.FC<PublicCompanyViewProps> = ({
                               activeModules.appointments ? (
                                 <Calendar className="w-3.5 h-3.5" />
                               ) : (
-                                <ChevronRight className="w-3.5 h-3.5" />
+                                <Scissors className="w-3.5 h-3.5" />
                               )
                             }
                             actionVariant="theme"
@@ -1690,15 +1693,15 @@ export const PublicCompanyView: React.FC<PublicCompanyViewProps> = ({
               title={company.productCatalog?.externalButtonText || 'Ver Catálogo'}
               subtitle="Acesse nossa loja oficial e veja todos os produtos"
               actionText={company.productCatalog?.externalButtonText || 'Ver Catálogo'}
-              actionIcon={<ExternalLink className="w-3.5 h-3.5" />}
+              actionIcon={<ShoppingBag className="w-3.5 h-3.5" />}
               actionVariant="theme"
               onAction={handleOpenCatalogExternal}
               onClick={handleOpenCatalogExternal}
               isDark={isDark}
               cardStyle={themedCardStyle}
               primaryColor={primaryColor}
-              buttonBgColor={primaryColor}
-              buttonTextColor="#ffffff"
+              buttonBgColor={activeTheme.colors.buttonBg || primaryColor}
+              buttonTextColor={activeTheme.colors.buttonText}
             />
           ) : activeModules.products ? (
             <PublicCard
@@ -1714,15 +1717,15 @@ export const PublicCompanyView: React.FC<PublicCompanyViewProps> = ({
                   : 'Conheça nossa seleção de produtos disponíveis'
               }
               actionText="Ver Produtos"
-              actionIcon={<ChevronRight className="w-3.5 h-3.5" />}
+              actionIcon={<Package className="w-3.5 h-3.5" />}
               actionVariant="theme"
               onAction={() => setIsProductsSheetOpen(true)}
               onClick={() => setIsProductsSheetOpen(true)}
               isDark={isDark}
               cardStyle={themedCardStyle}
               primaryColor={primaryColor}
-              buttonBgColor={primaryColor}
-              buttonTextColor="#ffffff"
+              buttonBgColor={activeTheme.colors.buttonBg || primaryColor}
+              buttonTextColor={activeTheme.colors.buttonText}
             />
           ) : null,
               appointments: activeModules.appointments ? (
@@ -1749,7 +1752,7 @@ export const PublicCompanyView: React.FC<PublicCompanyViewProps> = ({
                   isDark={isDark}
                   cardStyle={themedCardStyle}
                   primaryColor={primaryColor}
-                  buttonBgColor={activeTheme.colors.buttonBg}
+                  buttonBgColor={activeTheme.colors.buttonBg || primaryColor}
                   buttonTextColor={activeTheme.colors.buttonText}
                 />
               ) : null,
@@ -2081,15 +2084,15 @@ export const PublicCompanyView: React.FC<PublicCompanyViewProps> = ({
               title="Cardápio Digital"
               subtitle="Acesse nosso cardápio completo e confira todas as opções"
               actionText="Abrir Cardápio"
-              actionIcon={<ExternalLink className="w-3.5 h-3.5" />}
+              actionIcon={<BookOpen className="w-3.5 h-3.5" />}
               actionVariant="theme"
               onAction={handleOpenMenu}
               onClick={handleOpenMenu}
               isDark={isDark}
               cardStyle={themedCardStyle}
               primaryColor={primaryColor}
-              buttonBgColor={primaryColor}
-              buttonTextColor="#ffffff"
+              buttonBgColor={activeTheme.colors.buttonBg || primaryColor}
+              buttonTextColor={activeTheme.colors.buttonText}
             />
           ) : activeModules.menu ? (
             <PublicCard
@@ -2105,15 +2108,15 @@ export const PublicCompanyView: React.FC<PublicCompanyViewProps> = ({
                   : 'Confira nossas opções de pratos, porções e bebidas'
               }
               actionText="Ver Cardápio"
-              actionIcon={<ChevronRight className="w-3.5 h-3.5" />}
+              actionIcon={<UtensilsCrossed className="w-3.5 h-3.5" />}
               actionVariant="theme"
               onAction={handleOpenMenu}
               onClick={handleOpenMenu}
               isDark={isDark}
               cardStyle={themedCardStyle}
               primaryColor={primaryColor}
-              buttonBgColor={primaryColor || '#7A1228'}
-              buttonTextColor="#ffffff"
+              buttonBgColor={activeTheme.colors.buttonBg || primaryColor}
+              buttonTextColor={activeTheme.colors.buttonText}
             />
           ) : null,
               loyalty: activeModules.loyalty ? (
@@ -2146,7 +2149,7 @@ export const PublicCompanyView: React.FC<PublicCompanyViewProps> = ({
                   isDark={isDark}
                   cardStyle={themedCardStyle}
                   primaryColor={primaryColor}
-                  buttonBgColor={activeTheme.colors.buttonBg}
+                  buttonBgColor={activeTheme.colors.buttonBg || primaryColor}
                   buttonTextColor={activeTheme.colors.buttonText}
                 />
               ) : null,
@@ -2164,13 +2167,15 @@ export const PublicCompanyView: React.FC<PublicCompanyViewProps> = ({
                   badgeVariant="amber"
                   subtitle={`${company.reviewCount || '120+'} avaliações • Avalie sua experiência`}
                   actionText="Avaliar"
-                  actionIcon={<ExternalLink className="w-3.5 h-3.5" />}
-                  actionVariant="google"
+                  actionIcon={<Star className="w-3.5 h-3.5" />}
+                  actionVariant="theme"
                   onAction={handleGoogleReview}
                   onClick={handleGoogleReview}
                   isDark={isDark}
                   cardStyle={themedCardStyle}
                   primaryColor={primaryColor}
+                  buttonBgColor={activeTheme.colors.buttonBg || primaryColor}
+                  buttonTextColor={activeTheme.colors.buttonText}
                 />
               ) : null,
               location: activeModules.location ? (
@@ -2186,12 +2191,14 @@ export const PublicCompanyView: React.FC<PublicCompanyViewProps> = ({
                   subtitle={company.addressText || 'Como chegar ao nosso estabelecimento'}
                   actionText="Como Chegar"
                   actionIcon={<Navigation className="w-3.5 h-3.5" />}
-                  actionVariant="rose"
+                  actionVariant="theme"
                   onAction={handleOpenLocation}
                   onClick={handleOpenLocation}
                   isDark={isDark}
                   cardStyle={themedCardStyle}
                   primaryColor={primaryColor}
+                  buttonBgColor={activeTheme.colors.buttonBg || primaryColor}
+                  buttonTextColor={activeTheme.colors.buttonText}
                 />
               ) : null,
               wifi: activeModules.wifi ? (
@@ -2208,12 +2215,14 @@ export const PublicCompanyView: React.FC<PublicCompanyViewProps> = ({
                   subtitle={company.wifi?.ssid ? `Rede: ${company.wifi.ssid}` : 'Toque para ver a senha e conectar'}
                   actionText="Conectar"
                   actionIcon={<Wifi className="w-3.5 h-3.5" />}
-                  actionVariant="wifi"
+                  actionVariant="theme"
                   onAction={handleOpenWifi}
                   onClick={handleOpenWifi}
                   isDark={isDark}
                   cardStyle={themedCardStyle}
                   primaryColor={primaryColor}
+                  buttonBgColor={activeTheme.colors.buttonBg || primaryColor}
+                  buttonTextColor={activeTheme.colors.buttonText}
                 />
               ) : null,
               feedback: activeModules.feedback ? (
@@ -2236,7 +2245,7 @@ export const PublicCompanyView: React.FC<PublicCompanyViewProps> = ({
                   isDark={isDark}
                   cardStyle={themedCardStyle}
                   primaryColor={primaryColor}
-                  buttonBgColor={activeTheme.colors.buttonBg}
+                  buttonBgColor={activeTheme.colors.buttonBg || primaryColor}
                   buttonTextColor={activeTheme.colors.buttonText}
                 />
               ) : null,
@@ -2253,13 +2262,15 @@ export const PublicCompanyView: React.FC<PublicCompanyViewProps> = ({
                   title={company.instagram ? `@${company.instagram.replace(/^@/, '')}` : 'Instagram Oficial'}
                   subtitle="Siga nosso perfil oficial no Instagram"
                   actionText="Seguir"
-                  actionIcon={<ExternalLink className="w-3.5 h-3.5" />}
-                  actionVariant="instagram"
+                  actionIcon={<Instagram className="w-3.5 h-3.5" />}
+                  actionVariant="theme"
                   onAction={handleOpenInstagram}
                   onClick={handleOpenInstagram}
                   isDark={isDark}
                   cardStyle={themedCardStyle}
                   primaryColor={primaryColor}
+                  buttonBgColor={activeTheme.colors.buttonBg || primaryColor}
+                  buttonTextColor={activeTheme.colors.buttonText}
                 />
               ) : null,
             }
@@ -2440,7 +2451,11 @@ export const PublicCompanyView: React.FC<PublicCompanyViewProps> = ({
             <button
               type="button"
               onClick={handleOpenWhatsApp}
-              className="flex-1 py-2.5 px-4 rounded-xl font-extrabold text-xs text-white bg-emerald-600 hover:bg-emerald-700 active:scale-95 shadow-md transition-all flex items-center justify-center gap-1.5 cursor-pointer truncate"
+              className="flex-1 py-2.5 px-4 rounded-xl font-extrabold text-xs shadow-md hover:opacity-95 active:scale-95 transition-all flex items-center justify-center gap-1.5 cursor-pointer truncate"
+              style={{
+                background: gradientBg,
+                color: contrastText,
+              }}
             >
               <MessageCircle className="w-3.5 h-3.5 shrink-0" />
               <span className="truncate">Falar no WhatsApp</span>

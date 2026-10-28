@@ -76,5 +76,10 @@ service cloud.firestore {
     match /tableOrders/{orderId} {
       allow read, write: if true;
     }
+
+    // Couriers: Motoboys e entregadores por estabelecimento
+    match /couriers/{courierId} {
+      allow read, write: if true;
+    }
   }
 }

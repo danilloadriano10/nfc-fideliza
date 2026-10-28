@@ -1,7 +1,7 @@
 'use client'
 
 import React from 'react'
-import { ChevronRight } from 'lucide-react'
+import { sanitizeHex, getContrastTextColor } from '@/lib/colors'
 
 export interface PublicCardProps {
   id?: string
@@ -58,7 +58,7 @@ export const PublicCard: React.FC<PublicCardProps> = ({
   primaryColor = '#6D28D9',
   secondaryColor,
   buttonBgColor,
-  buttonTextColor = '#ffffff',
+  buttonTextColor,
   className = '',
   children,
 }) => {
@@ -79,64 +79,18 @@ export const PublicCard: React.FC<PublicCardProps> = ({
     }
   }
 
-  // Resolver classes e estilos do botão de ação
-  const getButtonStyles = (): { className: string; style?: React.CSSProperties } => {
-    switch (actionVariant) {
-      case 'whatsapp':
-        return {
-          className: 'bg-[#25D366] hover:bg-[#20ba59] text-white shadow-xs',
-          style: actionStyle,
-        }
-      case 'google':
-        return {
-          className: 'bg-amber-500 hover:bg-amber-600 text-white shadow-xs',
-          style: actionStyle,
-        }
-      case 'instagram':
-        return {
-          className: 'bg-gradient-to-r from-pink-500 via-rose-500 to-amber-500 text-white shadow-xs hover:opacity-95',
-          style: actionStyle,
-        }
-      case 'wifi':
-        return {
-          className: 'bg-sky-600 hover:bg-sky-500 text-white shadow-xs',
-          style: actionStyle,
-        }
-      case 'rose':
-        return {
-          className: 'bg-rose-600 hover:bg-rose-500 text-white shadow-xs',
-          style: actionStyle,
-        }
-      case 'secondary':
-        return {
-          className: 'text-white shadow-xs hover:opacity-90',
-          style: {
-            backgroundColor: secondaryColor || primaryColor,
-            color: '#ffffff',
-            ...actionStyle,
-          },
-        }
-      case 'outline':
-        return {
-          className: isDark
-            ? 'border border-white/15 hover:bg-white/10 text-white'
-            : 'border border-neutral-300 hover:bg-neutral-100 text-neutral-800',
-          style: actionStyle,
-        }
-      case 'theme':
-      default:
-        return {
-          className: 'text-white shadow-xs hover:opacity-90',
-          style: {
-            backgroundColor: buttonBgColor || primaryColor,
-            color: buttonTextColor,
-            ...actionStyle,
-          },
-        }
-    }
-  }
+  // Resolver cor principal e contraste para o botão de ação padronizado
+  const resolvedBg = sanitizeHex(buttonBgColor || primaryColor, '#6D28D9')
+  const resolvedTextColor = buttonTextColor || getContrastTextColor(resolvedBg)
+  const isOutline = actionVariant === 'outline'
 
-  const buttonProps = getButtonStyles()
+  const buttonStyle: React.CSSProperties = isOutline
+    ? actionStyle || {}
+    : {
+        backgroundColor: resolvedBg,
+        color: resolvedTextColor,
+        ...actionStyle,
+      }
 
   // Badge styles
   const getBadgeClasses = () => {
@@ -208,15 +162,28 @@ export const PublicCard: React.FC<PublicCardProps> = ({
           </div>
         </div>
 
-        {/* LADO DIREITO: Botão de Ação */}
+        {/* LADO DIREITO: Botão de Ação Padronizado */}
         <button
           type="button"
           onClick={handleButtonClick}
-          className={`px-3.5 py-2 sm:px-4 sm:py-2 rounded-xl text-xs font-bold shrink-0 cursor-pointer active:scale-95 transition-all flex items-center gap-1.5 whitespace-nowrap ${buttonProps.className} ${actionClassName || ''}`}
-          style={buttonProps.style}
+          className={`w-[124px] sm:w-[132px] h-9 sm:h-[38px] rounded-xl px-2 sm:px-2.5 text-[11px] sm:text-xs font-bold shrink-0 cursor-pointer active:scale-95 transition-all flex items-center justify-center gap-1.5 whitespace-nowrap shadow-xs hover:opacity-90 select-none ${
+            isOutline
+              ? isDark
+                ? 'border border-white/20 hover:bg-white/10 text-white'
+                : 'border border-neutral-300 hover:bg-neutral-100 text-neutral-800'
+              : ''
+          } ${actionClassName || ''}`}
+          style={buttonStyle}
         >
-          {actionIcon}
-          <span>{actionText}</span>
+          {actionIcon && (
+            <span
+              className="shrink-0 flex items-center justify-center [&>svg]:w-3.5 [&>svg]:h-3.5 [&>svg]:stroke-[2.2]"
+              style={{ color: isOutline ? undefined : resolvedTextColor }}
+            >
+              {actionIcon}
+            </span>
+          )}
+          <span className="truncate">{actionText}</span>
         </button>
       </div>
 

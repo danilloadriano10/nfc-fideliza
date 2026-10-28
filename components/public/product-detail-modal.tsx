@@ -286,11 +286,7 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
               >
                 {/* Foto Principal do Produto */}
                 <div className="space-y-2">
-                  <div
-                    className={`relative w-full aspect-square sm:aspect-[4/3] min-h-[280px] sm:min-h-[340px] rounded-2xl overflow-hidden border flex items-center justify-center shadow-xs ${
-                      isDark ? 'bg-neutral-900 border-white/5' : 'bg-neutral-100 border-neutral-200'
-                    }`}
-                  >
+                  <div className="relative w-full aspect-square sm:aspect-[4/3] flex items-center justify-center overflow-hidden">
                     {activePhoto ? (
                       /* eslint-disable-next-line @next/next/no-img-element */
                       <img
@@ -301,8 +297,12 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
                         referrerPolicy="no-referrer"
                       />
                     ) : (
-                      <div className="flex flex-col items-center justify-center text-neutral-400 gap-2">
-                        <Package className="w-12 h-12 opacity-60" />
+                      <div
+                        className={`w-full h-full rounded-2xl flex flex-col items-center justify-center ${
+                          isDark ? 'bg-white/[0.04] text-neutral-500' : 'bg-neutral-100/80 text-neutral-400'
+                        }`}
+                      >
+                        <Package className="w-12 h-12 opacity-40 mb-1" />
                         <span className="text-xs font-medium">Sem imagem cadastrada</span>
                       </div>
                     )}
@@ -364,7 +364,7 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
                           <img
                             src={photo}
                             alt={`Foto ${idx + 1}`}
-                            className="w-full h-full object-cover"
+                            className="w-full h-full object-contain"
                             loading="lazy"
                           />
                         </button>

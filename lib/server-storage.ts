@@ -59,6 +59,10 @@ import {
   getFirestoreTableOrders,
   saveFirestoreTableOrder,
   updateFirestoreTableOrderStatus,
+  updateFirestoreTableOrderFull,
+  getFirestoreCouriers,
+  saveFirestoreCourier,
+  deleteFirestoreCourier,
   ensureFirestoreInitialized,
 } from './firestore-service'
 
@@ -77,6 +81,7 @@ import {
   CompanyTable,
   TableOrder,
   TableOrderStatus,
+  CompanyCourier,
 } from '@/types/platform'
 
 // Ensure system migration is initialized on startup
@@ -452,5 +457,25 @@ export async function updateServerTableOrderStatus(
   companyId?: string
 ): Promise<void> {
   return await updateFirestoreTableOrderStatus(orderId, status, companyId)
+}
+
+export async function updateServerTableOrderFull(order: TableOrder): Promise<TableOrder> {
+  return await updateFirestoreTableOrderFull(order)
+}
+
+// ==========================================
+// MOTOBOYS / ENTREGADORES (COURIERS)
+// ==========================================
+
+export async function getServerCouriers(companyId: string): Promise<CompanyCourier[]> {
+  return await getFirestoreCouriers(companyId)
+}
+
+export async function saveServerCourier(courier: CompanyCourier): Promise<CompanyCourier> {
+  return await saveFirestoreCourier(courier)
+}
+
+export async function deleteServerCourier(courierId: string): Promise<void> {
+  return await deleteFirestoreCourier(courierId)
 }
 

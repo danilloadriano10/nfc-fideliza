@@ -28,6 +28,7 @@ import {
   CompanyTable,
   TableOrder,
   TableOrderStatus,
+  CompanyCourier,
 } from '@/types/platform'
 import { normalizePhone } from '@/lib/utils'
 import { hashPassword } from '@/lib/auth-crypto'
@@ -61,6 +62,7 @@ const PROFESSIONALS_COLLECTION = 'professionals'
 const DELETED_COMPANIES_COLLECTION = 'deleted_companies'
 const TABLES_COLLECTION = 'tables'
 const TABLE_ORDERS_COLLECTION = 'tableOrders'
+const COURIERS_COLLECTION = 'couriers'
 
 let migrationPromise: Promise<void> | null = null
 
@@ -2440,6 +2442,60 @@ export async function updateFirestoreTableOrderStatus(
     } catch (innerErr) {
       console.warn('Firestore fallback update also failed, keeping local contingency status:', innerErr)
     }
+  }
+}
+
+export async function updateFirestoreTableOrderFull(order: TableOrder): Promise<TableOrder> {
+  return await saveFirestoreTableOrder(order)
+}
+
+// ==========================================
+// 14. MOTOBOYS / ENTREGADORES (COURIERS)
+// ==========================================
+
+export async function getFirestoreCouriers(companyId: string): Promise<CompanyCourier[]> {
+  try {
+    await ensureFirestoreInitialized()
+    const q = query(collection(db, COURIERS_COLLECTION), where('companyId', '==', companyId))
+    const snap = await getDocs(q)
+    const list: CompanyCourier[] = []
+    snap.forEach((d) => {
+      list.push(d.data() as CompanyCourier)
+    })
+    return list.sort((a, b) => (a.name || '').localeCompare(b.name || ''))
+  } catch (err) {
+    console.warn('Could not read couriers from Firestore:', err)
+    return []
+  }
+}
+
+export async function saveFirestoreCourier(courier: CompanyCourier): Promise<CompanyCourier> {
+  try {
+    await ensureFirestoreInitialized()
+    const cleanId = courier.id || `courier_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`
+    const toSave: CompanyCourier = {
+      ...courier,
+      id: cleanId,
+      createdAt: courier.createdAt || new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    }
+    const docRef = doc(db, COURIERS_COLLECTION, cleanId)
+    await setDoc(docRef, toSave, { merge: true })
+    return toSave
+  } catch (err) {
+    handleFirestoreError(err, OperationType.WRITE, COURIERS_COLLECTION)
+    throw err
+  }
+}
+
+export async function deleteFirestoreCourier(courierId: string): Promise<void> {
+  try {
+    await ensureFirestoreInitialized()
+    const docRef = doc(db, COURIERS_COLLECTION, courierId)
+    await deleteDoc(docRef)
+  } catch (err) {
+    handleFirestoreError(err, OperationType.DELETE, COURIERS_COLLECTION)
+    throw err
   }
 }
 
