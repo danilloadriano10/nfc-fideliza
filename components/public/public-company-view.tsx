@@ -1020,8 +1020,8 @@ export const PublicCompanyView: React.FC<PublicCompanyViewProps> = ({
         {/* 1. TOPO DA EMPRESA: HERO IMERSIVO COM IDENTIDADE DA MARCA */}
         {/* ========================================================= */}
         <div className="relative w-full">
-          {/* Foto de Capa Imersiva & Integração com o Fundo */}
-          <div className="relative w-full h-52 sm:h-56 bg-neutral-950 overflow-hidden">
+          {/* Foto de Capa Imersiva (Proporção Padrão 2:1, Horizontal e Compacta no Mobile) */}
+          <div className="relative w-full aspect-[2/1] bg-neutral-950 overflow-hidden">
             {company.coverUrl && !coverError ? (
               <>
                 <Image
@@ -1029,7 +1029,13 @@ export const PublicCompanyView: React.FC<PublicCompanyViewProps> = ({
                   alt={company.name}
                   fill
                   priority
-                  className={company.coverFit === 'contain' ? 'object-contain' : 'object-cover'}
+                  className={
+                    company.coverFit === 'contain'
+                      ? 'object-contain'
+                      : company.coverFit === 'logo'
+                      ? 'object-contain p-3.5 sm:p-5'
+                      : 'object-cover'
+                  }
                   style={{
                     objectPosition: `${company.coverPositionX || 'center'} ${company.coverPositionY || 'center'}`,
                     transform: company.coverZoom && company.coverZoom !== 1 ? `scale(${company.coverZoom})` : undefined,
@@ -1041,7 +1047,7 @@ export const PublicCompanyView: React.FC<PublicCompanyViewProps> = ({
                 />
                 {/* Gradiente concentrado na base da foto para transição suave com o fundo do tema */}
                 <div
-                  className="absolute bottom-0 left-0 right-0 h-14 sm:h-16 pointer-events-none"
+                  className="absolute bottom-0 left-0 right-0 h-8 sm:h-10 pointer-events-none"
                   style={{ background: activeTheme.heroTransitionGradient }}
                 />
               </>

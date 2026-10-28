@@ -317,7 +317,7 @@ export interface Company {
   bookingSettings?: BookingSettings
   paymentConfig?: CompanyPaymentConfig // Configurações de formas de pagamento e Pix
   // Ajustes de enquadramento da foto de capa
-  coverFit?: 'cover' | 'contain'
+  coverFit?: 'cover' | 'contain' | 'logo'
   coverPositionX?: 'left' | 'center' | 'right' | string
   coverPositionY?: 'top' | 'center' | 'bottom' | string
   coverZoom?: number

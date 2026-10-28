@@ -8,6 +8,7 @@ import {
   Check,
   Maximize2,
   Minimize2,
+  Square,
   ArrowUp,
   ArrowDown,
   ArrowLeft,
@@ -24,7 +25,7 @@ interface CoverAdjustModalProps {
   isOpen: boolean
   onClose: () => void
   onSave: (adjustments: {
-    coverFit: 'cover' | 'contain'
+    coverFit: 'cover' | 'contain' | 'logo'
     coverPositionX: string
     coverPositionY: string
     coverZoom: number
@@ -38,7 +39,7 @@ export const CoverAdjustModal: React.FC<CoverAdjustModalProps> = ({
   onClose,
   onSave,
 }) => {
-  const [coverFit, setCoverFit] = useState<'cover' | 'contain'>(
+  const [coverFit, setCoverFit] = useState<'cover' | 'contain' | 'logo'>(
     company.coverFit || 'cover'
   )
   const [coverPositionX, setCoverPositionX] = useState<string>(
@@ -88,7 +89,7 @@ export const CoverAdjustModal: React.FC<CoverAdjustModalProps> = ({
                 Ajustar Enquadramento da Capa
               </h3>
               <p className="text-xs text-neutral-500">
-                Ajuste como a fotografia de capa será exibida na página pública do seu estabelecimento.
+                Ajuste como a fotografia de capa será exibida na proporção 2:1 da página pública.
               </p>
             </div>
           </div>
@@ -104,28 +105,32 @@ export const CoverAdjustModal: React.FC<CoverAdjustModalProps> = ({
 
         {/* Conteúdo com Preview e Controles */}
         <div className="p-4 sm:p-6 space-y-6 overflow-y-auto flex-1">
-          {/* PRÉ-VISUALIZAÇÃO MOBILE (Formato do cabeçalho da página pública) */}
+          {/* PRÉ-VISUALIZAÇÃO 2:1 MOBILE (Formato do cabeçalho da página pública) */}
           <div className="space-y-2">
             <div className="flex items-center justify-between">
               <label className="text-xs font-bold text-neutral-700 uppercase tracking-wider flex items-center gap-1.5">
                 <Sparkles className="w-3.5 h-3.5 text-violet-600" />
-                <span>Pré-visualização Mobile (Cabeçalho Real)</span>
+                <span>Pré-visualização 2:1 (Smartphone)</span>
               </label>
-              <span className="text-[11px] text-neutral-400">
-                Como seu cliente verá no smartphone
+              <span className="text-[11px] font-semibold text-violet-700 bg-violet-100 px-2 py-0.5 rounded-full">
+                Proporção 2:1
               </span>
             </div>
 
             {/* Mockup do Topo da Página */}
-            <div className="max-w-sm mx-auto rounded-3xl border-2 border-neutral-300 bg-neutral-900 p-2 shadow-xl">
-              <div className="relative w-full h-48 sm:h-52 rounded-2xl overflow-hidden bg-neutral-950 flex items-center justify-center">
+            <div className="max-w-md mx-auto rounded-3xl border-2 border-neutral-300 bg-neutral-900 p-2 shadow-xl">
+              <div className="relative w-full aspect-[2/1] rounded-2xl overflow-hidden bg-neutral-950 flex items-center justify-center">
                 {coverUrl ? (
                   // eslint-disable-next-line @next/next/no-img-element
                   <img
                     src={coverUrl}
                     alt={company.name}
-                    className={`w-full h-full transition-transform duration-100 select-none ${
-                      coverFit === 'contain' ? 'object-contain' : 'object-cover'
+                    className={`w-full h-full transition-all duration-150 select-none ${
+                      coverFit === 'contain'
+                        ? 'object-contain'
+                        : coverFit === 'logo'
+                        ? 'object-contain p-4 sm:p-5'
+                        : 'object-cover'
                     }`}
                     style={{
                       objectPosition: objectPositionStyle,
@@ -137,7 +142,7 @@ export const CoverAdjustModal: React.FC<CoverAdjustModalProps> = ({
                 )}
 
                 {/* Gradiente sutil inferior como na página pública */}
-                <div className="absolute bottom-0 inset-x-0 h-14 bg-gradient-to-t from-neutral-950/80 to-transparent pointer-events-none" />
+                <div className="absolute bottom-0 inset-x-0 h-10 bg-gradient-to-t from-neutral-950/80 to-transparent pointer-events-none" />
 
                 {/* Badge com nome da empresa para dar realismo */}
                 <div className="absolute bottom-2.5 left-3 z-10 flex items-center gap-2">
@@ -157,45 +162,98 @@ export const CoverAdjustModal: React.FC<CoverAdjustModalProps> = ({
             </div>
           </div>
 
-          {/* 1. MODO DE EXIBIÇÃO: PREENCHER OU ENCAIXAR INTEIRA */}
+          {/* 1. MODO DE EXIBIÇÃO: 3 OPÇÕES (PREENCHER, ENCAIXAR INTEIRA, LOGO / CENTRALIZAR) */}
           <div className="space-y-2">
-            <label className="block text-xs font-bold text-neutral-700 uppercase tracking-wider">
-              1. Modo de Exibição
-            </label>
-            <div className="grid grid-cols-2 gap-3">
+            <div className="flex items-center justify-between">
+              <label className="block text-xs font-bold text-neutral-700 uppercase tracking-wider">
+                1. Modo de Exibição
+              </label>
+              <span className="text-[11px] text-neutral-500 font-medium">
+                {coverFit === 'cover' && 'Preenchimento total'}
+                {coverFit === 'contain' && 'Sem cortes na foto'}
+                {coverFit === 'logo' && 'Centralizado com espaçamento'}
+              </span>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+              {/* 1. PREENCHER */}
               <button
                 type="button"
                 onClick={() => setCoverFit('cover')}
-                className={`p-3 rounded-2xl border text-xs font-bold flex items-center justify-center gap-2 transition-all cursor-pointer ${
+                className={`p-3 rounded-2xl border text-left transition-all cursor-pointer flex flex-col justify-between ${
                   coverFit === 'cover'
-                    ? 'border-violet-600 bg-violet-50 text-violet-900 ring-2 ring-violet-500/20 shadow-xs'
-                    : 'border-neutral-200 bg-neutral-50 text-neutral-600 hover:bg-neutral-100'
+                    ? 'border-violet-600 bg-violet-50 text-violet-950 ring-2 ring-violet-500/25 shadow-xs'
+                    : 'border-neutral-200 bg-neutral-50/80 text-neutral-700 hover:bg-neutral-100 hover:border-neutral-300'
                 }`}
               >
-                <Maximize2 className="w-4 h-4 text-violet-600" />
-                <div className="text-left">
-                  <span className="block font-bold">Preencher (Cover)</span>
-                  <span className="text-[10px] text-neutral-500 font-normal">
-                    Ocupa 100% da área sem faixas
-                  </span>
+                <div>
+                  <div className="flex items-center gap-2 mb-1.5">
+                    <div
+                      className={`p-1.5 rounded-lg ${
+                        coverFit === 'cover' ? 'bg-violet-600 text-white' : 'bg-neutral-200 text-neutral-700'
+                      }`}
+                    >
+                      <Maximize2 className="w-3.5 h-3.5" />
+                    </div>
+                    <span className="font-black text-xs">PREENCHER</span>
+                  </div>
+                  <p className="text-[11px] text-neutral-500 leading-snug">
+                    Preenche toda a capa, podendo cortar a imagem.
+                  </p>
                 </div>
               </button>
 
+              {/* 2. ENCAIXAR INTEIRA */}
               <button
                 type="button"
                 onClick={() => setCoverFit('contain')}
-                className={`p-3 rounded-2xl border text-xs font-bold flex items-center justify-center gap-2 transition-all cursor-pointer ${
+                className={`p-3 rounded-2xl border text-left transition-all cursor-pointer flex flex-col justify-between ${
                   coverFit === 'contain'
-                    ? 'border-violet-600 bg-violet-50 text-violet-900 ring-2 ring-violet-500/20 shadow-xs'
-                    : 'border-neutral-200 bg-neutral-50 text-neutral-600 hover:bg-neutral-100'
+                    ? 'border-violet-600 bg-violet-50 text-violet-950 ring-2 ring-violet-500/25 shadow-xs'
+                    : 'border-neutral-200 bg-neutral-50/80 text-neutral-700 hover:bg-neutral-100 hover:border-neutral-300'
                 }`}
               >
-                <Minimize2 className="w-4 h-4 text-violet-600" />
-                <div className="text-left">
-                  <span className="block font-bold">Encaixar Inteira (Contain)</span>
-                  <span className="text-[10px] text-neutral-500 font-normal">
-                    Mostra a foto inteira sem nenhum corte
-                  </span>
+                <div>
+                  <div className="flex items-center gap-2 mb-1.5">
+                    <div
+                      className={`p-1.5 rounded-lg ${
+                        coverFit === 'contain' ? 'bg-violet-600 text-white' : 'bg-neutral-200 text-neutral-700'
+                      }`}
+                    >
+                      <Minimize2 className="w-3.5 h-3.5" />
+                    </div>
+                    <span className="font-black text-xs">ENCAIXAR INTEIRA</span>
+                  </div>
+                  <p className="text-[11px] text-neutral-500 leading-snug">
+                    Mostra a imagem completa sem cortar.
+                  </p>
+                </div>
+              </button>
+
+              {/* 3. LOGO / CENTRALIZAR */}
+              <button
+                type="button"
+                onClick={() => setCoverFit('logo')}
+                className={`p-3 rounded-2xl border text-left transition-all cursor-pointer flex flex-col justify-between ${
+                  coverFit === 'logo'
+                    ? 'border-violet-600 bg-violet-50 text-violet-950 ring-2 ring-violet-500/25 shadow-xs'
+                    : 'border-neutral-200 bg-neutral-50/80 text-neutral-700 hover:bg-neutral-100 hover:border-neutral-300'
+                }`}
+              >
+                <div>
+                  <div className="flex items-center gap-2 mb-1.5">
+                    <div
+                      className={`p-1.5 rounded-lg ${
+                        coverFit === 'logo' ? 'bg-violet-600 text-white' : 'bg-neutral-200 text-neutral-700'
+                      }`}
+                    >
+                      <Square className="w-3.5 h-3.5" />
+                    </div>
+                    <span className="font-black text-xs">LOGO / CENTRALIZAR</span>
+                  </div>
+                  <p className="text-[11px] text-neutral-500 leading-snug">
+                    Para logos quadradas ou verticais. Mostra a logo inteira, centralizada e com espaço ao redor.
+                  </p>
                 </div>
               </button>
             </div>

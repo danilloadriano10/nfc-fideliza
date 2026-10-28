@@ -818,14 +818,24 @@ export const PageThemeSelector: React.FC<PageThemeSelectorProps> = ({
                 color: resolvedActiveTheme.textPrimary,
               }}
             >
-              {/* Foto de Capa Simulada */}
-              <div className="relative w-full h-32 bg-neutral-900 overflow-hidden">
+              {/* Foto de Capa Simulada (Proporção 2:1) */}
+              <div className="relative w-full aspect-[2/1] bg-neutral-900 overflow-hidden">
                 {company.coverUrl ? (
                   <Image
                     src={company.coverUrl}
                     alt={company.name}
                     fill
-                    className="object-cover"
+                    className={
+                      company.coverFit === 'contain'
+                        ? 'object-contain'
+                        : company.coverFit === 'logo'
+                        ? 'object-contain p-3'
+                        : 'object-cover'
+                    }
+                    style={{
+                      objectPosition: `${company.coverPositionX || 'center'} ${company.coverPositionY || 'center'}`,
+                      transform: company.coverZoom && company.coverZoom !== 1 ? `scale(${company.coverZoom})` : undefined,
+                    }}
                     sizes="380px"
                     referrerPolicy="no-referrer"
                   />

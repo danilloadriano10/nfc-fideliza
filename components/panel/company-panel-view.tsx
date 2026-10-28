@@ -478,7 +478,7 @@ export const CompanyPanelView: React.FC<CompanyPanelViewProps> = ({
   const [coverMode, setCoverMode] = useState<'upload' | 'presets' | 'url'>('upload')
 
   const handleSaveCoverAdjustments = async (adjustments: {
-    coverFit: 'cover' | 'contain'
+    coverFit: 'cover' | 'contain' | 'logo'
     coverPositionX: string
     coverPositionY: string
     coverZoom: number
@@ -2072,15 +2072,31 @@ export const CompanyPanelView: React.FC<CompanyPanelViewProps> = ({
                     </div>
                   </div>
 
-                  {/* Preview da Capa */}
+                  {/* Preview da Capa (Proporção 2:1) */}
                   <div className="space-y-3 bg-white p-3.5 rounded-xl border border-neutral-200/80 shadow-xs">
-                    <div className="relative h-24 sm:h-28 rounded-xl bg-neutral-100 border border-neutral-200 overflow-hidden flex items-center justify-center shadow-inner">
+                    <div className="relative aspect-[2/1] w-full max-w-md mx-auto rounded-xl bg-neutral-950 border border-neutral-200 overflow-hidden flex items-center justify-center shadow-inner">
                       {coverPreview ? (
                         // eslint-disable-next-line @next/next/no-img-element
                         <img
                           src={coverPreview}
                           alt="Cover Preview"
-                          className="w-full h-full object-cover"
+                          className={`w-full h-full transition-all duration-150 select-none ${
+                            (formData.coverFit || company.coverFit) === 'contain'
+                              ? 'object-contain'
+                              : (formData.coverFit || company.coverFit) === 'logo'
+                              ? 'object-contain p-3.5 sm:p-5'
+                              : 'object-cover'
+                          }`}
+                          style={{
+                            objectPosition: `${formData.coverPositionX || company.coverPositionX || 'center'} ${
+                              formData.coverPositionY || company.coverPositionY || 'center'
+                            }`,
+                            transform:
+                              (formData.coverZoom || company.coverZoom) &&
+                              (formData.coverZoom || company.coverZoom) !== 1
+                                ? `scale(${formData.coverZoom || company.coverZoom})`
+                                : undefined,
+                          }}
                         />
                       ) : (
                         <div className="text-neutral-400 text-xs flex items-center gap-1.5">
@@ -2093,6 +2109,9 @@ export const CompanyPanelView: React.FC<CompanyPanelViewProps> = ({
                           <span>Enviando foto de capa...</span>
                         </div>
                       )}
+                      <div className="absolute top-2 right-2 px-1.5 py-0.5 rounded-md bg-black/60 backdrop-blur-xs text-[10px] font-bold text-white/90">
+                        2:1
+                      </div>
                     </div>
 
                     {coverMode === 'upload' && (
@@ -2123,7 +2142,7 @@ export const CompanyPanelView: React.FC<CompanyPanelViewProps> = ({
                           )}
                         </div>
                         <p className="text-[10px] text-neutral-400">
-                          Resolução recomendada: 1200×600 px.
+                          Proporção padrão 2:1 (ex: 1200×600 px).
                         </p>
                       </div>
                     )}
