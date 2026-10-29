@@ -22,6 +22,7 @@ import {
   ShieldCheck,
 } from 'lucide-react'
 import { Company, TableOrderHistoryEvent } from '@/types/platform'
+import { getPublicTheme } from '@/lib/public-themes'
 import { CartItem } from './menu-item-modal'
 import { DeliveryOptionsForm } from './delivery-options-form'
 import {
@@ -68,6 +69,10 @@ export const MenuCartDrawer: React.FC<MenuCartDrawerProps> = ({
   onRemoveItem,
   onClearCart,
 }) => {
+  const activeTheme = useMemo(
+    () => getPublicTheme(company.theme, company.customThemeConfig, company.themeColors),
+    [company.theme, company.customThemeConfig, company.themeColors]
+  )
   const [step, setStep] = useState<'items' | 'delivery' | 'payment'>(initialStep)
   const [deliveryInfo, setDeliveryInfo] = useState<OrderDeliveryInfo>(() => {
     const saved = loadSavedDeliveryInfo(company.id)
@@ -605,12 +610,20 @@ export const MenuCartDrawer: React.FC<MenuCartDrawerProps> = ({
             ? 'bg-neutral-900 border-neutral-800 text-white'
             : 'bg-white border-neutral-200 text-neutral-900'
         }`}
+        style={{
+          backgroundColor: activeTheme.modalBg,
+          borderColor: activeTheme.containerBorderColor,
+        }}
       >
         {/* Header */}
         <div
           className={`p-4 border-b flex items-center justify-between shrink-0 ${
             isDark ? 'border-neutral-800 bg-neutral-950/40' : 'border-neutral-100 bg-neutral-50/60'
           }`}
+          style={{
+            backgroundColor: activeTheme.fixedAreaBg,
+            borderColor: activeTheme.containerBorderColor,
+          }}
         >
           <div className="flex items-center gap-2.5">
             {step === 'delivery' ? (
@@ -1266,6 +1279,10 @@ export const MenuCartDrawer: React.FC<MenuCartDrawerProps> = ({
             className={`p-4 border-t space-y-3 shrink-0 ${
               isDark ? 'border-neutral-800 bg-neutral-950/70' : 'border-neutral-100 bg-neutral-50'
             }`}
+            style={{
+              backgroundColor: activeTheme.fixedAreaBg,
+              borderColor: activeTheme.containerBorderColor,
+            }}
           >
             <div className="flex items-baseline justify-between">
               <span className="text-xs text-neutral-400 font-semibold">

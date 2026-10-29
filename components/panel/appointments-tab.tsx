@@ -54,6 +54,7 @@ import {
   fetchCompanyAppointmentsFromServer,
   updateAppointmentStatusOnServerApi,
   updateAppointmentOnServerApi,
+  deleteAppointmentOnServerApi,
   createAppointmentOnServerApi,
   getCompanyProfessionals,
   fetchCompanyProfessionalsFromServer,
@@ -125,6 +126,8 @@ export const AppointmentsTab: React.FC<AppointmentsTabProps> = ({
   const [filterStatus, setFilterStatus] = useState<string>('all')
   const [dateFilter, setDateFilter] = useState<string>('')
   const [toastMessage, setToastMessage] = useState<{ text: string; type: 'success' | 'error' } | null>(null)
+  const [deletingAppointment, setDeletingAppointment] = useState<Appointment | null>(null)
+  const [isDeleting, setIsDeleting] = useState(false)
 
   // Booking settings state
   const [settings, setSettings] = useState<BookingSettings>(() => {
@@ -277,6 +280,22 @@ export const AppointmentsTab: React.FC<AppointmentsTabProps> = ({
       loadData()
     } else {
       showToast('error', 'Erro ao atualizar status.')
+    }
+  }
+
+  // Delete Appointment (Requirement: Excluir agendamentos)
+  const handleDeleteAppointment = async () => {
+    if (!deletingAppointment) return
+    setIsDeleting(true)
+    const res = await deleteAppointmentOnServerApi(deletingAppointment.id, company.id)
+    setIsDeleting(false)
+    if (res.success) {
+      setAppointments((prev) => prev.filter((a) => a.id !== deletingAppointment.id))
+      showToast('success', 'Agendamento excluído com sucesso!')
+      setDeletingAppointment(null)
+      loadData()
+    } else {
+      showToast('error', res.error || 'Erro ao excluir agendamento.')
     }
   }
 
@@ -1050,6 +1069,15 @@ export const AppointmentsTab: React.FC<AppointmentsTabProps> = ({
                             Cancelar
                           </button>
                         )}
+
+                        <button
+                          type="button"
+                          onClick={() => setDeletingAppointment(appt)}
+                          className="p-1.5 rounded-lg border border-neutral-200 text-neutral-400 hover:text-rose-600 hover:border-rose-300 hover:bg-rose-50 transition-colors cursor-pointer"
+                          title="Excluir agendamento permanentemente"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
                       </div>
                     </div>
                   </div>
@@ -2002,6 +2030,83 @@ export const AppointmentsTab: React.FC<AppointmentsTabProps> = ({
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* Modal de Confirmação de Exclusão de Agendamento */}
+      {deletingAppointment && (
+        <div className="fixed inset-0 z-50 bg-neutral-950/70 backdrop-blur-xs flex items-center justify-center p-4 animate-in fade-in">
+          <div className="bg-white rounded-3xl max-w-md w-full p-6 shadow-2xl border border-neutral-200 space-y-4 animate-in zoom-in-95">
+            <div className="flex items-center gap-3">
+              <div className="w-11 h-11 rounded-2xl bg-rose-50 text-rose-600 flex items-center justify-center shrink-0 border border-rose-200">
+                <Trash2 className="w-5 h-5 text-rose-600" />
+              </div>
+              <div>
+                <h4 className="font-bold text-base text-neutral-900">
+                  Excluir Agendamento
+                </h4>
+                <p className="text-xs text-neutral-500">
+                  Esta ação é irreversível
+                </p>
+              </div>
+            </div>
+
+            <div className="p-3.5 rounded-2xl bg-neutral-50 border border-neutral-200/80 space-y-2 text-xs">
+              <div className="flex justify-between items-center">
+                <span className="text-neutral-500">Cliente:</span>
+                <span className="font-bold text-neutral-900">{deletingAppointment.customerName}</span>
+              </div>
+              <div className="flex justify-between items-center">
+                <span className="text-neutral-500">Serviço:</span>
+                <span className="font-semibold text-neutral-800">{deletingAppointment.serviceName}</span>
+              </div>
+              <div className="flex justify-between items-center">
+                <span className="text-neutral-500">Data e Horário:</span>
+                <span className="font-mono font-bold text-neutral-900">
+                  {deletingAppointment.date.split('-').reverse().join('/')} às {deletingAppointment.time}
+                </span>
+              </div>
+              {deletingAppointment.professionalName && (
+                <div className="flex justify-between items-center">
+                  <span className="text-neutral-500">Profissional:</span>
+                  <span className="text-neutral-800">{deletingAppointment.professionalName}</span>
+                </div>
+              )}
+            </div>
+
+            <p className="text-xs text-neutral-600 leading-relaxed">
+              Tem certeza que deseja excluir permanentemente este agendamento? Ele será removido do painel e os horários poderão ser liberados.
+            </p>
+
+            <div className="pt-2 flex items-center justify-end gap-2.5">
+              <button
+                type="button"
+                disabled={isDeleting}
+                onClick={() => setDeletingAppointment(null)}
+                className="px-4 py-2.5 rounded-xl border border-neutral-200 text-neutral-700 font-semibold text-xs hover:bg-neutral-50 transition-all cursor-pointer disabled:opacity-50"
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                disabled={isDeleting}
+                onClick={handleDeleteAppointment}
+                className="px-4 py-2.5 rounded-xl bg-rose-600 hover:bg-rose-700 text-white font-bold text-xs flex items-center gap-1.5 transition-all shadow-xs cursor-pointer disabled:opacity-50"
+              >
+                {isDeleting ? (
+                  <>
+                    <span className="w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                    <span>Excluindo...</span>
+                  </>
+                ) : (
+                  <>
+                    <Trash2 className="w-3.5 h-3.5" />
+                    <span>Sim, excluir agendamento</span>
+                  </>
+                )}
+              </button>
+            </div>
           </div>
         </div>
       )}

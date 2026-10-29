@@ -231,11 +231,15 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
         animate={{ y: 0, opacity: 1 }}
         exit={{ y: '100%', opacity: 0 }}
         transition={{ type: 'spring', damping: 28, stiffness: 300 }}
-        className={`relative w-full sm:max-w-md rounded-t-3xl sm:rounded-3xl shadow-2xl overflow-hidden z-10 max-h-[92vh] flex flex-col border ${
+        className={`relative w-full sm:max-w-xl rounded-t-3xl sm:rounded-3xl shadow-2xl overflow-hidden z-10 max-h-[92vh] flex flex-col border ${
           isDark
             ? 'bg-[#15151b] border-white/10 text-white'
             : 'bg-white border-neutral-200 text-neutral-900'
         }`}
+        style={{
+          backgroundColor: activeTheme.modalBg,
+          borderColor: activeTheme.containerBorderColor,
+        }}
       >
         {/* Mobile Drag Bar */}
         <div className="w-12 h-1.5 bg-neutral-500/40 rounded-full mx-auto mt-2.5 mb-1 sm:hidden shrink-0" />
@@ -596,6 +600,10 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
           className={`p-4 sm:p-5 border-t shrink-0 flex flex-col gap-2.5 ${
             isDark ? 'bg-[#101015] border-white/10' : 'bg-neutral-50 border-neutral-200'
           }`}
+          style={{
+            backgroundColor: activeTheme.fixedAreaBg,
+            borderColor: activeTheme.containerBorderColor,
+          }}
         >
           {viewStep === 'details' ? (
             <div className="flex flex-col sm:flex-row gap-2.5">

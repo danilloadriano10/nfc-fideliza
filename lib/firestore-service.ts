@@ -29,6 +29,8 @@ import {
   TableOrder,
   TableOrderStatus,
   CompanyCourier,
+  CompanySubscription,
+  AsaasWebhookEventLog,
 } from '@/types/platform'
 import { normalizePhone } from '@/lib/utils'
 import { hashPassword } from '@/lib/auth-crypto'
@@ -63,6 +65,8 @@ const DELETED_COMPANIES_COLLECTION = 'deleted_companies'
 const TABLES_COLLECTION = 'tables'
 const TABLE_ORDERS_COLLECTION = 'tableOrders'
 const COURIERS_COLLECTION = 'couriers'
+const SUBSCRIPTIONS_COLLECTION = 'subscriptions'
+const ASAAS_WEBHOOK_EVENTS_COLLECTION = 'asaasWebhookEvents'
 
 let migrationPromise: Promise<void> | null = null
 
@@ -1716,6 +1720,29 @@ export async function updateFirestoreAppointment(
   }
 }
 
+export async function deleteFirestoreAppointment(
+  id: string,
+  companyId: string
+): Promise<{ success: boolean; error?: string }> {
+  try {
+    await ensureFirestoreInitialized()
+    const docRef = doc(db, APPOINTMENTS_COLLECTION, id)
+    const snap = await getDoc(docRef)
+    if (!snap.exists()) {
+      return { success: true }
+    }
+    const data = snap.data() as Appointment
+    if (companyId && data.companyId && data.companyId !== companyId) {
+      return { success: false, error: 'Operação não autorizada.' }
+    }
+    await deleteDoc(docRef)
+    return { success: true }
+  } catch (err) {
+    handleFirestoreError(err, OperationType.DELETE, `${APPOINTMENTS_COLLECTION}/${id}`)
+    return { success: false, error: 'Erro ao excluir agendamento.' }
+  }
+}
+
 // ==========================================
 // 8. PROFESSIONALS (MULTI-TENANT)
 // ==========================================
@@ -2449,6 +2476,31 @@ export async function updateFirestoreTableOrderFull(order: TableOrder): Promise<
   return await saveFirestoreTableOrder(order)
 }
 
+export async function deleteFirestoreTableOrder(
+  orderId: string,
+  companyId: string
+): Promise<{ success: boolean; error?: string }> {
+  const cleanId = (orderId || '').trim()
+  if (!cleanId) return { success: false, error: 'ID do pedido é obrigatório.' }
+  try {
+    await ensureFirestoreInitialized()
+    const docRef = doc(db, TABLE_ORDERS_COLLECTION, cleanId)
+    const snap = await getDoc(docRef)
+    if (!snap.exists()) {
+      return { success: true }
+    }
+    const data = snap.data() as TableOrder
+    if (companyId && data.companyId && data.companyId !== companyId) {
+      return { success: false, error: 'Operação não autorizada.' }
+    }
+    await deleteDoc(docRef)
+    return { success: true }
+  } catch (err) {
+    handleFirestoreError(err, OperationType.DELETE, `${TABLE_ORDERS_COLLECTION}/${cleanId}`)
+    return { success: false, error: 'Erro ao excluir pedido.' }
+  }
+}
+
 // ==========================================
 // 14. MOTOBOYS / ENTREGADORES (COURIERS)
 // ==========================================
@@ -2498,5 +2550,157 @@ export async function deleteFirestoreCourier(courierId: string): Promise<void> {
     throw err
   }
 }
+
+// ==========================================
+// 15. ASSINATURAS E WEBHOOK ASAAS (SANDBOX / PRODUÇÃO)
+// ==========================================
+
+export async function getFirestoreSubscription(companyId: string): Promise<CompanySubscription | null> {
+  if (!companyId) return null
+  try {
+    await ensureFirestoreInitialized()
+    const cleanId = companyId.trim()
+    const docRef = doc(db, SUBSCRIPTIONS_COLLECTION, cleanId)
+    const snap = await getDoc(docRef)
+    if (snap.exists()) {
+      return snap.data() as CompanySubscription
+    }
+
+    // Fallback: verificar se já está gravada no documento da empresa
+    const compRef = doc(db, COMPANIES_COLLECTION, cleanId)
+    const compSnap = await getDoc(compRef)
+    if (compSnap.exists() && compSnap.data()?.subscription) {
+      return compSnap.data()?.subscription as CompanySubscription
+    }
+
+    // Fallback: buscar por query no campo companyId
+    const q = query(collection(db, SUBSCRIPTIONS_COLLECTION), where('companyId', '==', cleanId))
+    const qSnap = await getDocs(q)
+    if (!qSnap.empty) {
+      return qSnap.docs[0].data() as CompanySubscription
+    }
+
+    return null
+  } catch (err) {
+    handleFirestoreError(err, OperationType.GET, SUBSCRIPTIONS_COLLECTION)
+    return null
+  }
+}
+
+export async function saveFirestoreSubscription(sub: CompanySubscription): Promise<CompanySubscription> {
+  if (!sub || !sub.companyId) {
+    throw new Error('companyId é obrigatório na assinatura.')
+  }
+  try {
+    await ensureFirestoreInitialized()
+    const cleanCompanyId = sub.companyId.trim()
+    const docId = cleanCompanyId // Indexado diretamente por companyId para acesso rápido e seguro
+    const nowIso = new Date().toISOString()
+    const toSave: CompanySubscription = {
+      ...sub,
+      id: sub.id || `sub_${cleanCompanyId}`,
+      companyId: cleanCompanyId,
+      updatedAt: nowIso,
+      createdAt: sub.createdAt || nowIso,
+    }
+
+    const payload = JSON.parse(JSON.stringify(toSave))
+
+    // 1. Grava na coleção dedicada subscriptions
+    const subRef = doc(db, SUBSCRIPTIONS_COLLECTION, docId)
+    await setDoc(subRef, payload, { merge: true })
+
+    // 2. Atualiza atomicamente o campo subscription no documento da empresa correspondente
+    try {
+      const compRef = doc(db, COMPANIES_COLLECTION, cleanCompanyId)
+      await setDoc(compRef, { subscription: payload, updatedAt: nowIso }, { merge: true })
+    } catch (compErr) {
+      console.warn('Não foi possível sincronizar subscription no doc da empresa:', compErr)
+    }
+
+    return toSave
+  } catch (err) {
+    handleFirestoreError(err, OperationType.WRITE, SUBSCRIPTIONS_COLLECTION)
+    throw err
+  }
+}
+
+export async function getFirestoreSubscriptionByAsaasId(
+  asaasSubscriptionId: string
+): Promise<CompanySubscription | null> {
+  if (!asaasSubscriptionId) return null
+  try {
+    await ensureFirestoreInitialized()
+    const cleanId = asaasSubscriptionId.trim()
+    const q = query(collection(db, SUBSCRIPTIONS_COLLECTION), where('asaasSubscriptionId', '==', cleanId))
+    const qSnap = await getDocs(q)
+    if (!qSnap.empty) {
+      return qSnap.docs[0].data() as CompanySubscription
+    }
+    return null
+  } catch (err) {
+    handleFirestoreError(err, OperationType.GET, SUBSCRIPTIONS_COLLECTION)
+    return null
+  }
+}
+
+export async function getFirestoreSubscriptionByAsaasCustomerId(
+  asaasCustomerId: string
+): Promise<CompanySubscription | null> {
+  if (!asaasCustomerId) return null
+  try {
+    await ensureFirestoreInitialized()
+    const cleanId = asaasCustomerId.trim()
+    const q = query(collection(db, SUBSCRIPTIONS_COLLECTION), where('asaasCustomerId', '==', cleanId))
+    const qSnap = await getDocs(q)
+    if (!qSnap.empty) {
+      return qSnap.docs[0].data() as CompanySubscription
+    }
+    return null
+  } catch (err) {
+    handleFirestoreError(err, OperationType.GET, SUBSCRIPTIONS_COLLECTION)
+    return null
+  }
+}
+
+export async function isAsaasWebhookEventProcessed(eventId: string): Promise<boolean> {
+  if (!eventId) return false
+  try {
+    await ensureFirestoreInitialized()
+    const docRef = doc(db, ASAAS_WEBHOOK_EVENTS_COLLECTION, eventId.trim())
+    const snap = await getDoc(docRef)
+    return snap.exists()
+  } catch (err) {
+    handleFirestoreError(err, OperationType.GET, ASAAS_WEBHOOK_EVENTS_COLLECTION)
+    return false
+  }
+}
+
+export async function recordAsaasWebhookEvent(
+  eventId: string,
+  event: string,
+  payload: unknown,
+  companyId?: string
+): Promise<void> {
+  if (!eventId) return
+  try {
+    await ensureFirestoreInitialized()
+    const nowIso = new Date().toISOString()
+    const docRef = doc(db, ASAAS_WEBHOOK_EVENTS_COLLECTION, eventId.trim())
+    const log: AsaasWebhookEventLog = {
+      id: eventId.trim(),
+      event,
+      dateCreated: nowIso,
+      processedAt: nowIso,
+      companyId: companyId || undefined,
+      status: 'PROCESSED',
+    }
+    const cleanPayload = JSON.parse(JSON.stringify({ ...log, rawPayload: payload }))
+    await setDoc(docRef, cleanPayload, { merge: true })
+  } catch (err) {
+    handleFirestoreError(err, OperationType.WRITE, ASAAS_WEBHOOK_EVENTS_COLLECTION)
+  }
+}
+
 
 

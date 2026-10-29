@@ -81,5 +81,16 @@ service cloud.firestore {
     match /couriers/{courierId} {
       allow read, write: if true;
     }
+
+    // Subscriptions: Assinaturas Asaas vinculadas a empresas
+    match /subscriptions/{subscriptionId} {
+      allow read, write: if true;
+    }
+
+    // Asaas Webhook Events: Log de idempotência de eventos do Asaas
+    match /asaasWebhookEvents/{eventId} {
+      allow read, write: if true;
+    }
   }
 }
+

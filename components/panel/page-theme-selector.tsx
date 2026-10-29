@@ -298,7 +298,7 @@ export const PageThemeSelector: React.FC<PageThemeSelectorProps> = ({
               </label>
             </div>
             <p className="text-xs text-neutral-400 mt-1">
-              Escolha entre 10 atmosferas visuais com design profissional. Todas as cores podem ser ajustadas individualmente abaixo.
+              Escolha entre 11 atmosferas visuais com design profissional. Todas as cores podem ser ajustadas individualmente abaixo.
             </p>
           </div>
           <div className="flex items-center gap-2 flex-wrap">
@@ -313,14 +313,14 @@ export const PageThemeSelector: React.FC<PageThemeSelectorProps> = ({
         </div>
 
         {/* ======================================================== */}
-        {/* GRID DE 10 TEMAS VISUAIS COM MINIATURA DE PRÉVIA */}
+        {/* GRID DE 11 TEMAS VISUAIS COM MINIATURA DE PRÉVIA */}
         {/* ======================================================== */}
         <div className="space-y-2">
           <div className="flex items-center justify-between text-xs text-neutral-400">
-            <span className="font-semibold text-neutral-300">10 Temas Prontos (carregam cores padrão):</span>
+            <span className="font-semibold text-neutral-300">11 Temas Prontos (carregam cores padrão):</span>
             <span className="text-[11px] text-neutral-500">Toque em qualquer tema para carregar</span>
           </div>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3 pt-1">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 pt-1">
             {PUBLIC_THEME_LIST.map((theme, index) => {
               const isSelected =
                 currentThemeId === theme.id ||

@@ -46,6 +46,7 @@ import {
   createFirestoreAppointment,
   updateFirestoreAppointmentStatus,
   updateFirestoreAppointment,
+  deleteFirestoreAppointment,
   getFirestoreProfessionals,
   saveFirestoreProfessional,
   deleteFirestoreProfessional,
@@ -60,9 +61,16 @@ import {
   saveFirestoreTableOrder,
   updateFirestoreTableOrderStatus,
   updateFirestoreTableOrderFull,
+  deleteFirestoreTableOrder,
   getFirestoreCouriers,
   saveFirestoreCourier,
   deleteFirestoreCourier,
+  getFirestoreSubscription,
+  saveFirestoreSubscription,
+  getFirestoreSubscriptionByAsaasId,
+  getFirestoreSubscriptionByAsaasCustomerId,
+  recordAsaasWebhookEvent,
+  isAsaasWebhookEventProcessed,
   ensureFirestoreInitialized,
 } from './firestore-service'
 
@@ -82,6 +90,7 @@ import {
   TableOrder,
   TableOrderStatus,
   CompanyCourier,
+  CompanySubscription,
 } from '@/types/platform'
 
 // Ensure system migration is initialized on startup
@@ -385,6 +394,13 @@ export async function updateServerAppointment(
   return await updateFirestoreAppointment(id, companyId, patch)
 }
 
+export async function deleteServerAppointment(
+  id: string,
+  companyId: string
+): Promise<{ success: boolean; error?: string }> {
+  return await deleteFirestoreAppointment(id, companyId)
+}
+
 export async function getServerProfessionals(companyId: string): Promise<CompanyProfessional[]> {
   return await getFirestoreProfessionals(companyId)
 }
@@ -463,6 +479,13 @@ export async function updateServerTableOrderFull(order: TableOrder): Promise<Tab
   return await updateFirestoreTableOrderFull(order)
 }
 
+export async function deleteServerTableOrder(
+  orderId: string,
+  companyId: string
+): Promise<{ success: boolean; error?: string }> {
+  return await deleteFirestoreTableOrder(orderId, companyId)
+}
+
 // ==========================================
 // MOTOBOYS / ENTREGADORES (COURIERS)
 // ==========================================
@@ -478,4 +501,38 @@ export async function saveServerCourier(courier: CompanyCourier): Promise<Compan
 export async function deleteServerCourier(courierId: string): Promise<void> {
   return await deleteFirestoreCourier(courierId)
 }
+
+// ==========================================
+// ASSINATURAS E WEBHOOK ASAAS (SANDBOX / PRODUÇÃO)
+// ==========================================
+
+export async function getServerSubscription(companyId: string): Promise<CompanySubscription | null> {
+  return await getFirestoreSubscription(companyId)
+}
+
+export async function saveServerSubscription(sub: CompanySubscription): Promise<CompanySubscription> {
+  return await saveFirestoreSubscription(sub)
+}
+
+export async function getServerSubscriptionByAsaasId(asaasSubId: string): Promise<CompanySubscription | null> {
+  return await getFirestoreSubscriptionByAsaasId(asaasSubId)
+}
+
+export async function getServerSubscriptionByAsaasCustomerId(asaasCustomerId: string): Promise<CompanySubscription | null> {
+  return await getFirestoreSubscriptionByAsaasCustomerId(asaasCustomerId)
+}
+
+export async function isServerWebhookEventProcessed(eventId: string): Promise<boolean> {
+  return await isAsaasWebhookEventProcessed(eventId)
+}
+
+export async function recordServerWebhookEvent(
+  eventId: string,
+  event: string,
+  payload: unknown,
+  companyId?: string
+): Promise<void> {
+  return await recordAsaasWebhookEvent(eventId, event, payload, companyId)
+}
+
 

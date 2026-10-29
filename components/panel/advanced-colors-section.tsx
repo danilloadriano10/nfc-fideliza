@@ -49,14 +49,14 @@ export const AdvancedColorsSection: React.FC<AdvancedColorsSectionProps> = ({
       label: 'Fundo da página',
       description: 'Cor principal de fundo em tela cheia no mobile e desktop',
       icon: <Square className="w-4 h-4 text-sky-400" />,
-      presetChips: ['#070709', '#05120c', '#120904', '#08080a', '#050a14', '#f8fafc', '#fdf2f4', '#f3ece3'],
+      presetChips: ['#000000', '#070709', '#05120c', '#120904', '#08080a', '#050a14', '#f8fafc', '#fdf2f4', '#f3ece3'],
     },
     {
       key: 'cardBg',
       label: 'Fundo dos cards',
       description: 'Superfície dos módulos, vitrine de serviços e produtos',
       icon: <Square className="w-4 h-4 text-violet-400" />,
-      presetChips: ['#141419', '#10291e', '#27170e', '#16161c', '#10223d', '#ffffff', '#faf7f2', '#181822'],
+      presetChips: ['#080808', '#141419', '#10291e', '#27170e', '#16161c', '#10223d', '#ffffff', '#faf7f2', '#181822'],
       sampleType: 'card',
     },
     {
@@ -110,7 +110,7 @@ export const AdvancedColorsSection: React.FC<AdvancedColorsSectionProps> = ({
       label: 'Cor das bordas/detalhes',
       description: 'Linhas divisórias, contornos dos cartões e anéis decorativos',
       icon: <Square className="w-4 h-4 text-neutral-400" />,
-      presetChips: ['rgba(255, 255, 255, 0.08)', '#e2e8f0', '#1b4d35', 'rgba(245, 158, 11, 0.22)', 'rgba(212, 175, 55, 0.28)', 'rgba(59, 130, 246, 0.22)', '#f9dce2', '#ebdcd0'],
+      presetChips: ['#202020', 'rgba(255, 255, 255, 0.08)', '#e2e8f0', '#1b4d35', 'rgba(245, 158, 11, 0.22)', 'rgba(212, 175, 55, 0.28)', 'rgba(59, 130, 246, 0.22)', '#f9dce2', '#ebdcd0'],
       sampleType: 'border',
     },
   ]

@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useMemo } from 'react'
 import { motion, AnimatePresence } from 'motion/react'
 import {
   X,
@@ -16,6 +16,7 @@ import {
   ArrowLeft,
   Loader2,
   Sparkles,
+  Check,
 } from 'lucide-react'
 import {
   Company,
@@ -28,7 +29,8 @@ import {
   getCompanyProfessionals,
   createAppointmentOnServerApi,
 } from '@/lib/storage'
-import { formatPhone, normalizePhone } from '@/lib/utils'
+import { normalizePhone } from '@/lib/utils'
+import { getPublicTheme } from '@/lib/public-themes'
 
 interface BookingSheetProps {
   isOpen: boolean
@@ -62,6 +64,17 @@ export const BookingSheet: React.FC<BookingSheetProps> = ({
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
   const [createdAppointment, setCreatedAppointment] = useState<Appointment | null>(null)
+
+  // Theme configuration
+  const activeTheme = useMemo(
+    () => getPublicTheme(company.theme, company.customThemeConfig, company.themeColors),
+    [company.theme, company.customThemeConfig, company.themeColors]
+  )
+  const isDark = activeTheme.isDarkBase ?? false
+  const primaryColor = activeTheme.colors.primary || company.primaryColor || '#6D28D9'
+  const buttonBg = activeTheme.colors.buttonBg || primaryColor
+  const buttonText = activeTheme.colors.buttonText || '#FFFFFF'
+  const priceColor = activeTheme.colors.priceColor || (isDark ? '#34D399' : '#059669')
 
   // Load services & professionals on open
   useEffect(() => {
@@ -101,7 +114,7 @@ export const BookingSheet: React.FC<BookingSheetProps> = ({
   }, [isOpen, company.id, initialService])
 
   // Available dates (Today + next 14 days)
-  const getUpcomingDates = () => {
+  const upcomingDates = useMemo(() => {
     const list: { dateString: string; label: string; weekday: string }[] = []
     const now = new Date()
 
@@ -136,7 +149,7 @@ export const BookingSheet: React.FC<BookingSheetProps> = ({
       list.push({ dateString, label, weekday })
     }
     return list
-  }
+  }, [])
 
   // Fetch available slots from backend whenever date or professional changes
   useEffect(() => {
@@ -187,7 +200,6 @@ export const BookingSheet: React.FC<BookingSheetProps> = ({
   // Handlers
   const handleSelectService = (srv: CompanyService) => {
     setSelectedService(srv)
-    // If no professionals exist for this service, skip directly to step 3 (Date)
     const profs = professionals.filter((p) => {
       if (!p.serviceIds || p.serviceIds.length === 0) return true
       return p.serviceIds.includes(srv.id)
@@ -265,435 +277,672 @@ export const BookingSheet: React.FC<BookingSheetProps> = ({
     window.open(url, '_blank', 'noopener,noreferrer')
   }
 
-  const upcomingDates = getUpcomingDates()
-  const primaryColor = company.primaryColor || '#6D28D9'
-
   return (
-    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4">
-      {/* Backdrop */}
-      <motion.div
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        exit={{ opacity: 0 }}
-        onClick={onClose}
-        className="fixed inset-0 bg-neutral-950/60 backdrop-blur-sm"
-      />
+    <AnimatePresence>
+      <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 overflow-hidden">
+        {/* Backdrop */}
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          onClick={onClose}
+          className="fixed inset-0 bg-black/60 backdrop-blur-xs cursor-pointer"
+        />
 
-      {/* Sheet Content */}
-      <motion.div
-        initial={{ y: '100%', opacity: 0.9 }}
-        animate={{ y: 0, opacity: 1 }}
-        exit={{ y: '100%', opacity: 0 }}
-        transition={{ type: 'spring', damping: 26, stiffness: 280 }}
-        className="relative w-full sm:max-w-md bg-white rounded-t-3xl sm:rounded-3xl shadow-2xl overflow-hidden z-10 p-5 sm:p-6 space-y-4 max-h-[88vh] flex flex-col"
-      >
-        {/* Mobile drag handle */}
-        <div className="w-12 h-1.5 bg-neutral-200 rounded-full mx-auto -mt-1 mb-1 sm:hidden shrink-0" />
-
-        {/* Header */}
-        <div className="flex items-center justify-between shrink-0">
-          <div className="flex items-center gap-2.5">
-            <div
-              className="w-10 h-10 rounded-2xl flex items-center justify-center text-white shadow-xs shrink-0"
-              style={{ backgroundColor: primaryColor }}
-            >
-              <CalendarIcon className="w-5 h-5" />
-            </div>
-            <div>
-              <h3 className="font-bold text-neutral-900 text-base leading-tight">
-                Agendar Horário
-              </h3>
-              <p className="text-[11px] text-neutral-500">
-                {company.name} · Reserva online em tempo real
-              </p>
-            </div>
-          </div>
-
-          <button
-            type="button"
-            onClick={onClose}
-            className="w-8 h-8 rounded-full bg-neutral-100 hover:bg-neutral-200 text-neutral-600 flex items-center justify-center transition-colors cursor-pointer"
+        {/* Modal Sheet Container - Padronizado igual ao Cardápio Digital */}
+        <motion.div
+          initial={{ y: '100%', opacity: 0 }}
+          animate={{ y: 0, opacity: 1 }}
+          exit={{ y: '100%', opacity: 0 }}
+          transition={{ type: 'spring', damping: 26, stiffness: 280 }}
+          className={`relative w-full sm:max-w-3xl rounded-t-3xl sm:rounded-3xl shadow-2xl overflow-hidden z-10 flex flex-col max-h-[92vh] h-[92vh] sm:h-auto sm:max-h-[88vh] border ${
+            isDark ? 'bg-[#121217] border-white/10 text-white' : 'bg-white border-neutral-200 text-neutral-900'
+          }`}
+          style={{
+            backgroundColor: activeTheme.modalBg,
+            borderColor: activeTheme.containerBorderColor,
+          }}
+        >
+          {/* Header Superior Fixo */}
+          <div
+            className={`p-3.5 sm:p-4 border-b shrink-0 flex items-center justify-between gap-3 ${
+              isDark ? 'bg-[#15151c] border-white/[0.08]' : 'bg-neutral-50 border-neutral-200'
+            }`}
+            style={{
+              backgroundColor: activeTheme.fixedAreaBg,
+              borderColor: activeTheme.containerBorderColor,
+            }}
           >
-            <X className="w-4 h-4" />
-          </button>
-        </div>
-
-        {/* Step Indicator */}
-        {step < 5 && (
-          <div className="flex items-center justify-between gap-1 text-[11px] font-medium text-neutral-400 border-b border-neutral-100 pb-2 shrink-0">
-            <span className={step >= 1 ? 'text-violet-700 font-bold' : ''}>1. Serviço</span>
-            <span>→</span>
-            {availableProfessionalsForService.length > 0 && (
-              <>
-                <span className={step >= 2 ? 'text-violet-700 font-bold' : ''}>2. Profissional</span>
-                <span>→</span>
-              </>
-            )}
-            <span className={step >= 3 ? 'text-violet-700 font-bold' : ''}>3. Data & Horário</span>
-            <span>→</span>
-            <span className={step >= 4 ? 'text-violet-700 font-bold' : ''}>4. Seus Dados</span>
-          </div>
-        )}
-
-        {/* Error message */}
-        {errorMessage && (
-          <div className="p-3 bg-red-50 border border-red-200 rounded-xl text-red-700 text-xs flex items-center gap-2">
-            <AlertCircle className="w-4 h-4 shrink-0" />
-            <span>{errorMessage}</span>
-          </div>
-        )}
-
-        {/* STEP 1: SERVIÇOS */}
-        {step === 1 && (
-          <div className="space-y-3 overflow-y-auto flex-1 pr-0.5 scrollbar-thin">
-            <div className="flex items-center justify-between">
-              <span className="text-xs font-bold text-neutral-800">Selecione o serviço desejado:</span>
-            </div>
-
-            {services.length === 0 ? (
-              <div className="py-10 text-center text-xs text-neutral-400 space-y-1">
-                <Scissors className="w-8 h-8 mx-auto opacity-30" />
-                <p>Nenhum serviço disponível para agendamento no momento.</p>
+            <div className="flex items-center gap-3 min-w-0">
+              <div
+                className="w-10 h-10 rounded-2xl flex items-center justify-center text-white shadow-xs shrink-0"
+                style={{ backgroundColor: primaryColor }}
+              >
+                <CalendarIcon className="w-5 h-5" />
               </div>
-            ) : (
-              <div className="space-y-2">
-                {services.map((srv) => {
-                  const srvPhoto = srv.photoUrl || (srv as unknown as { imageUrl?: string }).imageUrl || ''
-                  return (
-                    <button
-                      key={srv.id}
-                      type="button"
-                      onClick={() => handleSelectService(srv)}
-                      className="w-full text-left p-3.5 rounded-2xl bg-neutral-50 hover:bg-violet-50/50 border border-neutral-200/80 hover:border-violet-300 transition-all flex items-center justify-between gap-3 group cursor-pointer"
-                    >
-                      <div className="flex items-center gap-3 min-w-0 flex-1">
-                        {srvPhoto ? (
-                          <div className="w-12 h-12 rounded-xl overflow-hidden shrink-0 bg-neutral-200 border border-neutral-200/80 shadow-2xs">
-                            {/* eslint-disable-next-line @next/next/no-img-element */}
-                            <img
-                              src={srvPhoto}
-                              alt={srv.name}
-                              className="w-full h-full object-cover"
-                              loading="lazy"
-                            />
-                          </div>
-                        ) : (
-                          <div className="w-12 h-12 rounded-xl bg-violet-100 text-violet-700 flex items-center justify-center shrink-0 border border-violet-200/50">
-                            <Scissors className="w-5 h-5 opacity-70" />
-                          </div>
-                        )}
-                        <div className="min-w-0 flex-1">
-                          <h4 className="font-bold text-neutral-900 text-xs sm:text-sm group-hover:text-violet-900 truncate">
-                            {srv.name}
-                          </h4>
-                          <div className="flex items-center gap-2 mt-1 text-[11px] text-neutral-500">
-                            {srv.price != null ? (
-                              <span className="font-bold text-neutral-900 font-mono">
-                                R$ {srv.price.toFixed(2).replace('.', ',')}
-                              </span>
-                            ) : (
-                              <span className="text-violet-700 font-medium">Consulte</span>
-                            )}
-                            {srv.durationMinutes && (
-                              <span className="flex items-center gap-0.5">
-                                <Clock className="w-3 h-3 text-neutral-400" />
-                                {srv.durationMinutes} min
-                              </span>
-                            )}
-                          </div>
-                        </div>
-                      </div>
-                      <ArrowRight className="w-4 h-4 text-neutral-400 group-hover:text-violet-600 shrink-0" />
-                    </button>
-                  )
-                })}
-              </div>
-            )}
-          </div>
-        )}
-
-        {/* STEP 2: PROFISSIONAL (SE HOUVER) */}
-        {step === 2 && (
-          <div className="space-y-3 overflow-y-auto flex-1 pr-0.5 scrollbar-thin">
-            <div className="flex items-center justify-between">
-              <span className="text-xs font-bold text-neutral-800">
-                Escolha o profissional:
-              </span>
-              <button
-                type="button"
-                onClick={() => setStep(1)}
-                className="text-[11px] text-neutral-500 hover:text-neutral-800 flex items-center gap-0.5 cursor-pointer"
-              >
-                <ArrowLeft className="w-3 h-3" />
-                <span>Voltar</span>
-              </button>
-            </div>
-
-            <div className="space-y-2">
-              {/* Option: Any Professional */}
-              <button
-                type="button"
-                onClick={() => handleSelectProf(null)}
-                className="w-full text-left p-3.5 rounded-2xl bg-neutral-50 hover:bg-violet-50/50 border border-neutral-200/80 hover:border-violet-300 transition-all flex items-center justify-between gap-3 group cursor-pointer"
-              >
-                <div className="flex items-center gap-3 min-w-0">
-                  <div className="w-10 h-10 rounded-xl bg-violet-100 text-violet-700 flex items-center justify-center shrink-0">
-                    <Sparkles className="w-5 h-5" />
-                  </div>
-                  <div>
-                    <h4 className="font-bold text-neutral-900 text-xs sm:text-sm group-hover:text-violet-900">
-                      Primeiro Horário Disponível
-                    </h4>
-                    <p className="text-[11px] text-neutral-500">Qualquer profissional da equipe</p>
-                  </div>
-                </div>
-                <ArrowRight className="w-4 h-4 text-neutral-400 group-hover:text-violet-600 shrink-0" />
-              </button>
-
-              {availableProfessionalsForService.map((p) => (
-                <button
-                  key={p.id}
-                  type="button"
-                  onClick={() => handleSelectProf(p)}
-                  className="w-full text-left p-3.5 rounded-2xl bg-neutral-50 hover:bg-violet-50/50 border border-neutral-200/80 hover:border-violet-300 transition-all flex items-center justify-between gap-3 group cursor-pointer"
-                >
-                  <div className="flex items-center gap-3 min-w-0">
-                    <div className="w-10 h-10 rounded-xl bg-neutral-200 text-neutral-800 font-bold text-xs flex items-center justify-center shrink-0">
-                      {p.name.slice(0, 2).toUpperCase()}
-                    </div>
-                    <div>
-                      <h4 className="font-bold text-neutral-900 text-xs sm:text-sm group-hover:text-violet-900 truncate">
-                        {p.name}
-                      </h4>
-                      <p className="text-[11px] text-neutral-500">{p.role || 'Profissional'}</p>
-                    </div>
-                  </div>
-                  <ArrowRight className="w-4 h-4 text-neutral-400 group-hover:text-violet-600 shrink-0" />
-                </button>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {/* STEP 3: DATA & HORÁRIO DISPONÍVEL */}
-        {step === 3 && (
-          <div className="space-y-4 overflow-y-auto flex-1 pr-0.5 scrollbar-thin">
-            <div className="flex items-center justify-between">
-              <span className="text-xs font-bold text-neutral-800">
-                Selecione o dia e o horário:
-              </span>
-              <button
-                type="button"
-                onClick={() => setStep(availableProfessionalsForService.length > 0 ? 2 : 1)}
-                className="text-[11px] text-neutral-500 hover:text-neutral-800 flex items-center gap-0.5 cursor-pointer"
-              >
-                <ArrowLeft className="w-3 h-3" />
-                <span>Voltar</span>
-              </button>
-            </div>
-
-            {/* Horizontal Dates List */}
-            <div className="flex items-center gap-2 overflow-x-auto pb-1 scrollbar-none">
-              {upcomingDates.map((d) => {
-                const isSelected = selectedDate === d.dateString
-                return (
-                  <button
-                    key={d.dateString}
-                    type="button"
-                    onClick={() => setSelectedDate(d.dateString)}
-                    className={`p-2.5 rounded-2xl text-center min-w-[70px] border transition-all cursor-pointer ${
-                      isSelected
-                        ? 'bg-neutral-900 text-white border-neutral-900 shadow-xs'
-                        : 'bg-neutral-50 hover:bg-neutral-100 text-neutral-700 border-neutral-200'
+              <div className="min-w-0">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <h3 className="font-black text-base sm:text-lg tracking-tight truncate">
+                    Agendamento Online
+                  </h3>
+                  <span
+                    className={`text-[11px] font-bold px-2 py-0.5 rounded-full shrink-0 ${
+                      isDark ? 'bg-white/10 text-neutral-300' : 'bg-neutral-100 text-neutral-700'
                     }`}
                   >
-                    <span className="block text-[10px] uppercase font-bold text-neutral-400">
-                      {d.weekday}
-                    </span>
-                    <span className="block text-xs font-bold mt-0.5">{d.label}</span>
-                  </button>
-                )
-              })}
+                    Reserva Online
+                  </span>
+                </div>
+                <p className={`text-xs truncate mt-0.5 ${isDark ? 'text-neutral-400' : 'text-neutral-500'}`}>
+                  {company.name} · Escolha serviço, profissional e horário
+                </p>
+              </div>
             </div>
 
-            {/* Time Slots Grid */}
-            <div className="space-y-2">
-              <span className="text-[11px] font-semibold text-neutral-500 block">
-                {selectedDate
-                  ? 'Horários disponíveis nesta data:'
-                  : 'Selecione uma data acima para carregar os horários.'}
-              </span>
-
-              {isLoadingSlots ? (
-                <div className="py-8 text-center text-xs text-neutral-400 flex items-center justify-center gap-2">
-                  <Loader2 className="w-4 h-4 animate-spin text-violet-600" />
-                  <span>Verificando horários disponíveis...</span>
-                </div>
-              ) : selectedDate && availableSlots.length === 0 ? (
-                <div className="py-8 text-center text-xs text-neutral-400 bg-neutral-50 rounded-2xl p-4">
-                  <p className="font-semibold text-neutral-600">Nenhum horário livre nesta data.</p>
-                  <p className="text-[11px] text-neutral-400 mt-1">
-                    Todos os horários estão ocupados ou o estabelecimento está fechado neste dia.
-                  </p>
-                </div>
-              ) : (
-                <div className="grid grid-cols-4 gap-2 max-h-48 overflow-y-auto">
-                  {availableSlots.map((slot) => {
-                    const isSelected = selectedTime === slot
-                    return (
-                      <button
-                        key={slot}
-                        type="button"
-                        onClick={() => handleSelectDateTime(selectedDate, slot)}
-                        className={`py-2 rounded-xl text-xs font-mono font-bold transition-all cursor-pointer border ${
-                          isSelected
-                            ? 'bg-violet-600 text-white border-violet-600 shadow-xs'
-                            : 'bg-neutral-50 hover:bg-violet-50 text-neutral-800 border-neutral-200'
-                        }`}
-                      >
-                        {slot}
-                      </button>
-                    )
-                  })}
-                </div>
-              )}
-            </div>
-          </div>
-        )}
-
-        {/* STEP 4: DADOS DO CLIENTE */}
-        {step === 4 && (
-          <form onSubmit={handleSubmitBooking} className="space-y-4 overflow-y-auto flex-1 pr-0.5">
-            <div className="flex items-center justify-between">
-              <span className="text-xs font-bold text-neutral-800">
-                Quase lá! Confirme seus dados:
-              </span>
+            <div className="flex items-center gap-2 shrink-0">
               <button
                 type="button"
-                onClick={() => setStep(3)}
-                className="text-[11px] text-neutral-500 hover:text-neutral-800 flex items-center gap-0.5 cursor-pointer"
+                onClick={onClose}
+                className={`p-2 rounded-xl transition-colors cursor-pointer ${
+                  isDark ? 'bg-white/5 hover:bg-white/10 text-neutral-300' : 'bg-neutral-100 hover:bg-neutral-200 text-neutral-700'
+                }`}
+                title="Fechar"
               >
-                <ArrowLeft className="w-3 h-3" />
-                <span>Voltar</span>
+                <X className="w-5 h-5" />
               </button>
             </div>
+          </div>
 
-            {/* Summary Box */}
-            <div className="bg-neutral-50 rounded-2xl p-3.5 border border-neutral-200/80 space-y-1 text-xs">
-              <div className="flex items-center justify-between">
-                <span className="font-bold text-neutral-900">{selectedService?.name}</span>
-                {selectedService?.price != null && (
-                  <span className="font-mono font-bold text-neutral-900">
-                    R$ {selectedService.price.toFixed(2).replace('.', ',')}
-                  </span>
-                )}
-              </div>
-              <p className="text-[11px] text-neutral-500 flex items-center gap-2">
-                <span>Data: {selectedDate}</span>
-                <span>·</span>
-                <span className="font-bold text-violet-700">Horário: {selectedTime}</span>
-              </p>
-              {selectedProf && (
-                <p className="text-[11px] text-neutral-500">
-                  Profissional: <span className="font-semibold text-neutral-800">{selectedProf.name}</span>
-                </p>
-              )}
-            </div>
-
-            {/* Input Name */}
-            <div>
-              <label className="block text-xs font-semibold text-neutral-700 mb-1">
-                Seu Nome Completo <span className="text-red-500">*</span>
-              </label>
-              <input
-                type="text"
-                required
-                placeholder="Ex: Maria Oliveira"
-                value={customerName || ''}
-                onChange={(e) => setCustomerName(e.target.value)}
-                className="w-full px-3.5 py-2.5 rounded-xl border border-neutral-300 text-xs text-neutral-900 focus:outline-none focus:border-violet-600"
-              />
-            </div>
-
-            {/* Input WhatsApp */}
-            <div>
-              <label className="block text-xs font-semibold text-neutral-700 mb-1">
-                Seu WhatsApp (com DDD) <span className="text-red-500">*</span>
-              </label>
-              <input
-                type="tel"
-                required
-                placeholder="Ex: 11999998888"
-                value={customerPhone || ''}
-                onChange={(e) => setCustomerPhone(e.target.value)}
-                className="w-full px-3.5 py-2.5 rounded-xl border border-neutral-300 text-xs text-neutral-900 font-mono focus:outline-none focus:border-violet-600"
-              />
-            </div>
-
-            <button
-              type="submit"
-              disabled={isSubmitting}
-              className="w-full py-3 rounded-xl bg-violet-600 hover:bg-violet-700 text-white font-semibold text-xs shadow-xs flex items-center justify-center gap-2 transition-all cursor-pointer disabled:opacity-50 mt-2"
+          {/* Barra de Etapas (Step Progress) */}
+          {step < 5 && (
+            <div
+              className={`px-4 py-2.5 border-b shrink-0 flex items-center gap-2 overflow-x-auto scrollbar-none text-xs font-semibold ${
+                isDark ? 'bg-[#101015] border-white/[0.06]' : 'bg-neutral-50/70 border-neutral-100'
+              }`}
             >
-              {isSubmitting ? (
+              <div
+                className={`flex items-center gap-1.5 whitespace-nowrap px-2.5 py-1 rounded-xl transition-all ${
+                  step === 1
+                    ? 'text-white shadow-2xs font-bold'
+                    : step > 1
+                    ? isDark ? 'text-neutral-300' : 'text-neutral-700'
+                    : isDark ? 'text-neutral-600' : 'text-neutral-400'
+                }`}
+                style={step === 1 ? { backgroundColor: primaryColor } : undefined}
+              >
+                <span className="w-4 h-4 rounded-full flex items-center justify-center text-[10px] font-bold border border-current">
+                  1
+                </span>
+                <span>Serviço</span>
+              </div>
+
+              <span className={`text-[10px] ${isDark ? 'text-neutral-600' : 'text-neutral-300'}`}>→</span>
+
+              {availableProfessionalsForService.length > 0 && (
                 <>
-                  <Loader2 className="w-4 h-4 animate-spin" />
-                  <span>Confirmando agendamento...</span>
-                </>
-              ) : (
-                <>
-                  <CheckCircle2 className="w-4 h-4" />
-                  <span>Confirmar Agendamento</span>
+                  <div
+                    className={`flex items-center gap-1.5 whitespace-nowrap px-2.5 py-1 rounded-xl transition-all ${
+                      step === 2
+                        ? 'text-white shadow-2xs font-bold'
+                        : step > 2
+                        ? isDark ? 'text-neutral-300' : 'text-neutral-700'
+                        : isDark ? 'text-neutral-600' : 'text-neutral-400'
+                    }`}
+                    style={step === 2 ? { backgroundColor: primaryColor } : undefined}
+                  >
+                    <span className="w-4 h-4 rounded-full flex items-center justify-center text-[10px] font-bold border border-current">
+                      2
+                    </span>
+                    <span>Profissional</span>
+                  </div>
+                  <span className={`text-[10px] ${isDark ? 'text-neutral-600' : 'text-neutral-300'}`}>→</span>
                 </>
               )}
-            </button>
-          </form>
-        )}
 
-        {/* STEP 5: SUCESSO & WHATSAPP */}
-        {step === 5 && createdAppointment && (
-          <div className="py-4 space-y-4 text-center">
-            <div className="w-14 h-14 rounded-2xl bg-emerald-100 text-emerald-700 flex items-center justify-center mx-auto shadow-xs">
-              <CheckCircle2 className="w-8 h-8" />
+              <div
+                className={`flex items-center gap-1.5 whitespace-nowrap px-2.5 py-1 rounded-xl transition-all ${
+                  step === 3
+                    ? 'text-white shadow-2xs font-bold'
+                    : step > 3
+                    ? isDark ? 'text-neutral-300' : 'text-neutral-700'
+                    : isDark ? 'text-neutral-600' : 'text-neutral-400'
+                }`}
+                style={step === 3 ? { backgroundColor: primaryColor } : undefined}
+              >
+                <span className="w-4 h-4 rounded-full flex items-center justify-center text-[10px] font-bold border border-current">
+                  {availableProfessionalsForService.length > 0 ? '3' : '2'}
+                </span>
+                <span>Data & Horário</span>
+              </div>
+
+              <span className={`text-[10px] ${isDark ? 'text-neutral-600' : 'text-neutral-300'}`}>→</span>
+
+              <div
+                className={`flex items-center gap-1.5 whitespace-nowrap px-2.5 py-1 rounded-xl transition-all ${
+                  step === 4
+                    ? 'text-white shadow-2xs font-bold'
+                    : isDark ? 'text-neutral-600' : 'text-neutral-400'
+                }`}
+                style={step === 4 ? { backgroundColor: primaryColor } : undefined}
+              >
+                <span className="w-4 h-4 rounded-full flex items-center justify-center text-[10px] font-bold border border-current">
+                  {availableProfessionalsForService.length > 0 ? '4' : '3'}
+                </span>
+                <span>Confirmação</span>
+              </div>
             </div>
+          )}
 
-            <div>
-              <h3 className="font-bold text-neutral-900 text-base">
-                Agendamento Solicitado com Sucesso!
-              </h3>
-              <p className="text-xs text-neutral-500 max-w-xs mx-auto mt-1">
-                Sua reserva para <strong>{createdAppointment.serviceName}</strong> em{' '}
-                <strong>
-                  {createdAppointment.date} às {createdAppointment.time}
-                </strong>{' '}
-                foi registrada.
-              </p>
-            </div>
-
-            {/* Notify via WhatsApp button */}
-            {company.whatsapp && (
-              <div className="pt-2">
-                <button
-                  type="button"
-                  onClick={handleNotifyWhatsApp}
-                  className="w-full py-3 px-4 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-semibold text-xs shadow-sm flex items-center justify-center gap-2 transition-all cursor-pointer"
-                >
-                  <MessageCircle className="w-4 h-4" />
-                  <span>Avisar o estabelecimento no WhatsApp</span>
-                </button>
+          {/* Conteúdo Scrollável Amplo */}
+          <div className="flex-1 overflow-y-auto p-3.5 sm:p-5 space-y-4">
+            {/* Mensagem de Erro */}
+            {errorMessage && (
+              <div className="p-3.5 bg-rose-500/10 border border-rose-500/25 rounded-2xl text-rose-500 text-xs font-semibold flex items-center gap-2">
+                <AlertCircle className="w-4 h-4 shrink-0" />
+                <span>{errorMessage}</span>
               </div>
             )}
 
-            <button
-              type="button"
-              onClick={onClose}
-              className="w-full py-2.5 rounded-xl border border-neutral-300 text-xs font-semibold text-neutral-700 hover:bg-neutral-100 transition-colors cursor-pointer"
-            >
-              Concluir e Fechar
-            </button>
+            {/* ETAPA 1: SERVIÇOS DISPONÍVEIS */}
+            {step === 1 && (
+              <div className="space-y-3.5">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h4 className="text-sm sm:text-base font-black">
+                      Selecione o serviço que deseja agendar:
+                    </h4>
+                    <p className={`text-xs ${isDark ? 'text-neutral-400' : 'text-neutral-500'}`}>
+                      Clique sobre o serviço para escolher o horário
+                    </p>
+                  </div>
+                  <span
+                    className={`text-xs font-bold px-2.5 py-0.5 rounded-full ${
+                      isDark ? 'bg-white/10 text-neutral-300' : 'bg-neutral-100 text-neutral-700'
+                    }`}
+                  >
+                    {services.length} {services.length === 1 ? 'opção' : 'opções'}
+                  </span>
+                </div>
+
+                {services.length === 0 ? (
+                  <div
+                    className={`py-16 text-center rounded-3xl border border-dashed ${
+                      isDark ? 'border-white/10 text-neutral-500' : 'border-neutral-200 text-neutral-400'
+                    }`}
+                  >
+                    <Scissors className="w-10 h-10 mx-auto opacity-30 mb-2" />
+                    <p className="font-bold text-sm">Nenhum serviço disponível no momento</p>
+                    <p className="text-xs mt-1">Volte em instantes ou entre em contato pelo WhatsApp.</p>
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-3.5">
+                    {services.map((srv) => {
+                      const srvPhoto = srv.photoUrl || (srv as unknown as { imageUrl?: string }).imageUrl || ''
+                      const isConsult = srv.priceType === 'consult' || srv.price == null
+
+                      return (
+                        <div
+                          key={srv.id}
+                          onClick={() => handleSelectService(srv)}
+                          className={`p-3.5 sm:p-4 rounded-2xl border transition-all cursor-pointer flex gap-3.5 items-center justify-between group active:scale-[0.99] ${
+                            isDark
+                              ? 'bg-[#15151c] border-white/[0.08] hover:border-white/20 hover:bg-white/[0.04]'
+                              : 'bg-white border-neutral-200 hover:border-neutral-300 shadow-2xs hover:shadow-xs'
+                          }`}
+                        >
+                          <div className="flex items-center gap-3.5 min-w-0 flex-1">
+                            {srvPhoto ? (
+                              <div className="w-16 h-16 sm:w-18 sm:h-18 rounded-2xl overflow-hidden shrink-0 bg-neutral-100 dark:bg-neutral-800 border border-black/5 dark:border-white/5">
+                                {/* eslint-disable-next-line @next/next/no-img-element */}
+                                <img
+                                  src={srvPhoto}
+                                  alt={srv.name}
+                                  className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                                  loading="lazy"
+                                />
+                              </div>
+                            ) : (
+                              <div
+                                className="w-16 h-16 sm:w-18 sm:h-18 rounded-2xl flex items-center justify-center shrink-0"
+                                style={{
+                                  backgroundColor: `${primaryColor}18`,
+                                  color: primaryColor,
+                                }}
+                              >
+                                <Scissors className="w-6 h-6 opacity-80" />
+                              </div>
+                            )}
+
+                            <div className="min-w-0 flex-1">
+                              {srv.category && (
+                                <span className="text-[10px] font-bold uppercase tracking-wider text-neutral-400 dark:text-neutral-500 block truncate">
+                                  {srv.category}
+                                </span>
+                              )}
+                              <h4 className="font-bold text-xs sm:text-sm leading-snug truncate mt-0.5">
+                                {srv.name}
+                              </h4>
+                              {srv.description && (
+                                <p className={`text-[11px] line-clamp-1 mt-0.5 ${isDark ? 'text-neutral-400' : 'text-neutral-500'}`}>
+                                  {srv.description}
+                                </p>
+                              )}
+
+                              <div className="flex items-center gap-2.5 mt-1.5 flex-wrap">
+                                <span
+                                  className="font-black text-xs sm:text-sm font-mono"
+                                  style={{ color: priceColor }}
+                                >
+                                  {isConsult
+                                    ? 'Sob consulta'
+                                    : `R$ ${srv.price?.toFixed(2).replace('.', ',')}`}
+                                </span>
+
+                                {srv.durationMinutes && (
+                                  <span className={`inline-flex items-center gap-1 text-[11px] px-2 py-0.5 rounded-md ${
+                                    isDark ? 'bg-white/5 text-neutral-400' : 'bg-neutral-100 text-neutral-600'
+                                  }`}>
+                                    <Clock className="w-3 h-3 text-neutral-400" />
+                                    <span>{srv.durationMinutes} min</span>
+                                  </span>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+
+                          <div
+                            className="w-8 h-8 rounded-xl flex items-center justify-center text-white shrink-0 opacity-80 group-hover:opacity-100 group-hover:scale-105 transition-all"
+                            style={{ backgroundColor: primaryColor }}
+                          >
+                            <ArrowRight className="w-4 h-4" />
+                          </div>
+                        </div>
+                      )
+                    })}
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* ETAPA 2: PROFISSIONAL */}
+            {step === 2 && (
+              <div className="space-y-3.5">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h4 className="text-sm sm:text-base font-black">
+                      Escolha o profissional:
+                    </h4>
+                    <p className={`text-xs ${isDark ? 'text-neutral-400' : 'text-neutral-500'}`}>
+                      Serviço selecionado: <strong>{selectedService?.name}</strong>
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setStep(1)}
+                    className="px-3 py-1.5 rounded-xl border border-neutral-300 dark:border-white/10 text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer"
+                  >
+                    <ArrowLeft className="w-3.5 h-3.5" />
+                    <span>Mudar serviço</span>
+                  </button>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-3.5">
+                  {/* Opção: Sem preferência / Primeiro horário */}
+                  <div
+                    onClick={() => handleSelectProf(null)}
+                    className={`p-4 rounded-2xl border transition-all cursor-pointer flex items-center justify-between group active:scale-[0.99] ${
+                      isDark
+                        ? 'bg-[#15151c] border-white/[0.08] hover:border-white/20 hover:bg-white/[0.04]'
+                        : 'bg-white border-neutral-200 hover:border-neutral-300 shadow-2xs hover:shadow-xs'
+                    }`}
+                  >
+                    <div className="flex items-center gap-3.5 min-w-0">
+                      <div
+                        className="w-12 h-12 rounded-2xl flex items-center justify-center text-white shadow-xs shrink-0"
+                        style={{ backgroundColor: primaryColor }}
+                      >
+                        <Sparkles className="w-6 h-6" />
+                      </div>
+                      <div className="min-w-0">
+                        <h4 className="font-bold text-xs sm:text-sm">
+                          Primeiro Horário Disponível
+                        </h4>
+                        <p className={`text-xs ${isDark ? 'text-neutral-400' : 'text-neutral-500'}`}>
+                          Sem preferência de profissional
+                        </p>
+                      </div>
+                    </div>
+                    <ArrowRight className="w-4 h-4 text-neutral-400 group-hover:text-white shrink-0" />
+                  </div>
+
+                  {availableProfessionalsForService.map((p) => (
+                    <div
+                      key={p.id}
+                      onClick={() => handleSelectProf(p)}
+                      className={`p-4 rounded-2xl border transition-all cursor-pointer flex items-center justify-between group active:scale-[0.99] ${
+                        isDark
+                          ? 'bg-[#15151c] border-white/[0.08] hover:border-white/20 hover:bg-white/[0.04]'
+                          : 'bg-white border-neutral-200 hover:border-neutral-300 shadow-2xs hover:shadow-xs'
+                      }`}
+                    >
+                      <div className="flex items-center gap-3.5 min-w-0">
+                        <div className="w-12 h-12 rounded-2xl bg-neutral-200 dark:bg-white/10 text-neutral-800 dark:text-white font-black text-sm flex items-center justify-center shrink-0">
+                          {p.name.slice(0, 2).toUpperCase()}
+                        </div>
+                        <div className="min-w-0">
+                          <h4 className="font-bold text-xs sm:text-sm truncate">
+                            {p.name}
+                          </h4>
+                          <p className={`text-xs truncate ${isDark ? 'text-neutral-400' : 'text-neutral-500'}`}>
+                            {p.role || 'Profissional da equipe'}
+                          </p>
+                        </div>
+                      </div>
+                      <ArrowRight className="w-4 h-4 text-neutral-400 group-hover:text-white shrink-0" />
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* ETAPA 3: DATA E HORÁRIO */}
+            {step === 3 && (
+              <div className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h4 className="text-sm sm:text-base font-black">
+                      Selecione o dia e o horário:
+                    </h4>
+                    <p className={`text-xs ${isDark ? 'text-neutral-400' : 'text-neutral-500'}`}>
+                      {selectedService?.name} {selectedProf ? `com ${selectedProf.name}` : ''}
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setStep(availableProfessionalsForService.length > 0 ? 2 : 1)}
+                    className="px-3 py-1.5 rounded-xl border border-neutral-300 dark:border-white/10 text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer"
+                  >
+                    <ArrowLeft className="w-3.5 h-3.5" />
+                    <span>Voltar</span>
+                  </button>
+                </div>
+
+                {/* Lista Horizontal de Dias com boa área de toque */}
+                <div className="space-y-1.5">
+                  <span className={`text-xs font-bold uppercase tracking-wider block ${isDark ? 'text-neutral-400' : 'text-neutral-500'}`}>
+                    1. Escolha o dia
+                  </span>
+                  <div className="flex items-center gap-2 overflow-x-auto pb-2 scrollbar-none -mx-1 px-1 touch-pan-x">
+                    {upcomingDates.map((d) => {
+                      const isSelected = selectedDate === d.dateString
+                      return (
+                        <button
+                          key={d.dateString}
+                          type="button"
+                          onClick={() => setSelectedDate(d.dateString)}
+                          className={`p-3 rounded-2xl text-center min-w-[78px] border transition-all cursor-pointer shrink-0 ${
+                            isSelected
+                              ? 'text-white shadow-md scale-[1.02]'
+                              : isDark
+                              ? 'bg-[#15151c] text-neutral-300 border-white/10 hover:bg-white/10'
+                              : 'bg-white text-neutral-800 border-neutral-200 hover:bg-neutral-50'
+                          }`}
+                          style={isSelected ? { backgroundColor: primaryColor, borderColor: primaryColor } : undefined}
+                        >
+                          <span className={`block text-[10px] uppercase font-bold ${
+                            isSelected ? 'text-white/80' : isDark ? 'text-neutral-500' : 'text-neutral-400'
+                          }`}>
+                            {d.weekday}
+                          </span>
+                          <span className="block text-xs sm:text-sm font-black mt-0.5">
+                            {d.label}
+                          </span>
+                        </button>
+                      )
+                    })}
+                  </div>
+                </div>
+
+                {/* Grade Ampla de Horários Disponíveis */}
+                <div className="space-y-2 pt-1">
+                  <span className={`text-xs font-bold uppercase tracking-wider block ${isDark ? 'text-neutral-400' : 'text-neutral-500'}`}>
+                    2. Escolha o horário
+                  </span>
+
+                  {isLoadingSlots ? (
+                    <div className="py-12 text-center text-xs flex flex-col items-center justify-center gap-2 rounded-2xl border border-dashed border-neutral-300 dark:border-white/10">
+                      <Loader2 className="w-5 h-5 animate-spin text-teal-500" />
+                      <span className={isDark ? 'text-neutral-400' : 'text-neutral-600'}>
+                        Verificando horários livres nesta data...
+                      </span>
+                    </div>
+                  ) : !selectedDate ? (
+                    <div className={`py-12 text-center text-xs rounded-2xl border border-dashed ${
+                      isDark ? 'border-white/10 text-neutral-500' : 'border-neutral-200 text-neutral-400'
+                    }`}>
+                      <CalendarIcon className="w-8 h-8 mx-auto opacity-40 mb-1" />
+                      <span>Selecione uma data acima para visualizar os horários disponíveis.</span>
+                    </div>
+                  ) : availableSlots.length === 0 ? (
+                    <div className={`py-10 text-center text-xs rounded-2xl border border-dashed p-4 ${
+                      isDark ? 'border-white/10 bg-white/[0.02]' : 'border-neutral-200 bg-neutral-50'
+                    }`}>
+                      <Clock className="w-7 h-7 mx-auto opacity-40 mb-1 text-amber-500" />
+                      <p className="font-bold text-sm">Nenhum horário livre nesta data</p>
+                      <p className={`text-xs mt-1 ${isDark ? 'text-neutral-400' : 'text-neutral-500'}`}>
+                        Todos os horários estão preenchidos ou o estabelecimento não atende neste dia. Tente outra data.
+                      </p>
+                    </div>
+                  ) : (
+                    <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 gap-2 sm:gap-2.5">
+                      {availableSlots.map((slot) => {
+                        const isSelected = selectedTime === slot
+                        return (
+                          <button
+                            key={slot}
+                            type="button"
+                            onClick={() => handleSelectDateTime(selectedDate, slot)}
+                            className={`py-3 px-2 rounded-xl text-xs sm:text-sm font-mono font-bold transition-all cursor-pointer border text-center shadow-2xs ${
+                              isSelected
+                                ? 'text-white shadow-sm scale-105'
+                                : isDark
+                                ? 'bg-[#15151c] hover:bg-white/10 text-white border-white/10'
+                                : 'bg-white hover:bg-neutral-50 text-neutral-900 border-neutral-200'
+                            }`}
+                            style={isSelected ? { backgroundColor: primaryColor, borderColor: primaryColor } : undefined}
+                          >
+                            {slot}
+                          </button>
+                        )
+                      })}
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* ETAPA 4: CONFIRMAÇÃO & DADOS DO CLIENTE */}
+            {step === 4 && (
+              <form onSubmit={handleSubmitBooking} className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h4 className="text-sm sm:text-base font-black">
+                      Confirme seus dados para agendar:
+                    </h4>
+                    <p className={`text-xs ${isDark ? 'text-neutral-400' : 'text-neutral-500'}`}>
+                      Seu agendamento será registrado imediatamente
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setStep(3)}
+                    className="px-3 py-1.5 rounded-xl border border-neutral-300 dark:border-white/10 text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer"
+                  >
+                    <ArrowLeft className="w-3.5 h-3.5" />
+                    <span>Mudar horário</span>
+                  </button>
+                </div>
+
+                {/* Resumo Completo e Amplo do Agendamento */}
+                <div
+                  className={`p-4 rounded-2xl border space-y-2 text-xs ${
+                    isDark ? 'bg-[#15151c] border-white/[0.08]' : 'bg-neutral-50 border-neutral-200'
+                  }`}
+                >
+                  <div className="flex items-center justify-between gap-2 border-b border-black/5 dark:border-white/5 pb-2">
+                    <div>
+                      <span className="text-[10px] font-bold uppercase tracking-wider text-neutral-400 block">
+                        Serviço
+                      </span>
+                      <span className="font-black text-sm">{selectedService?.name}</span>
+                    </div>
+                    {selectedService?.price != null && (
+                      <span className="font-mono font-black text-sm" style={{ color: priceColor }}>
+                        R$ {selectedService.price.toFixed(2).replace('.', ',')}
+                      </span>
+                    )}
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-3 pt-1">
+                    <div>
+                      <span className="text-[10px] font-bold uppercase tracking-wider text-neutral-400 block">
+                        Data Selecionada
+                      </span>
+                      <span className="font-bold text-xs">{selectedDate}</span>
+                    </div>
+                    <div>
+                      <span className="text-[10px] font-bold uppercase tracking-wider text-neutral-400 block">
+                        Horário Marcado
+                      </span>
+                      <span className="font-bold text-xs font-mono" style={{ color: priceColor }}>
+                        {selectedTime}
+                      </span>
+                    </div>
+                  </div>
+
+                  {selectedProf && (
+                    <div className="pt-1 border-t border-black/5 dark:border-white/5">
+                      <span className="text-[10px] font-bold uppercase tracking-wider text-neutral-400 block">
+                        Profissional
+                      </span>
+                      <span className="font-bold text-xs">{selectedProf.name}</span>
+                    </div>
+                  )}
+                </div>
+
+                {/* Campos de Nome e WhatsApp */}
+                <div className="space-y-3 pt-1">
+                  <div>
+                    <label className="block text-xs font-bold mb-1">
+                      Seu Nome Completo <span className="text-rose-500">*</span>
+                    </label>
+                    <input
+                      type="text"
+                      required
+                      placeholder="Ex: Maria Santos"
+                      value={customerName || ''}
+                      onChange={(e) => setCustomerName(e.target.value)}
+                      className={`w-full px-4 py-3 rounded-xl border text-xs sm:text-sm transition-all focus:outline-hidden focus:ring-2 focus:ring-teal-500/20 ${
+                        isDark
+                          ? 'bg-white/5 border-white/10 text-white placeholder-neutral-500'
+                          : 'bg-white border-neutral-200 text-neutral-900 placeholder-neutral-400'
+                      }`}
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-bold mb-1">
+                      Seu WhatsApp com DDD <span className="text-rose-500">*</span>
+                    </label>
+                    <input
+                      type="tel"
+                      required
+                      placeholder="Ex: 11999998888"
+                      value={customerPhone || ''}
+                      onChange={(e) => setCustomerPhone(e.target.value)}
+                      className={`w-full px-4 py-3 rounded-xl border text-xs sm:text-sm font-mono transition-all focus:outline-hidden focus:ring-2 focus:ring-teal-500/20 ${
+                        isDark
+                          ? 'bg-white/5 border-white/10 text-white placeholder-neutral-500'
+                          : 'bg-white border-neutral-200 text-neutral-900 placeholder-neutral-400'
+                      }`}
+                    />
+                  </div>
+                </div>
+
+                <div className="pt-2">
+                  <button
+                    type="submit"
+                    disabled={isSubmitting}
+                    className="w-full py-3.5 px-4 rounded-xl font-black text-xs sm:text-sm shadow-md flex items-center justify-center gap-2 transition-all cursor-pointer disabled:opacity-50 active:scale-[0.98]"
+                    style={{ backgroundColor: buttonBg, color: buttonText }}
+                  >
+                    {isSubmitting ? (
+                      <>
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                        <span>Confirmando agendamento...</span>
+                      </>
+                    ) : (
+                      <>
+                        <Check className="w-4 h-4 stroke-[3]" />
+                        <span>Confirmar Agendamento</span>
+                      </>
+                    )}
+                  </button>
+                </div>
+              </form>
+            )}
+
+            {/* ETAPA 5: SUCESSO & WHATSAPP */}
+            {step === 5 && createdAppointment && (
+              <div className="py-6 space-y-4 text-center">
+                <div className="w-16 h-16 rounded-3xl bg-emerald-500/15 text-emerald-500 flex items-center justify-center mx-auto shadow-xs border border-emerald-500/25">
+                  <CheckCircle2 className="w-9 h-9" />
+                </div>
+
+                <div className="space-y-1">
+                  <h3 className="font-black text-lg sm:text-xl">
+                    Agendamento Solicitado com Sucesso!
+                  </h3>
+                  <p className={`text-xs max-w-sm mx-auto ${isDark ? 'text-neutral-400' : 'text-neutral-500'}`}>
+                    Sua reserva para <strong>{createdAppointment.serviceName}</strong> em{' '}
+                    <strong>
+                      {createdAppointment.date} às {createdAppointment.time}
+                    </strong>{' '}
+                    foi registrada no sistema.
+                  </p>
+                </div>
+
+                {company.whatsapp && (
+                  <div className="pt-2 max-w-md mx-auto">
+                    <button
+                      type="button"
+                      onClick={handleNotifyWhatsApp}
+                      className="w-full py-3.5 px-4 rounded-xl bg-[#25D366] hover:bg-[#20ba59] text-white font-bold text-xs sm:text-sm shadow-md flex items-center justify-center gap-2 transition-all cursor-pointer active:scale-95"
+                    >
+                      <MessageCircle className="w-4 h-4 fill-white" />
+                      <span>Avisar o estabelecimento no WhatsApp</span>
+                    </button>
+                  </div>
+                )}
+
+                <div className="pt-2 max-w-md mx-auto">
+                  <button
+                    type="button"
+                    onClick={onClose}
+                    className={`w-full py-3 rounded-xl border text-xs font-bold transition-colors cursor-pointer ${
+                      isDark
+                        ? 'border-white/10 hover:bg-white/10 text-white'
+                        : 'border-neutral-300 hover:bg-neutral-100 text-neutral-800'
+                    }`}
+                  >
+                    Concluir e Fechar
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
-        )}
-      </motion.div>
-    </div>
+        </motion.div>
+      </div>
+    </AnimatePresence>
   )
 }

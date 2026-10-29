@@ -234,6 +234,7 @@ export type PublicPageThemeId =
   | 'vibrant'
   | 'custom'
   | 'light' // Backward compatibility
+  | 'absolute-black'
 
 export interface CustomThemeConfig {
   bgType?: 'color' | 'gradient' | 'image'
@@ -324,6 +325,7 @@ export interface Company {
   // Configurações da Central de Pedidos
   autoAcceptOrders?: boolean // Aceitar pedidos automaticamente (vai direto para Em Preparo)
   soundAlertNewOrders?: boolean // Alerta sonoro quando chegar novo pedido
+  subscription?: CompanySubscription // Assinatura Asaas da empresa
   ownerAuth?: CompanyOwnerAuth
   origin?: 'admin' | 'self_service'
   onboardingCompleted?: boolean
@@ -516,3 +518,55 @@ export interface TableOrder {
   createdAt: string
   updatedAt?: string
 }
+
+// ==========================================
+// ASSINATURAS E COBRANÇAS ASAAS
+// ==========================================
+
+export type AsaasSubscriptionStatus =
+  | 'ACTIVE'
+  | 'PENDING'
+  | 'OVERDUE'
+  | 'CANCELLED'
+  | 'INACTIVE'
+  | 'TRIAL'
+
+export type AsaasPaymentMethod = 'PIX' | 'CREDIT_CARD' | 'UNDEFINED'
+
+export interface CompanySubscription {
+  id: string
+  companyId: string
+  asaasCustomerId: string
+  asaasSubscriptionId: string
+  status: AsaasSubscriptionStatus
+  paymentMethod: AsaasPaymentMethod
+  value: number // default: 69.99
+  cycle: 'MONTHLY'
+  nextDueDate: string | null
+  lastPaymentDate: string | null
+  lastPaymentStatus?: string | null
+  lastPaymentId?: string | null
+  pixQrCodeUrl?: string | null
+  pixCopiaECola?: string | null
+  pixExpirationDate?: string | null
+  creditCardLast4?: string | null
+  creditCardBrand?: string | null
+  invoiceUrl?: string | null
+  description?: string
+  externalReference?: string
+  createdAt: string
+  updatedAt: string
+}
+
+export interface AsaasWebhookEventLog {
+  id: string
+  event: string
+  dateCreated: string
+  processedAt: string
+  companyId?: string
+  subscriptionId?: string
+  paymentId?: string
+  status: 'PROCESSED' | 'SKIPPED' | 'FAILED'
+  error?: string
+}
+

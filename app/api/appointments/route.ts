@@ -4,6 +4,7 @@ import {
   createServerAppointment,
   updateServerAppointmentStatus,
   updateServerAppointment,
+  deleteServerAppointment,
   getServerCompanyById,
   getServerCompanyBySlug,
   getServerProfessionals,
@@ -336,6 +337,40 @@ export async function PUT(req: NextRequest) {
     console.error('Error in PUT /api/appointments:', err)
     return NextResponse.json(
       { success: false, error: err instanceof Error ? err.message : 'Erro interno.' },
+      { status: 500 }
+    )
+  }
+}
+
+export async function DELETE(req: NextRequest) {
+  try {
+    const searchParams = req.nextUrl.searchParams
+    const id = searchParams.get('id')
+    const companyId = searchParams.get('companyId')
+
+    if (!id || !companyId) {
+      return NextResponse.json(
+        { success: false, error: 'id e companyId são obrigatórios.' },
+        { status: 400 }
+      )
+    }
+
+    const res = await deleteServerAppointment(id, companyId)
+    if (!res.success) {
+      return NextResponse.json(
+        { success: false, error: res.error || 'Erro ao excluir agendamento.' },
+        { status: 400 }
+      )
+    }
+
+    return NextResponse.json(
+      { success: true, message: 'Agendamento excluído com sucesso.' },
+      { status: 200 }
+    )
+  } catch (err) {
+    console.error('Error in DELETE /api/appointments:', err)
+    return NextResponse.json(
+      { success: false, error: err instanceof Error ? err.message : 'Erro interno ao excluir agendamento.' },
       { status: 500 }
     )
   }

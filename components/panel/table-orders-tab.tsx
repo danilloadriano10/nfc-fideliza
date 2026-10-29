@@ -42,6 +42,7 @@ import {
   Plus,
   Settings,
   Download,
+  Trash2,
 } from 'lucide-react'
 import {
   Company,
@@ -56,6 +57,7 @@ import {
   fetchCompanyTableOrdersFromServer,
   updateTableOrderStatusOnServerApi,
   updateTableOrderOnServerApi,
+  deleteTableOrderOnServerApi,
   getCompanyCouriers,
   fetchCompanyCouriersFromServer,
   saveCompanyLocally,
@@ -428,6 +430,8 @@ export const TableOrdersTab: React.FC<TableOrdersTabProps> = ({
   const [isOrderSettingsOpen, setIsOrderSettingsOpen] = useState(false)
   const [confirmingPixOrder, setConfirmingPixOrder] = useState<TableOrder | null>(null)
   const [viewingReceiptOrder, setViewingReceiptOrder] = useState<TableOrder | null>(null)
+  const [deletingOrder, setDeletingOrder] = useState<TableOrder | null>(null)
+  const [isDeletingOrder, setIsDeletingOrder] = useState(false)
 
   // Configurações da Central de Pedidos
   const [soundAlertEnabled, setSoundAlertEnabled] = useState<boolean>(() => company.soundAlertNewOrders !== false)
@@ -441,6 +445,21 @@ export const TableOrdersTab: React.FC<TableOrdersTabProps> = ({
   const showToast = (text: string, type: 'success' | 'error' = 'success') => {
     setToastMessage({ text, type })
     setTimeout(() => setToastMessage(null), 3000)
+  }
+
+  // Excluir pedido (Requirement: Excluir pedidos do cardápio)
+  const handleDeleteOrder = async () => {
+    if (!deletingOrder) return
+    setIsDeletingOrder(true)
+    const res = await deleteTableOrderOnServerApi(deletingOrder.id, company.id)
+    setIsDeletingOrder(false)
+    if (res.success) {
+      setOrders((prev) => prev.filter((o) => o.id !== deletingOrder.id))
+      showToast('Pedido excluído com sucesso!', 'success')
+      setDeletingOrder(null)
+    } else {
+      showToast(res.error || 'Erro ao excluir pedido.', 'error')
+    }
   }
 
   // Monitorar novos pedidos para disparo de alerta sonoro
@@ -1320,6 +1339,16 @@ export const TableOrdersTab: React.FC<TableOrdersTabProps> = ({
                         <Edit className="w-3.5 h-3.5 text-neutral-500" />
                         <span>Gerenciar / Detalhes</span>
                       </button>
+
+                      {/* Botão EXCLUIR PEDIDO */}
+                      <button
+                        type="button"
+                        onClick={() => setDeletingOrder(order)}
+                        className="p-1.5 rounded-xl border border-neutral-200 bg-neutral-50 hover:bg-rose-50 hover:border-rose-300 text-neutral-400 hover:text-rose-600 text-xs transition-all flex items-center justify-center cursor-pointer shadow-xs"
+                        title="Excluir este pedido"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
                     </div>
                   </div>
 
@@ -1775,6 +1804,10 @@ export const TableOrdersTab: React.FC<TableOrdersTabProps> = ({
             setOrders((prev) => prev.map((o) => (o.id === updated.id ? updated : o)))
             setManagingOrder(null)
           }}
+          onOrderDeleted={(orderId) => {
+            setOrders((prev) => prev.filter((o) => o.id !== orderId))
+            setManagingOrder(null)
+          }}
           onOpenCouriersManager={() => {
             setIsCouriersModalOpen(true)
           }}
@@ -2124,6 +2157,83 @@ export const TableOrdersTab: React.FC<TableOrdersTabProps> = ({
                   </>
                 ) : (
                   'Salvar Configurações'
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal de Confirmação de Exclusão de Pedido */}
+      {deletingOrder && (
+        <div className="fixed inset-0 z-60 bg-neutral-950/70 backdrop-blur-xs flex items-center justify-center p-4 animate-in fade-in">
+          <div className="bg-white rounded-3xl max-w-md w-full p-6 shadow-2xl border border-neutral-200 space-y-4 animate-in zoom-in-95">
+            <div className="flex items-center gap-3">
+              <div className="w-11 h-11 rounded-2xl bg-rose-50 text-rose-600 flex items-center justify-center shrink-0 border border-rose-200">
+                <Trash2 className="w-5 h-5 text-rose-600" />
+              </div>
+              <div>
+                <h4 className="font-bold text-base text-neutral-900">
+                  Excluir Pedido
+                </h4>
+                <p className="text-xs text-neutral-500">
+                  Esta ação é irreversível
+                </p>
+              </div>
+            </div>
+
+            <div className="p-3.5 rounded-2xl bg-neutral-50 border border-neutral-200/80 space-y-2 text-xs">
+              <div className="flex justify-between items-center">
+                <span className="text-neutral-500">Identificação:</span>
+                <span className="font-bold text-neutral-900">
+                  #{deletingOrder.id.slice(-6).toUpperCase()} ({getOrderOrigin(deletingOrder) === 'mesa' ? `Mesa ${deletingOrder.tableNumber || ''}` : getOrderOrigin(deletingOrder) === 'entrega' ? 'Delivery' : 'Retirada'})
+                </span>
+              </div>
+              {deletingOrder.customerName && (
+                <div className="flex justify-between items-center">
+                  <span className="text-neutral-500">Cliente:</span>
+                  <span className="font-semibold text-neutral-800">{deletingOrder.customerName}</span>
+                </div>
+              )}
+              <div className="flex justify-between items-center">
+                <span className="text-neutral-500">Valor Total:</span>
+                <span className="font-mono font-bold text-teal-700">{formatMoneyBRL(deletingOrder.totalAmount)}</span>
+              </div>
+              <div className="flex justify-between items-center">
+                <span className="text-neutral-500">Itens:</span>
+                <span className="text-neutral-700">{deletingOrder.items?.length || 0} itens</span>
+              </div>
+            </div>
+
+            <p className="text-xs text-neutral-600 leading-relaxed">
+              Tem certeza que deseja excluir este pedido? Ele será removido permanentemente da Central de Pedidos e do histórico.
+            </p>
+
+            <div className="pt-2 flex items-center justify-end gap-2.5">
+              <button
+                type="button"
+                disabled={isDeletingOrder}
+                onClick={() => setDeletingOrder(null)}
+                className="px-4 py-2.5 rounded-xl border border-neutral-200 text-neutral-700 font-semibold text-xs hover:bg-neutral-50 transition-all cursor-pointer disabled:opacity-50"
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                disabled={isDeletingOrder}
+                onClick={handleDeleteOrder}
+                className="px-4 py-2.5 rounded-xl bg-rose-600 hover:bg-rose-700 text-white font-bold text-xs flex items-center gap-1.5 transition-all shadow-xs cursor-pointer disabled:opacity-50"
+              >
+                {isDeletingOrder ? (
+                  <>
+                    <span className="w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                    <span>Excluindo...</span>
+                  </>
+                ) : (
+                  <>
+                    <Trash2 className="w-3.5 h-3.5" />
+                    <span>Sim, excluir pedido</span>
+                  </>
                 )}
               </button>
             </div>

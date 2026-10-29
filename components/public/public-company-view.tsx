@@ -49,6 +49,7 @@ import { MenuSheet } from './menu-sheet'
 import { ProductDetailModal } from './product-detail-modal'
 import { MenuItemModal, CartItem } from './menu-item-modal'
 import { MenuCartDrawer } from './menu-cart-drawer'
+import { MenuCatalogView } from './menu-catalog-view'
 import {
   getLocalCustomerSession,
   getCustomerByPhone,
@@ -1763,326 +1764,25 @@ export const PublicCompanyView: React.FC<PublicCompanyViewProps> = ({
                 />
               ) : null,
               menu: (activeModules.menu && !isExternalMenu && !isMenuShortcutMode && activeMenuItemsList.length > 0) ? (
-            <div
-              id="secao-cardapio"
-              className="space-y-3.5 sm:space-y-4 w-full"
-            >
-              {/* Cabeçalho do Cardápio */}
-              <div className="flex items-center justify-between px-0.5">
-                <div className="flex items-center gap-2.5">
-                  <div
-                    className="w-10 h-10 rounded-2xl flex items-center justify-center shadow-xs text-white shrink-0"
-                    style={{ backgroundColor: primaryColor || '#7A1228' }}
-                  >
-                    <UtensilsCrossed className="w-5 h-5" />
-                  </div>
-                  <div>
-                    <span
-                      className="text-[10px] font-black uppercase tracking-wider block"
-                      style={{ color: primaryColor || '#7A1228' }}
-                    >
-                      Cardápio Digital
-                    </span>
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <h3
-                        className={`text-base sm:text-lg font-black tracking-tight ${
-                          isDark ? 'text-white' : 'text-neutral-900'
-                        }`}
-                      >
-                        Nossas Opções
-                      </h3>
-                      <span
-                        className={`text-[11px] font-bold px-2.5 py-0.5 rounded-full ${
-                          isDark
-                            ? 'bg-white/10 text-neutral-300'
-                            : 'bg-neutral-100 text-neutral-700'
-                        }`}
-                      >
-                        {activeMenuItemsList.length} {activeMenuItemsList.length === 1 ? 'item' : 'itens'}
-                      </span>
-                      {displayTableLabel && (
-                        <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-teal-500/15 border border-teal-500/30 text-teal-600 dark:text-teal-400">
-                          <span className="w-1.5 h-1.5 rounded-full bg-teal-500 shrink-0" />
-                          <span>Você está na <strong>{displayTableLabel}</strong></span>
-                        </span>
-                      )}
-                    </div>
-                  </div>
+                <div id="secao-cardapio" className="w-full">
+                  <MenuCatalogView
+                    company={company}
+                    menuItems={activeMenuItemsList}
+                    cart={cart}
+                    onSelectItem={(item) => setSelectedMenuItemDetail(item)}
+                    onOpenCart={() => setIsCartOpen(true)}
+                    tableNumber={displayTableLabel || cleanTableNumber || undefined}
+                    showHeader={true}
+                    showSearch={true}
+                    isModal={false}
+                    customThemedCardStyle={themedCardStyle}
+                    customPrimaryColor={primaryColor}
+                    customButtonBgColor={activeTheme.colors.buttonBg || primaryColor}
+                    customButtonTextColor={activeTheme.colors.buttonText}
+                    customPriceColor={activeTheme.colors.priceColor}
+                  />
                 </div>
-
-                {cart.length > 0 && (
-                  <button
-                    type="button"
-                    onClick={() => setIsCartOpen(true)}
-                    className="px-3 py-1.5 rounded-xl bg-teal-600 hover:bg-teal-500 text-white font-bold text-xs flex items-center gap-1.5 shadow-md shadow-teal-600/20 transition-all cursor-pointer"
-                  >
-                    <ShoppingBag className="w-3.5 h-3.5" />
-                    <span>Ver Pedido ({cart.reduce((a, b) => a + b.quantity, 0)})</span>
-                  </button>
-                )}
-              </div>
-
-              {/* Filtro de Categorias em Chips Horizontais */}
-              {menuCategories.length > 1 && (
-                <div className="flex items-center gap-2 overflow-x-auto pb-2 scrollbar-none -mx-1 px-1 flex-nowrap shrink-0 touch-pan-x">
-                  {menuCategories.map((cat) => {
-                    const isSelected = selectedMenuCategory === cat
-
-                    const getCategoryIcon = (c: string) => {
-                      const lower = c.toLowerCase()
-                      if (lower === 'todos') return <LayoutGrid className="w-3.5 h-3.5 shrink-0" />
-                      if (lower.includes('pizza')) return <Pizza className="w-3.5 h-3.5 shrink-0" />
-                      if (lower.includes('bebida') || lower.includes('drink') || lower.includes('café') || lower.includes('suco'))
-                        return <Coffee className="w-3.5 h-3.5 shrink-0" />
-                      if (lower.includes('combo') || lower.includes('lanche') || lower.includes('burger'))
-                        return <Package className="w-3.5 h-3.5 shrink-0" />
-                      if (lower.includes('sobremesa') || lower.includes('doce') || lower.includes('torta') || lower.includes('chocolate'))
-                        return <Cake className="w-3.5 h-3.5 shrink-0" />
-                      return <UtensilsCrossed className="w-3.5 h-3.5 shrink-0" />
-                    }
-
-                    return (
-                      <button
-                        key={cat}
-                        type="button"
-                        onClick={() => setSelectedMenuCategory(cat)}
-                        className={`px-3.5 sm:px-4 py-2 rounded-2xl text-xs font-bold whitespace-nowrap transition-all cursor-pointer flex items-center gap-1.5 shadow-2xs ${
-                          isSelected
-                            ? 'text-white shadow-sm scale-[1.02]'
-                            : isDark
-                              ? 'bg-[#181820] hover:bg-white/10 text-neutral-300 border border-white/10'
-                              : 'bg-white hover:bg-neutral-100 text-neutral-800 border border-neutral-200/90'
-                        }`}
-                        style={
-                          isSelected
-                            ? { backgroundColor: primaryColor || '#7A1228' }
-                            : undefined
-                        }
-                      >
-                        {getCategoryIcon(cat)}
-                        <span>{cat}</span>
-                      </button>
-                    )
-                  })}
-                </div>
-              )}
-
-              {/* Lista de Cards do Cardápio - Mobile First (FOTO QUADRADA 1:1 À ESQUERDA + INFORMAÇÕES À DIREITA) */}
-              <div className="flex flex-col gap-3.5 sm:gap-4 pt-1 w-full">
-                {displayedMenuItems.map((item) => {
-                  const hasPromo =
-                    item.promotionalPrice != null &&
-                    typeof item.price === 'number' &&
-                    item.promotionalPrice < item.price
-                  const isSoldOut = item.isAvailable === false
-
-                  const formatMoney = (val?: number | null) => {
-                    if (val == null) return ''
-                    return new Intl.NumberFormat('pt-BR', {
-                      style: 'currency',
-                      currency: 'BRL',
-                    }).format(val)
-                  }
-
-                  // Menor preço dos tamanhos para "A partir de R$ XX,XX"
-                  const validSizePrices = (item.sizes || [])
-                    .map((s) => s.price)
-                    .filter((p): p is number => typeof p === 'number' && p > 0)
-                  const minSizePrice =
-                    validSizePrices.length > 0 ? Math.min(...validSizePrices) : null
-                  const hasPriceFrom =
-                    item.sizes && item.sizes.length > 0 && minSizePrice != null
-
-                  // Texto descritivo de customização (ex: "3 tamanhos • Personalizável")
-                  const sizeCount = item.sizes?.length || 0
-                  const isCustomizable = Boolean(
-                    (item.extras && item.extras.length > 0) ||
-                      (item.removableIngredients && item.removableIngredients.length > 0) ||
-                      item.isCustomBuilder ||
-                      (item.flavors && item.flavors.length > 0)
-                  )
-                  let customizationTag = ''
-                  if (sizeCount > 0 && isCustomizable) {
-                    customizationTag = `${sizeCount} ${sizeCount === 1 ? 'tamanho' : 'tamanhos'} • Personalizável`
-                  } else if (sizeCount > 0) {
-                    customizationTag = `${sizeCount} ${sizeCount === 1 ? 'tamanho' : 'tamanhos'}`
-                  } else if (isCustomizable) {
-                    customizationTag = 'Personalizável'
-                  }
-
-                  return (
-                    <div
-                      key={item.id}
-                      onClick={() => {
-                        if (!isSoldOut) setSelectedMenuItemDetail(item)
-                      }}
-                      className={`group w-full rounded-2xl sm:rounded-3xl border transition-all flex flex-row items-stretch overflow-hidden select-none ${
-                        isSoldOut
-                          ? 'opacity-65 cursor-not-allowed'
-                          : 'cursor-pointer hover:shadow-lg active:scale-[0.99]'
-                      } shadow-xs`}
-                      style={themedCardStyle}
-                    >
-                      {/* 1. FOTO PERFEITAMENTE QUADRADA (1:1) ENCOSTANDO NAS BORDAS ESQUERDA, SUPERIOR E INFERIOR */}
-                      <div className="w-[172px] h-[172px] min-w-[172px] sm:w-[185px] sm:h-[185px] sm:min-w-[185px] aspect-square shrink-0 relative overflow-hidden bg-neutral-100 dark:bg-neutral-800">
-                        {item.photoUrl ? (
-                          /* eslint-disable-next-line @next/next/no-img-element */
-                          <img
-                            src={item.photoUrl}
-                            alt={item.name}
-                            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-                            loading="lazy"
-                            referrerPolicy="no-referrer"
-                            onError={(e) => {
-                              ;(e.target as HTMLElement).style.display = 'none'
-                            }}
-                          />
-                        ) : (
-                          <div className="w-full h-full flex flex-col items-center justify-center text-neutral-400 dark:text-neutral-600 p-2 text-center">
-                            <UtensilsCrossed className="w-8 h-8 opacity-40 mb-1" />
-                            <span className="text-[10px] font-medium">Sem foto</span>
-                          </div>
-                        )}
-
-                        {/* Selos SOBRE a foto no canto superior esquerdo: Mais pedido, Destaque, Novidade */}
-                        <div className="absolute top-2 left-2 flex flex-col gap-1 z-10 pointer-events-none items-start">
-                          {item.isBestSeller && (
-                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[9px] sm:text-[10px] font-black uppercase tracking-tight bg-[#E52E2E] text-white shadow-md">
-                              <Flame className="w-2.5 h-2.5 sm:w-3 sm:h-3 fill-white text-white shrink-0" />
-                              <span>Mais pedido</span>
-                            </span>
-                          )}
-                          {item.isFeatured && (
-                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[9px] sm:text-[10px] font-black uppercase tracking-tight bg-[#FFB800] text-neutral-950 shadow-md">
-                              <Star className="w-2.5 h-2.5 sm:w-3 sm:h-3 fill-neutral-950 text-neutral-950 shrink-0" />
-                              <span>Destaque</span>
-                            </span>
-                          )}
-                          {item.isNew && (
-                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[9px] sm:text-[10px] font-black uppercase tracking-tight bg-[#008A5E] text-white shadow-md">
-                              <Tag className="w-2.5 h-2.5 sm:w-3 sm:h-3 fill-white text-white shrink-0" />
-                              <span>Novidade</span>
-                            </span>
-                          )}
-                        </div>
-
-                        {hasPromo && !item.isBestSeller && !item.isFeatured && !item.isNew && (
-                          <span className="absolute top-2 left-2 px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider bg-rose-600 text-white shadow-xs z-10">
-                            Promo
-                          </span>
-                        )}
-
-                        {isSoldOut && (
-                          <div className="absolute inset-0 bg-black/75 backdrop-blur-2xs flex items-center justify-center p-1 text-center z-20">
-                            <span className="text-[10px] font-black uppercase tracking-wider text-rose-300">
-                              Esgotado
-                            </span>
-                          </div>
-                        )}
-                      </div>
-
-                      {/* 2. ÁREA DE INFORMAÇÕES À DIREITA COM EXATAMENTE A MESMA ALTURA DA FOTO (SEM NENHUM CORTE) */}
-                      <div className="flex-1 min-w-0 p-2.5 sm:p-3 flex flex-col justify-between h-[172px] sm:h-[185px]">
-                        {/* Bloco Superior: Categoria, Nome, Descrição */}
-                        <div className="min-w-0">
-                          {/* CATEGORIA */}
-                          <span className="text-[9px] sm:text-[10px] font-bold uppercase tracking-wider text-neutral-400 dark:text-neutral-500 block truncate leading-none">
-                            {item.category || 'Geral'}
-                          </span>
-
-                          {/* NOME DO PRODUTO */}
-                          <h4
-                            className={`font-black text-xs sm:text-base leading-snug tracking-tight line-clamp-2 mt-0.5 ${
-                              isDark ? 'text-white' : 'text-neutral-900'
-                            }`}
-                          >
-                            {item.name}
-                          </h4>
-
-                          {/* DESCRIÇÃO */}
-                          {item.description && (
-                            <p
-                              className={`text-[10px] sm:text-xs line-clamp-1 leading-tight mt-0.5 ${
-                                isDark ? 'text-neutral-400' : 'text-neutral-500'
-                              }`}
-                            >
-                              {item.description}
-                            </p>
-                          )}
-                        </div>
-
-                        {/* Bloco Inferior: "A partir de", Preço, Tag de Tamanhos, Botão (Sem cortes) */}
-                        <div className="space-y-1 pt-0.5 min-w-0 shrink-0">
-                          {/* Preço com "A partir de" */}
-                          <div>
-                            <span className="text-[9px] sm:text-[10px] text-neutral-500 dark:text-neutral-400 font-medium block leading-none">
-                              {hasPriceFrom ? 'A partir de' : 'Valor'}
-                            </span>
-                            <div
-                              className="text-sm sm:text-base font-black leading-tight mt-0.5"
-                              style={{ color: activeTheme.colors.priceColor }}
-                            >
-                              {hasPriceFrom ? (
-                                formatMoney(minSizePrice)
-                              ) : hasPromo ? (
-                                <div className="flex items-baseline gap-1.5 flex-wrap">
-                                  <span style={{ color: activeTheme.colors.priceColor }}>
-                                    {formatMoney(item.promotionalPrice)}
-                                  </span>
-                                  <span className="text-[11px] text-neutral-400 line-through font-normal">
-                                    {formatMoney(item.price)}
-                                  </span>
-                                </div>
-                              ) : item.price != null ? (
-                                formatMoney(item.price)
-                              ) : (
-                                <span className="text-xs font-semibold text-neutral-400">Sob consulta</span>
-                              )}
-                            </div>
-                          </div>
-
-                          {/* "3 tamanhos • Personalizável" (completo) */}
-                          <div>
-                            <div className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md bg-neutral-100 dark:bg-neutral-800/80 text-neutral-700 dark:text-neutral-300 text-[9px] sm:text-[10px] font-semibold leading-none max-w-full">
-                              <Tag className="w-2.5 h-2.5 text-neutral-400 shrink-0" />
-                              <span className="truncate">{customizationTag || 'Personalizável'}</span>
-                            </div>
-                          </div>
-
-                          {/* BOTÃO "+ Pedir agora" (100% inteiro, visível e sem corte) */}
-                          <div className="pt-0.5 shrink-0">
-                            <button
-                              type="button"
-                              disabled={isSoldOut}
-                              onClick={(e) => {
-                                e.stopPropagation()
-                                if (!isSoldOut) setSelectedMenuItemDetail(item)
-                              }}
-                              className={`w-full py-2 px-2.5 rounded-xl font-bold text-xs sm:text-sm shadow-xs transition-all active:scale-[0.98] flex items-center justify-center cursor-pointer shrink-0 ${
-                                isSoldOut
-                                  ? 'opacity-40 cursor-not-allowed bg-neutral-400 text-white'
-                                  : 'shadow-sm hover:opacity-95'
-                              }`}
-                              style={
-                                !isSoldOut
-                                  ? {
-                                      backgroundColor: activeTheme.colors.buttonBg,
-                                      color: activeTheme.colors.buttonText,
-                                    }
-                                  : undefined
-                              }
-                            >
-                              <span>{item.isCustomBuilder ? '+ Montar agora' : '+ Pedir agora'}</span>
-                            </button>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  )
-                })}
-              </div>
-            </div>
-          ) : (activeModules.menu && isExternalMenu && company.menuUrl) ? (
+              ) : (activeModules.menu && isExternalMenu && company.menuUrl) ? (
             <PublicCard
               key="menu-external"
               icon={<BookOpen className="w-5 h-5 text-white" />}
@@ -2330,6 +2030,10 @@ export const PublicCompanyView: React.FC<PublicCompanyViewProps> = ({
               ? 'bg-[#0f0f14]/95 border-white/[0.08] shadow-[0_-8px_25px_rgba(0,0,0,0.6)]'
               : 'bg-white/95 border-neutral-200/80 shadow-[0_-8px_25px_rgba(0,0,0,0.08)]'
           }`}
+          style={{
+            backgroundColor: activeTheme.fixedAreaBg,
+            borderColor: activeTheme.containerBorderColor,
+          }}
         >
           {/* Ações Rápidas Secundárias */}
           <div className="flex items-center gap-1 sm:gap-2">

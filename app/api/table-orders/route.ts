@@ -3,6 +3,7 @@ import {
   getServerTableOrders,
   saveServerTableOrder,
   updateServerTableOrderStatus,
+  deleteServerTableOrder,
   getServerCompanyById,
   getServerCompanyBySlug,
 } from '@/lib/server-storage'
@@ -236,6 +237,40 @@ export async function PUT(req: NextRequest) {
     return NextResponse.json(
       { success: true, status: body?.status, warning: "Atualizado em modo de contingência." },
       { status: 200 }
+    )
+  }
+}
+
+export async function DELETE(req: NextRequest) {
+  try {
+    const searchParams = req.nextUrl.searchParams
+    const id = searchParams.get('id')
+    const companyId = searchParams.get('companyId')
+
+    if (!id || !companyId) {
+      return NextResponse.json(
+        { success: false, error: 'id e companyId são obrigatórios.' },
+        { status: 400 }
+      )
+    }
+
+    const res = await deleteServerTableOrder(id, companyId)
+    if (!res.success) {
+      return NextResponse.json(
+        { success: false, error: res.error || 'Erro ao excluir pedido.' },
+        { status: 400 }
+      )
+    }
+
+    return NextResponse.json(
+      { success: true, message: 'Pedido excluído com sucesso.' },
+      { status: 200 }
+    )
+  } catch (err: unknown) {
+    console.error('API /api/table-orders DELETE error:', err)
+    return NextResponse.json(
+      { success: false, error: 'Erro interno ao excluir pedido.' },
+      { status: 500 }
     )
   }
 }

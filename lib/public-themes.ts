@@ -53,6 +53,9 @@ export interface PublicThemeDefinition {
   badgeBg: string
   badgeTextCol: string
   heroTransitionGradient: string
+  secondaryBg?: string
+  modalBg?: string
+  fixedAreaBg?: string
 }
 
 export function isColorDark(hex: string): boolean {
@@ -645,6 +648,59 @@ export const PRESET_THEMES: Record<string, PublicThemeDefinition> = {
     badgeTextCol: '#ffffff',
     heroTransitionGradient: 'linear-gradient(to top, #111116 0%, rgba(17,17,22,0.85) 55%, transparent 100%)',
   },
+
+  // 11. Preto Absoluto — preto puro (#000000), moderno e sofisticado
+  'absolute-black': {
+    id: 'absolute-black',
+    name: 'Preto Absoluto',
+    subtitle: 'Preto puro, moderno e sofisticado',
+    description: 'Preto absoluto (#000000) ultra sofisticado, com superfícies em preto puro, cartões em #080808 e contrastes perfeitos.',
+    isDarkBase: true,
+    badgeText: 'Preto Puro',
+    preview: {
+      bgGradient: '#000000',
+      cardBg: '#080808',
+      cardBorder: '#202020',
+      accentColor: '#ffffff',
+      textColor: '#ffffff',
+      secondaryAccent: '#bdbdbd',
+    },
+    colors: {
+      pageBg: '#000000',
+      cardBg: '#080808',
+      primary: '#ffffff',
+      secondary: '#bdbdbd',
+      buttonBg: '#ffffff',
+      buttonText: '#000000',
+      priceColor: '#22c55e',
+      titleColor: '#ffffff',
+      textColor: '#bdbdbd',
+      borderColor: '#202020',
+    },
+    pageBgStyle: {
+      backgroundColor: '#000000',
+    },
+    pageBgClass: 'bg-black',
+    containerBgStyle: {
+      backgroundColor: '#000000',
+    },
+    containerBorderColor: '#202020',
+    containerShadow: '0 25px 50px -12px rgba(0, 0, 0, 1)',
+    cardBg: '#080808',
+    cardBorder: '#202020',
+    cardHoverBg: '#121212',
+    cardShadow: '0 4px 16px -2px rgba(0, 0, 0, 0.95)',
+    textPrimary: '#ffffff',
+    textSecondary: '#bdbdbd',
+    textMuted: '#8a8a8a',
+    accentColor: '#ffffff',
+    badgeBg: '#141414',
+    badgeTextCol: '#ffffff',
+    heroTransitionGradient: 'linear-gradient(to top, #000000 0%, rgba(0,0,0,0.85) 55%, transparent 100%)',
+    secondaryBg: '#050505',
+    modalBg: '#050505',
+    fixedAreaBg: '#000000',
+  },
 }
 
 export const PUBLIC_THEME_LIST: PublicThemeDefinition[] = [
@@ -658,6 +714,7 @@ export const PUBLIC_THEME_LIST: PublicThemeDefinition[] = [
   PRESET_THEMES.earth,
   PRESET_THEMES.vibrant,
   PRESET_THEMES.custom,
+  PRESET_THEMES['absolute-black'],
 ]
 
 /**
@@ -671,6 +728,9 @@ export function getPublicTheme(
   // Normalize alias
   let cleanId: string = (themeId || 'dark').toLowerCase().trim()
   if (cleanId === 'light') cleanId = 'clean'
+  if (cleanId === 'preto-absoluto' || cleanId === 'black' || cleanId === 'preto') {
+    cleanId = 'absolute-black'
+  }
 
   const base = PRESET_THEMES[cleanId] || PRESET_THEMES.dark
 
@@ -715,6 +775,7 @@ export function getPublicTheme(
 
   // Determine dark or light mode base from card background and page background
   const isDark = isColorDark(cardBg) || isColorDark(pageBg)
+  const isAbsoluteBlack = cleanId === 'absolute-black' || base.id === 'absolute-black'
 
   const resolvedColors: ResolvedThemeColors = {
     pageBg,
@@ -762,38 +823,55 @@ export function getPublicTheme(
     }
   }
 
-  const containerBg = isDark ? '#0d0d14' : '#ffffff'
+  const containerBg = isAbsoluteBlack ? '#000000' : (isDark ? '#0d0d14' : '#ffffff')
+  const containerBorderColor = isAbsoluteBlack
+    ? (themeColors?.borderColor || '#202020')
+    : (isDark ? 'rgba(255, 255, 255, 0.12)' : 'rgba(0, 0, 0, 0.1)')
 
   return {
     ...base,
     isDarkBase: isDark,
     colors: resolvedColors,
     preview: {
-      bgGradient: `linear-gradient(135deg, ${pageBg} 0%, ${primary} 100%)`,
+      bgGradient:
+        isAbsoluteBlack && (!themeColors?.pageBg || themeColors.pageBg === '#000000')
+          ? '#000000'
+          : `linear-gradient(135deg, ${pageBg} 0%, ${primary} 100%)`,
       cardBg,
       cardBorder: borderColor,
       accentColor: primary,
       textColor: titleColor,
       secondaryAccent: secondary,
     },
-    pageBgStyle,
+    pageBgStyle:
+      isAbsoluteBlack && (!themeColors?.pageBg || themeColors.pageBg === '#000000')
+        ? { backgroundColor: '#000000' }
+        : pageBgStyle,
+    pageBgClass: isAbsoluteBlack ? 'bg-black' : base.pageBgClass,
     containerBgStyle: {
       backgroundColor: containerBg,
     },
-    containerBorderColor: isDark ? 'rgba(255, 255, 255, 0.12)' : 'rgba(0, 0, 0, 0.1)',
-    containerShadow: isDark
+    containerBorderColor,
+    containerShadow: isAbsoluteBlack
+      ? '0 25px 50px -12px rgba(0, 0, 0, 1)'
+      : isDark
       ? '0 25px 50px -12px rgba(0, 0, 0, 0.95)'
       : '0 25px 50px -12px rgba(0, 0, 0, 0.15)',
-    textureOverlay,
+    textureOverlay: isAbsoluteBlack ? undefined : textureOverlay,
     cardBg,
     cardBorder: borderColor,
-    cardHoverBg: isDark ? '#1d1d28' : '#f8fafc',
+    cardHoverBg: isAbsoluteBlack ? '#121212' : (isDark ? '#1d1d28' : '#f8fafc'),
     textPrimary: titleColor,
     textSecondary: textColor,
-    textMuted: isDark ? 'rgba(255, 255, 255, 0.6)' : 'rgba(0, 0, 0, 0.6)',
+    textMuted: isAbsoluteBlack ? '#8a8a8a' : (isDark ? 'rgba(255, 255, 255, 0.6)' : 'rgba(0, 0, 0, 0.6)'),
     accentColor: primary,
-    badgeBg: hexToRgba(primary, 0.15),
-    badgeTextCol: primary,
-    heroTransitionGradient: `linear-gradient(to top, ${containerBg} 0%, ${hexToRgba(containerBg, 0.85)} 55%, transparent 100%)`,
+    badgeBg: isAbsoluteBlack ? '#141414' : hexToRgba(primary, 0.15),
+    badgeTextCol: isAbsoluteBlack ? '#ffffff' : primary,
+    heroTransitionGradient: isAbsoluteBlack
+      ? 'linear-gradient(to top, #000000 0%, rgba(0,0,0,0.85) 55%, transparent 100%)'
+      : `linear-gradient(to top, ${containerBg} 0%, ${hexToRgba(containerBg, 0.85)} 55%, transparent 100%)`,
+    secondaryBg: isAbsoluteBlack ? '#050505' : (isDark ? '#0f0f14' : '#f8fafc'),
+    modalBg: isAbsoluteBlack ? '#050505' : (isDark ? '#121217' : '#ffffff'),
+    fixedAreaBg: isAbsoluteBlack ? '#000000' : (isDark ? '#0f0f14' : '#ffffff'),
   }
 }

@@ -46,6 +46,7 @@ import {
 import {
   getCompanyMenuItems,
   updateTableOrderOnServerApi,
+  deleteTableOrderOnServerApi,
   getCompanyCouriers,
   fetchCompanyCouriersFromServer,
 } from '@/lib/storage'
@@ -58,6 +59,7 @@ interface OrderManagementModalProps {
   isOpen: boolean
   onClose: () => void
   onOrderUpdated: (updatedOrder: TableOrder) => void
+  onOrderDeleted?: (orderId: string) => void
   onOpenCouriersManager?: () => void
 }
 
@@ -76,6 +78,7 @@ export const OrderManagementModal: React.FC<OrderManagementModalProps> = ({
   isOpen,
   onClose,
   onOrderUpdated,
+  onOrderDeleted,
   onOpenCouriersManager,
 }) => {
   // Estado local do pedido sendo editado
@@ -95,6 +98,8 @@ export const OrderManagementModal: React.FC<OrderManagementModalProps> = ({
   const [cancellationReason, setCancellationReason] = useState('')
   const [isReopenModalOpen, setIsReopenModalOpen] = useState(false)
   const [isReceiptModalOpen, setIsReceiptModalOpen] = useState(false)
+  const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false)
+  const [isDeleting, setIsDeleting] = useState(false)
 
   const showToast = (text: string, type: 'success' | 'error' = 'success') => {
     setFeedback({ text, type })
@@ -327,6 +332,24 @@ export const OrderManagementModal: React.FC<OrderManagementModalProps> = ({
       showToast('Erro ao salvar alterações.', 'error')
     } finally {
       setIsSaving(false)
+    }
+  }
+
+  // Excluir pedido permanentemente (Requirement: Excluir pedidos do cardápio)
+  const handleDeleteOrder = async () => {
+    if (!editedOrder) return
+    setIsDeleting(true)
+    const res = await deleteTableOrderOnServerApi(editedOrder.id, company.id)
+    setIsDeleting(false)
+    if (res.success) {
+      showToast('Pedido excluído com sucesso!', 'success')
+      setIsDeleteModalOpen(false)
+      if (onOrderDeleted) {
+        onOrderDeleted(editedOrder.id)
+      }
+      onClose()
+    } else {
+      showToast(res.error || 'Erro ao excluir pedido.', 'error')
     }
   }
 
@@ -1363,6 +1386,16 @@ export const OrderManagementModal: React.FC<OrderManagementModalProps> = ({
                 <span>Reabrir Pedido</span>
               </button>
             )}
+
+            <button
+              type="button"
+              onClick={() => setIsDeleteModalOpen(true)}
+              className="px-3 py-2 rounded-xl border border-rose-200 text-rose-700 hover:bg-rose-50 text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5"
+              title="Excluir este pedido permanentemente"
+            >
+              <Trash2 className="w-3.5 h-3.5 text-rose-600" />
+              <span>Excluir Pedido</span>
+            </button>
           </div>
 
           {/* Botões Fechar e Salvar */}
@@ -1578,6 +1611,83 @@ export const OrderManagementModal: React.FC<OrderManagementModalProps> = ({
                   Fechar
                 </button>
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal de Confirmação de Exclusão do Pedido */}
+      {isDeleteModalOpen && (
+        <div className="fixed inset-0 z-70 bg-neutral-950/70 backdrop-blur-xs flex items-center justify-center p-4 animate-in fade-in">
+          <div className="bg-white rounded-3xl max-w-md w-full p-6 shadow-2xl border border-neutral-200 space-y-4 animate-in zoom-in-95">
+            <div className="flex items-center gap-3">
+              <div className="w-11 h-11 rounded-2xl bg-rose-50 text-rose-600 flex items-center justify-center shrink-0 border border-rose-200">
+                <Trash2 className="w-5 h-5 text-rose-600" />
+              </div>
+              <div>
+                <h4 className="font-bold text-base text-neutral-900">
+                  Excluir Pedido Permanentemente
+                </h4>
+                <p className="text-xs text-neutral-500">
+                  Esta ação não pode ser desfeita
+                </p>
+              </div>
+            </div>
+
+            <div className="p-3.5 rounded-2xl bg-neutral-50 border border-neutral-200/80 space-y-2 text-xs">
+              <div className="flex justify-between items-center">
+                <span className="text-neutral-500">Identificação:</span>
+                <span className="font-bold text-neutral-900">
+                  #{editedOrder.id.slice(-6).toUpperCase()} ({origin === 'mesa' ? `Mesa ${editedOrder.tableNumber || ''}` : origin === 'entrega' ? 'Delivery' : 'Retirada'})
+                </span>
+              </div>
+              {editedOrder.customerName && (
+                <div className="flex justify-between items-center">
+                  <span className="text-neutral-500">Cliente:</span>
+                  <span className="font-semibold text-neutral-800">{editedOrder.customerName}</span>
+                </div>
+              )}
+              <div className="flex justify-between items-center">
+                <span className="text-neutral-500">Valor Total:</span>
+                <span className="font-mono font-bold text-teal-700">{formatMoneyBRL(editedOrder.totalAmount)}</span>
+              </div>
+              <div className="flex justify-between items-center">
+                <span className="text-neutral-500">Itens:</span>
+                <span className="text-neutral-700">{editedOrder.items?.length || 0} itens</span>
+              </div>
+            </div>
+
+            <p className="text-xs text-neutral-600 leading-relaxed">
+              Tem certeza que deseja excluir permanentemente este pedido? Ele será removido da Central de Pedidos, dos relatórios e do histórico.
+            </p>
+
+            <div className="pt-2 flex items-center justify-end gap-2.5">
+              <button
+                type="button"
+                disabled={isDeleting}
+                onClick={() => setIsDeleteModalOpen(false)}
+                className="px-4 py-2.5 rounded-xl border border-neutral-200 text-neutral-700 font-semibold text-xs hover:bg-neutral-50 transition-all cursor-pointer disabled:opacity-50"
+              >
+                Voltar
+              </button>
+              <button
+                type="button"
+                disabled={isDeleting}
+                onClick={handleDeleteOrder}
+                className="px-4 py-2.5 rounded-xl bg-rose-600 hover:bg-rose-700 text-white font-bold text-xs flex items-center gap-1.5 transition-all shadow-xs cursor-pointer disabled:opacity-50"
+              >
+                {isDeleting ? (
+                  <>
+                    <span className="w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                    <span>Excluindo...</span>
+                  </>
+                ) : (
+                  <>
+                    <Trash2 className="w-3.5 h-3.5" />
+                    <span>Sim, excluir pedido</span>
+                  </>
+                )}
+              </button>
             </div>
           </div>
         </div>

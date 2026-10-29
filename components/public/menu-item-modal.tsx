@@ -15,6 +15,7 @@ import {
   Tag,
 } from 'lucide-react'
 import { MenuItem, Company } from '@/types/platform'
+import { getPublicTheme } from '@/lib/public-themes'
 
 export interface CartItemOption {
   size?: { name: string; price: number }
@@ -51,7 +52,11 @@ export const MenuItemModal: React.FC<MenuItemModalProps> = ({
   onAddToCart,
   onDirectOrderWhatsApp,
 }) => {
-  const primaryColor = company.primaryColor || '#0D9488'
+  const activeTheme = useMemo(
+    () => getPublicTheme(company.theme, company.customThemeConfig, company.themeColors),
+    [company.theme, company.customThemeConfig, company.themeColors]
+  )
+  const primaryColor = activeTheme.colors.primary || company.primaryColor || '#0D9488'
 
   const [quantity, setQuantity] = useState(1)
   const [selectedSizeId, setSelectedSizeId] = useState<string>(() => {
@@ -226,9 +231,13 @@ export const MenuItemModal: React.FC<MenuItemModalProps> = ({
       <div
         className={`w-full max-w-lg rounded-t-3xl sm:rounded-3xl max-h-[92vh] sm:max-h-[88vh] flex flex-col shadow-2xl overflow-hidden border transition-all ${
           isDark
-            ? 'bg-[#14141a] border-white/10 text-white'
+            ? 'dark bg-[#14141a] border-white/10 text-white'
             : 'bg-white border-neutral-200 text-neutral-900'
         }`}
+        style={{
+          backgroundColor: activeTheme.modalBg,
+          borderColor: activeTheme.containerBorderColor,
+        }}
       >
         {/* FOTO GRANDE NO TOPO - Cores e iluminação originais, sem filtros ou escurecimento */}
         <div className="relative shrink-0">
@@ -489,7 +498,11 @@ export const MenuItemModal: React.FC<MenuItemModalProps> = ({
             <div className="space-y-3 pt-3">
               <div className="flex items-baseline justify-between">
                 <div>
-                  <h4 className="text-xs font-black uppercase tracking-wider text-neutral-900 dark:text-white">
+                  <h4
+                    className={`text-xs font-black uppercase tracking-wider ${
+                      isDark ? 'text-white' : 'text-neutral-900'
+                    }`}
+                  >
                     Tamanho
                   </h4>
                   <p className="text-[11px] text-neutral-400">
@@ -553,9 +566,7 @@ export const MenuItemModal: React.FC<MenuItemModalProps> = ({
                         </div>
                         <span
                           className={`text-xs sm:text-sm font-bold ${
-                            isSelected
-                              ? 'text-neutral-900 dark:text-white'
-                              : 'text-neutral-700 dark:text-neutral-300'
+                            isDark ? 'text-white' : 'text-neutral-900'
                           }`}
                         >
                           {sz.name}
@@ -837,6 +848,10 @@ export const MenuItemModal: React.FC<MenuItemModalProps> = ({
               ? 'bg-[#181822]/95 border-white/[0.08] backdrop-blur-md'
               : 'bg-white/95 border-neutral-200 backdrop-blur-md shadow-xl'
           }`}
+          style={{
+            backgroundColor: activeTheme.fixedAreaBg,
+            borderColor: activeTheme.containerBorderColor,
+          }}
         >
           {/* Seletor de Quantidade */}
           <div

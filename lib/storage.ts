@@ -16,6 +16,7 @@ import {
   TableOrderStatus,
   CompanyCourier,
   TableOrderHistoryEvent,
+  CompanySubscription,
 } from '@/types/platform'
 import {
   INITIAL_COMPANIES,
@@ -2056,6 +2057,35 @@ export async function updateAppointmentOnServerApi(
   }
 }
 
+export function deleteCompanyAppointmentLocally(id: string, companyId?: string): void {
+  if (!isBrowser() || !id) return
+  const all = getItem<Appointment[]>(STORAGE_KEYS.APPOINTMENTS, memoryAppointments) || []
+  const updated = all.filter((a) => !(a.id === id && (!companyId || a.companyId === companyId)))
+  memoryAppointments = updated
+  setItem(STORAGE_KEYS.APPOINTMENTS, updated)
+  notifyDataChange()
+}
+
+export async function deleteAppointmentOnServerApi(
+  id: string,
+  companyId: string
+): Promise<{ success: boolean; error?: string }> {
+  deleteCompanyAppointmentLocally(id, companyId)
+  try {
+    const res = await fetch(`/api/appointments?id=${encodeURIComponent(id)}&companyId=${encodeURIComponent(companyId)}`, {
+      method: 'DELETE',
+    })
+    const data = await res.json()
+    if (res.ok && data.success) {
+      return { success: true }
+    }
+    return { success: false, error: data.error || 'Erro ao excluir agendamento no servidor.' }
+  } catch (err) {
+    console.warn('Network error deleting appointment, kept local deletion:', err)
+    return { success: true }
+  }
+}
+
 // ==========================================
 // 10. PROFESSIONALS (MULTI-TENANT & SERVER SYNC)
 // ==========================================
@@ -2473,6 +2503,40 @@ export async function updateTableOrderOnServerApi(
   }
 }
 
+export function deleteCompanyTableOrderLocally(orderId: string, companyId?: string): void {
+  const cleanId = (orderId || '').trim()
+  if (!cleanId) return
+  const all = isBrowser()
+    ? getItem<TableOrder[]>(STORAGE_KEYS.TABLE_ORDERS, memoryTableOrders)
+    : memoryTableOrders
+  const updated = all.filter((o) => !(o.id === cleanId && (!companyId || o.companyId === companyId)))
+  memoryTableOrders = updated
+  if (isBrowser()) {
+    setItem(STORAGE_KEYS.TABLE_ORDERS, updated)
+  }
+  notifyDataChange()
+}
+
+export async function deleteTableOrderOnServerApi(
+  orderId: string,
+  companyId: string
+): Promise<{ success: boolean; error?: string }> {
+  deleteCompanyTableOrderLocally(orderId, companyId)
+  try {
+    const res = await fetch(`/api/table-orders?id=${encodeURIComponent(orderId)}&companyId=${encodeURIComponent(companyId)}`, {
+      method: 'DELETE',
+    })
+    const data = await res.json()
+    if (res.ok && data.success) {
+      return { success: true }
+    }
+    return { success: false, error: data.error || 'Erro ao excluir pedido no servidor.' }
+  } catch (err) {
+    console.warn('Network error deleting table order, kept local deletion:', err)
+    return { success: true }
+  }
+}
+
 // ==========================================
 // 14. MOTOBOYS / ENTREGADORES (COURIERS)
 // ==========================================
@@ -2586,4 +2650,122 @@ export async function deleteCompanyCourierOnServerApi(
     return true
   }
 }
+
+// ==========================================
+// 15. ASSINATURAS ASAAS (CLIENT-SIDE SAFE API CALLS)
+// ==========================================
+
+export async function fetchCompanySubscriptionFromServer(
+  companyId: string
+): Promise<{
+  success: boolean
+  subscription: CompanySubscription | null
+  environment?: 'SANDBOX' | 'PRODUCTION'
+  isConfigured?: boolean
+  planValue?: number
+  error?: string
+}> {
+  if (!companyId) return { success: false, subscription: null, error: 'companyId obrigatório' }
+  try {
+    const res = await fetch(`/api/asaas/subscription?companyId=${encodeURIComponent(companyId)}`, {
+      cache: 'no-store',
+    })
+    const data = await res.json()
+    if (res.ok && data.success) {
+      return {
+        success: true,
+        subscription: data.subscription || null,
+        environment: data.environment,
+        isConfigured: data.isConfigured,
+        planValue: data.planValue,
+      }
+    }
+    return { success: false, subscription: null, error: data.error }
+  } catch (err) {
+    return {
+      success: false,
+      subscription: null,
+      error: err instanceof Error ? err.message : 'Erro ao consultar assinatura',
+    }
+  }
+}
+
+export async function createCompanySubscriptionOnServerApi(params: {
+  companyId: string
+  paymentMethod: 'PIX' | 'CREDIT_CARD'
+  creditCard?: {
+    holderName: string
+    number: string
+    expiryMonth: string
+    expiryYear: string
+    ccv: string
+  }
+  creditCardHolderInfo?: {
+    name: string
+    email: string
+    cpfCnpj: string
+    postalCode: string
+    addressNumber: string
+    addressComplement?: string
+    phone: string
+  }
+  billingInfo?: {
+    name?: string
+    email?: string
+    cpfCnpj?: string
+    phone?: string
+  }
+}): Promise<{
+  success: boolean
+  subscription?: CompanySubscription
+  pix?: {
+    encodedImage: string
+    payload: string
+    expirationDate: string
+  }
+  error?: string
+}> {
+  try {
+    const res = await fetch('/api/asaas/subscription', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(params),
+    })
+    const data = await res.json()
+    if (res.ok && data.success) {
+      return {
+        success: true,
+        subscription: data.subscription,
+        pix: data.pix,
+      }
+    }
+    return { success: false, error: data.error || 'Erro ao gerar assinatura.' }
+  } catch (err) {
+    return {
+      success: false,
+      error: err instanceof Error ? err.message : 'Erro de conexão ao criar assinatura.',
+    }
+  }
+}
+
+export async function cancelCompanySubscriptionOnServerApi(
+  companyId: string
+): Promise<{ success: boolean; subscription?: CompanySubscription; error?: string }> {
+  try {
+    const res = await fetch(`/api/asaas/subscription?companyId=${encodeURIComponent(companyId)}`, {
+      method: 'DELETE',
+    })
+    const data = await res.json()
+    if (res.ok && data.success) {
+      return { success: true, subscription: data.subscription }
+    }
+    return { success: false, error: data.error || 'Erro ao cancelar assinatura.' }
+  } catch (err) {
+    return {
+      success: false,
+      error: err instanceof Error ? err.message : 'Erro de conexão ao cancelar assinatura.',
+    }
+  }
+}
+
 

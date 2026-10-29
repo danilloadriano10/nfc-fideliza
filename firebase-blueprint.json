@@ -754,6 +754,71 @@
         "phone",
         "isActive"
       ]
+    },
+    "CompanySubscription": {
+      "title": "CompanySubscription",
+      "description": "Asaas recurring subscription per establishment.",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "maxLength": 128
+        },
+        "companyId": {
+          "type": "string",
+          "maxLength": 128
+        },
+        "asaasCustomerId": {
+          "type": "string",
+          "maxLength": 128
+        },
+        "asaasSubscriptionId": {
+          "type": "string",
+          "maxLength": 128
+        },
+        "status": {
+          "type": "string",
+          "enum": ["ACTIVE", "PENDING", "OVERDUE", "CANCELLED", "INACTIVE", "TRIAL"]
+        },
+        "paymentMethod": {
+          "type": "string",
+          "enum": ["PIX", "CREDIT_CARD", "UNDEFINED"]
+        },
+        "value": {
+          "type": "number"
+        },
+        "cycle": {
+          "type": "string"
+        },
+        "nextDueDate": {
+          "type": "string"
+        },
+        "lastPaymentDate": {
+          "type": "string"
+        },
+        "lastPaymentStatus": {
+          "type": "string"
+        },
+        "lastPaymentId": {
+          "type": "string"
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "id",
+        "companyId",
+        "asaasCustomerId",
+        "asaasSubscriptionId",
+        "status",
+        "paymentMethod"
+      ]
     }
   },
   "firestore": {
@@ -808,6 +873,16 @@
     "/couriers/{courierId}": {
       "schema": "CompanyCourier",
       "description": "Couriers and motoboys assigned to delivery orders."
+    },
+    "/subscriptions/{subscriptionId}": {
+      "schema": "CompanySubscription",
+      "description": "Asaas recurring subscriptions per establishment."
+    },
+    "/asaasWebhookEvents/{eventId}": {
+      "schema": {
+        "$ref": "#/entities/CompanySubscription"
+      },
+      "description": "Idempotency log of processed Asaas webhook events."
     }
   }
 }
