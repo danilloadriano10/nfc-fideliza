@@ -10,7 +10,7 @@ import {
   saveServerCompany,
   saveServerProductsOrder,
 } from '@/lib/server-storage'
-import { CompanyProduct } from '@/types/platform'
+import { CompanyProduct, isCompanyPro, isCompanyActiveOrExempt } from '@/types/platform'
 import { uploadCompanyFileServer, isBase64Image } from '@/lib/storage-service'
 
 export const dynamic = 'force-dynamic'
@@ -104,6 +104,28 @@ export async function POST(req: NextRequest) {
       return NextResponse.json(
         { success: false, error: 'Empresa associada não encontrada.' },
         { status: 404 }
+      )
+    }
+
+    if (!isCompanyActiveOrExempt(company)) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: 'Assinatura pendente de ativação. Por favor, conclua o pagamento para gerenciar produtos.',
+          requiresActivation: true,
+        },
+        { status: 403 }
+      )
+    }
+
+    if (!isCompanyPro(company)) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: 'O catálogo de Produtos interno é exclusivo do Plano Pro.',
+          requiresPro: true,
+        },
+        { status: 403 }
       )
     }
 

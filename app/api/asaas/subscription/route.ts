@@ -17,12 +17,16 @@ import {
   AsaasCreditCardInput,
   AsaasCreditCardHolderInfo,
 } from '@/lib/asaas-service'
-import { CompanySubscription } from '@/types/platform'
+import {
+  CompanySubscription,
+  getCompanyPlan,
+  getPlanPrice,
+  getPlanLabel,
+  isCompanyActiveOrExempt,
+} from '@/types/platform'
 
 export const dynamic = 'force-dynamic'
 export const revalidate = 0
-
-const PLAN_VALUE = 69.99
 
 /**
  * Consulta a assinatura da empresa e ambiente Asaas atual.
@@ -52,19 +56,49 @@ export async function GET(req: NextRequest) {
     }
 
     const companyId = company.id
-    const subscription = await getServerSubscription(companyId)
+    const companyPlan = getCompanyPlan(company)
+    const planValue = getPlanPrice(companyPlan)
+    const planLabel = getPlanLabel(companyPlan)
+
+    let subscription = await getServerSubscription(companyId)
     const isConfigured = isAsaasConfigured()
     const environment = getAsaasEnvironment()
 
-    // Se temos assinatura ativa no Asaas, tentar enriquecer com dados atualizados se necessário
+    // Se temos assinatura pendente no Asaas, tentar conciliar pagamento em tempo real
     let asaasRemoteDetails = null
     if (subscription?.asaasSubscriptionId && isConfigured) {
       try {
         asaasRemoteDetails = await getAsaasSubscription(subscription.asaasSubscriptionId)
+        if (subscription.status !== 'ACTIVE') {
+          const paymentsList = await getAsaasSubscriptionPayments(subscription.asaasSubscriptionId)
+          if (Array.isArray(paymentsList)) {
+            const confirmedPayment = paymentsList.find(
+              (p) => p.status === 'CONFIRMED' || p.status === 'RECEIVED' || p.status === 'RECEIVED_IN_CASH'
+            )
+            if (confirmedPayment) {
+              const nowIso = new Date().toISOString()
+              subscription = {
+                ...subscription,
+                status: 'ACTIVE',
+                lastPaymentId: confirmedPayment.id,
+                lastPaymentStatus: confirmedPayment.status,
+                lastPaymentDate:
+                  confirmedPayment.paymentDate || confirmedPayment.clientPaymentDate || nowIso,
+                updatedAt: nowIso,
+              }
+              await saveServerSubscription(subscription)
+            }
+          }
+        }
       } catch (err) {
         console.warn('Não foi possível sincronizar com Asaas remoto no GET:', err)
       }
     }
+
+    const isUnlocked = isCompanyActiveOrExempt({
+      ...company,
+      subscription: subscription || undefined,
+    })
 
     return NextResponse.json(
       {
@@ -72,7 +106,11 @@ export async function GET(req: NextRequest) {
         companyId,
         environment,
         isConfigured,
-        planValue: PLAN_VALUE,
+        plan: companyPlan,
+        planValue,
+        planLabel,
+        requiresActivation: Boolean(company.requiresActivation),
+        isUnlocked,
         subscription: subscription || null,
         asaasRemote: asaasRemoteDetails,
       },
@@ -82,7 +120,7 @@ export async function GET(req: NextRequest) {
     console.error('Error in GET /api/asaas/subscription:', err)
     return NextResponse.json(
       { success: false, error: err instanceof Error ? err.message : 'Erro interno.' },
-      { status: 500 }
+      { status: 400, headers: { 'Content-Type': 'application/json' } }
     )
   }
 }
@@ -92,18 +130,19 @@ export async function GET(req: NextRequest) {
  */
 export async function POST(req: NextRequest) {
   try {
-    if (!isAsaasConfigured()) {
+    // Se estiver em produção e sem chave configurada, retorna erro JSON explicativo (status 400 para evitar interceptação de proxy)
+    if (!isAsaasConfigured() && getAsaasEnvironment() === 'PRODUCTION') {
       return NextResponse.json(
         {
           success: false,
           error:
-            'A chave ASAAS_API_KEY não foi configurada nas variáveis de ambiente do servidor.',
+            'A chave ASAAS_API_KEY não foi configurada nas variáveis de ambiente de produção.',
         },
-        { status: 503 }
+        { status: 400, headers: { 'Content-Type': 'application/json' } }
       )
     }
 
-    const body = await req.json()
+    const body = await req.json().catch(() => ({}))
     const {
       companyId,
       paymentMethod,
@@ -115,22 +154,68 @@ export async function POST(req: NextRequest) {
     if (!companyId) {
       return NextResponse.json(
         { success: false, error: 'companyId é obrigatório.' },
-        { status: 400 }
+        { status: 400, headers: { 'Content-Type': 'application/json' } }
       )
     }
 
     const method: 'PIX' | 'CREDIT_CARD' =
       paymentMethod === 'CREDIT_CARD' ? 'CREDIT_CARD' : 'PIX'
 
-    const company = await getServerCompanyById(companyId)
+    let company = await getServerCompanyById(companyId)
+    if (!company) {
+      company = await getServerCompanyBySlug(companyId)
+    }
     if (!company) {
       return NextResponse.json(
         { success: false, error: 'Estabelecimento não encontrado.' },
-        { status: 404 }
+        { status: 404, headers: { 'Content-Type': 'application/json' } }
       )
     }
 
-    // 1. Localizar ou cadastrar o cliente correspondente no Asaas
+    // Identificação do plano e valor estritamente no servidor
+    const companyPlan = getCompanyPlan(company)
+    const planValue = getPlanPrice(companyPlan)
+    const planLabel = getPlanLabel(companyPlan)
+
+    // 1. Prevenção de duplicidade: verificar se já existe assinatura ativa ou pendente
+    const existingSub = await getServerSubscription(companyId)
+    if (existingSub && existingSub.status === 'ACTIVE') {
+      return NextResponse.json(
+        {
+          success: true,
+          message: 'Esta empresa já possui uma assinatura ativa no Asaas.',
+          subscription: existingSub,
+          environment: getAsaasEnvironment(),
+        },
+        { status: 200 }
+      )
+    }
+
+    // Se o cliente já gerou uma assinatura PIX recente e ainda está PENDENTE com o mesmo plano, retornar os dados do Pix existente
+    if (
+      method === 'PIX' &&
+      existingSub &&
+      existingSub.status === 'PENDING' &&
+      existingSub.paymentMethod === 'PIX' &&
+      existingSub.pixCopiaECola &&
+      (!existingSub.plan || existingSub.plan === companyPlan)
+    ) {
+      return NextResponse.json(
+        {
+          success: true,
+          subscription: existingSub,
+          environment: getAsaasEnvironment(),
+          pix: {
+            encodedImage: existingSub.pixQrCodeUrl?.replace('data:image/png;base64,', '') || '',
+            payload: existingSub.pixCopiaECola,
+            expirationDate: existingSub.pixExpirationDate || '',
+          },
+        },
+        { status: 200 }
+      )
+    }
+
+    // 2. Localizar ou cadastrar o cliente correspondente no Asaas
     const customerRes = await findOrCreateAsaasCustomer(company, billingInfo)
     if (!customerRes.success || !customerRes.customerId) {
       return NextResponse.json(
@@ -141,16 +226,16 @@ export async function POST(req: NextRequest) {
 
     const asaasCustomerId = customerRes.customerId
 
-    // 2. Criar a assinatura no Asaas com valor de R$ 69,99 / mês
+    // 3. Criar a assinatura no Asaas com valor oficial calculado no servidor (LINKS: 29.99 | PRO: 69.99)
     const clientIp = req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() || undefined
 
     const subRes = await createAsaasSubscription({
       companyId,
       customerId: asaasCustomerId,
       billingType: method,
-      value: PLAN_VALUE,
+      plan: companyPlan,
       cycle: 'MONTHLY',
-      description: `Mensalidade DiretoLink - ${company.name}`,
+      description: `Mensalidade DiretoLink - ${planLabel} (${company.name})`,
       creditCard: method === 'CREDIT_CARD' ? (creditCard as AsaasCreditCardInput) : undefined,
       creditCardHolderInfo:
         method === 'CREDIT_CARD'
@@ -170,7 +255,7 @@ export async function POST(req: NextRequest) {
     const firstPayment = subRes.firstPayment
     const pixData = subRes.pix
 
-    // 3. Estruturar os dados da assinatura conforme especificado
+    // 4. Estruturar os dados da assinatura com plano e valores oficiais
     const nowIso = new Date().toISOString()
     const initialStatus = method === 'CREDIT_CARD' && firstPayment?.status === 'CONFIRMED'
       ? 'ACTIVE'
@@ -183,7 +268,8 @@ export async function POST(req: NextRequest) {
       asaasSubscriptionId: createdSub.id,
       status: initialStatus,
       paymentMethod: method,
-      value: PLAN_VALUE,
+      plan: companyPlan,
+      value: planValue,
       cycle: 'MONTHLY',
       nextDueDate: createdSub.nextDueDate || firstPayment?.dueDate || null,
       lastPaymentDate: firstPayment?.status === 'CONFIRMED' ? nowIso : null,
@@ -195,13 +281,13 @@ export async function POST(req: NextRequest) {
       creditCardLast4: firstPayment?.creditCard?.creditCardNumber || undefined,
       creditCardBrand: firstPayment?.creditCard?.creditCardBrand || undefined,
       invoiceUrl: firstPayment?.invoiceUrl || undefined,
-      description: createdSub.description || 'Mensalidade DiretoLink - Plano Profissional',
+      description: createdSub.description || `Mensalidade DiretoLink - ${planLabel}`,
       externalReference: companyId,
       createdAt: nowIso,
       updatedAt: nowIso,
     }
 
-    // 4. Salvar assinatura no Firestore
+    // 5. Salvar assinatura no Firestore
     const saved = await saveServerSubscription(companySubscription)
 
     return NextResponse.json(
@@ -218,7 +304,7 @@ export async function POST(req: NextRequest) {
     console.error('Error in POST /api/asaas/subscription:', err)
     return NextResponse.json(
       { success: false, error: err instanceof Error ? err.message : 'Erro ao processar assinatura.' },
-      { status: 500 }
+      { status: 400, headers: { 'Content-Type': 'application/json' } }
     )
   }
 }
@@ -234,7 +320,7 @@ export async function DELETE(req: NextRequest) {
     if (!companyId) {
       return NextResponse.json(
         { success: false, error: 'companyId é obrigatório.' },
-        { status: 400 }
+        { status: 400, headers: { 'Content-Type': 'application/json' } }
       )
     }
 
@@ -242,7 +328,7 @@ export async function DELETE(req: NextRequest) {
     if (!currentSub || !currentSub.asaasSubscriptionId) {
       return NextResponse.json(
         { success: false, error: 'Nenhuma assinatura encontrada para este estabelecimento.' },
-        { status: 404 }
+        { status: 404, headers: { 'Content-Type': 'application/json' } }
       )
     }
 
@@ -265,13 +351,13 @@ export async function DELETE(req: NextRequest) {
 
     return NextResponse.json(
       { success: true, message: 'Assinatura cancelada com sucesso.', subscription: updated },
-      { status: 200 }
+      { status: 200, headers: { 'Content-Type': 'application/json' } }
     )
   } catch (err) {
     console.error('Error in DELETE /api/asaas/subscription:', err)
     return NextResponse.json(
       { success: false, error: err instanceof Error ? err.message : 'Erro ao cancelar assinatura.' },
-      { status: 500 }
+      { status: 400, headers: { 'Content-Type': 'application/json' } }
     )
   }
 }

@@ -69,12 +69,21 @@ export const MenuCatalogView: React.FC<MenuCatalogViewProps> = ({
   const priceColor = customPriceColor || activeTheme.colors.priceColor || (isDark ? '#34D399' : '#059669')
 
   const themedCardStyle = useMemo(() => {
-    if (customThemedCardStyle) return customThemedCardStyle
+    if (customThemedCardStyle) {
+      return {
+        ...customThemedCardStyle,
+        border: 'none',
+        borderWidth: 0,
+        borderColor: 'transparent',
+      }
+    }
     return {
       backgroundColor: activeTheme.colors.cardBg || activeTheme.cardBg,
-      borderColor: activeTheme.colors.borderColor || activeTheme.cardBorder,
+      border: 'none',
+      borderWidth: 0,
+      borderColor: 'transparent',
     }
-  }, [customThemedCardStyle, activeTheme.colors.cardBg, activeTheme.cardBg, activeTheme.colors.borderColor, activeTheme.cardBorder])
+  }, [customThemedCardStyle, activeTheme.colors.cardBg, activeTheme.cardBg])
 
   // Active items of this company sorted correctly
   const sortedItems = useMemo(() => {
@@ -373,7 +382,7 @@ export const MenuCatalogView: React.FC<MenuCatalogViewProps> = ({
                 onClick={() => {
                   if (!isSoldOut) onSelectItem(item)
                 }}
-                className={`group w-full rounded-2xl sm:rounded-3xl border transition-all flex flex-row items-stretch overflow-hidden select-none ${
+                className={`group w-full rounded-2xl sm:rounded-3xl border-0 transition-all flex flex-row items-stretch overflow-hidden select-none ${
                   isSoldOut
                     ? 'opacity-65 cursor-not-allowed'
                     : 'cursor-pointer hover:shadow-lg active:scale-[0.99]'

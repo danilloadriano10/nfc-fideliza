@@ -71,6 +71,12 @@ import {
   getFirestoreSubscriptionByAsaasCustomerId,
   recordAsaasWebhookEvent,
   isAsaasWebhookEventProcessed,
+  getFirestoreExternalLinks,
+  getFirestoreExternalLinkById,
+  saveFirestoreExternalLink,
+  deleteFirestoreExternalLink,
+  toggleFirestoreExternalLinkStatus,
+  saveFirestoreExternalLinksOrder,
   ensureFirestoreInitialized,
 } from './firestore-service'
 
@@ -91,6 +97,7 @@ import {
   TableOrderStatus,
   CompanyCourier,
   CompanySubscription,
+  CompanyExternalLink,
 } from '@/types/platform'
 
 // Ensure system migration is initialized on startup
@@ -533,6 +540,48 @@ export async function recordServerWebhookEvent(
   companyId?: string
 ): Promise<void> {
   return await recordAsaasWebhookEvent(eventId, event, payload, companyId)
+}
+
+// ==========================================
+// 12. GERENCIADOR DE LINKS EXTERNOS
+// ==========================================
+
+export async function getServerExternalLinks(companyId: string): Promise<CompanyExternalLink[]> {
+  return await getFirestoreExternalLinks(companyId)
+}
+
+export async function getServerExternalLinkById(
+  companyId: string,
+  linkId: string
+): Promise<CompanyExternalLink | null> {
+  return await getFirestoreExternalLinkById(companyId, linkId)
+}
+
+export async function saveServerExternalLink(
+  link: CompanyExternalLink
+): Promise<{ success: boolean; link?: CompanyExternalLink; error?: string }> {
+  return await saveFirestoreExternalLink(link)
+}
+
+export async function deleteServerExternalLink(
+  linkId: string,
+  companyId: string
+): Promise<{ success: boolean; error?: string }> {
+  return await deleteFirestoreExternalLink(linkId, companyId)
+}
+
+export async function toggleServerExternalLinkStatus(
+  linkId: string,
+  companyId: string
+): Promise<{ success: boolean; enabled?: boolean; error?: string }> {
+  return await toggleFirestoreExternalLinkStatus(linkId, companyId)
+}
+
+export async function saveServerExternalLinksOrder(
+  companyId: string,
+  orderedLinkIds: string[]
+): Promise<{ success: boolean; error?: string }> {
+  return await saveFirestoreExternalLinksOrder(companyId, orderedLinkIds)
 }
 
 

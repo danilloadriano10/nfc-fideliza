@@ -5,6 +5,7 @@ import {
   getServerProducts,
   getServerServices,
   getServerMenuItems,
+  getServerExternalLinks,
 } from '@/lib/server-storage'
 import { EmpresaClientPage } from './empresa-client-page'
 
@@ -48,6 +49,7 @@ export default async function EmpresaPage({ params, searchParams }: PageProps) {
   const initialProducts = company ? await getServerProducts(company.id) : []
   const initialServices = company ? await getServerServices(company.id) : []
   const initialMenuItems = company ? await getServerMenuItems(company.id) : []
+  const initialExternalLinks = company ? await getServerExternalLinks(company.id) : []
 
   return (
     <EmpresaClientPage
@@ -56,6 +58,7 @@ export default async function EmpresaPage({ params, searchParams }: PageProps) {
       initialProducts={initialProducts}
       initialServices={initialServices}
       initialMenuItems={initialMenuItems}
+      initialExternalLinks={initialExternalLinks}
       initialTableNumber={sp.mesa}
       autoScrollToMenu={Boolean(sp.mesa)}
     />

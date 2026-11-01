@@ -17,6 +17,8 @@ import {
   CompanyCourier,
   TableOrderHistoryEvent,
   CompanySubscription,
+  CompanyExternalLink,
+  CompanyPlan,
 } from '@/types/platform'
 import {
   INITIAL_COMPANIES,
@@ -48,6 +50,7 @@ const STORAGE_KEYS = {
   COURIERS: 'nfc_tenant_couriers_v1',
   DELETED_COMPANIES: 'nfc_tenant_deleted_companies_v1',
   CURRENT_CUSTOMER_PREFIX: 'nfc_client_session_',
+  EXTERNAL_LINKS: 'nfc_tenant_external_links_v1',
 }
 
 // Event dispatcher for real-time reactivity within the same tab and cross-tabs
@@ -244,9 +247,12 @@ export function saveCompany(updated: Company): { success: boolean; error?: strin
 
   // Asynchronously synchronize with shared server storage
   if (isBrowser()) {
+    const adminToken = typeof window !== 'undefined' ? sessionStorage.getItem('nfc_admin_session_auth_v1') : null
+    const headers: Record<string, string> = { 'Content-Type': 'application/json' }
+    if (adminToken) headers['x-admin-token'] = adminToken
     fetch('/api/companies', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers,
       body: JSON.stringify(updated),
     }).catch((err) => console.error('Error syncing company to server:', err))
   }
@@ -263,9 +269,12 @@ export async function saveCompanyAsync(company: Company): Promise<{ success: boo
 
   if (isBrowser()) {
     try {
+      const adminToken = typeof window !== 'undefined' ? sessionStorage.getItem('nfc_admin_session_auth_v1') : null
+      const headers: Record<string, string> = { 'Content-Type': 'application/json' }
+      if (adminToken) headers['x-admin-token'] = adminToken
       const res = await fetch('/api/companies', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers,
         body: JSON.stringify(updated),
       })
       const data = await res.json()
@@ -292,6 +301,7 @@ export async function registerCompanySelfServiceAsync(data: {
   companyName: string
   category: string
   password: string
+  plan?: CompanyPlan
 }): Promise<{ success: boolean; company?: Company; error?: string }> {
   try {
     const res = await fetch('/api/companies/register', {
@@ -2663,13 +2673,30 @@ export async function fetchCompanySubscriptionFromServer(
   environment?: 'SANDBOX' | 'PRODUCTION'
   isConfigured?: boolean
   planValue?: number
+  isUnlocked?: boolean
+  requiresActivation?: boolean
   error?: string
 }> {
   if (!companyId) return { success: false, subscription: null, error: 'companyId obrigatório' }
   try {
     const res = await fetch(`/api/asaas/subscription?companyId=${encodeURIComponent(companyId)}`, {
       cache: 'no-store',
+      headers: {
+        Accept: 'application/json',
+      },
     })
+
+    const contentType = res.headers.get('content-type') || ''
+    if (!contentType.includes('application/json')) {
+      const text = await res.text().catch(() => '')
+      console.warn('Resposta não-JSON ao buscar assinatura:', res.status, text.slice(0, 100))
+      return {
+        success: false,
+        subscription: null,
+        error: `Servidor retornou resposta inesperada (${res.status}).`,
+      }
+    }
+
     const data = await res.json()
     if (res.ok && data.success) {
       return {
@@ -2678,6 +2705,8 @@ export async function fetchCompanySubscriptionFromServer(
         environment: data.environment,
         isConfigured: data.isConfigured,
         planValue: data.planValue,
+        isUnlocked: data.isUnlocked,
+        requiresActivation: data.requiresActivation,
       }
     }
     return { success: false, subscription: null, error: data.error }
@@ -2728,9 +2757,23 @@ export async function createCompanySubscriptionOnServerApi(params: {
   try {
     const res = await fetch('/api/asaas/subscription', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: {
+        'Content-Type': 'application/json',
+        Accept: 'application/json',
+      },
       body: JSON.stringify(params),
     })
+
+    const contentType = res.headers.get('content-type') || ''
+    if (!contentType.includes('application/json')) {
+      const text = await res.text().catch(() => '')
+      console.warn('Resposta não-JSON ao criar assinatura:', res.status, text.slice(0, 100))
+      return {
+        success: false,
+        error: `Servidor retornou resposta inválida (${res.status}). Verifique a conexão com o Asaas.`,
+      }
+    }
+
     const data = await res.json()
     if (res.ok && data.success) {
       return {
@@ -2754,7 +2797,19 @@ export async function cancelCompanySubscriptionOnServerApi(
   try {
     const res = await fetch(`/api/asaas/subscription?companyId=${encodeURIComponent(companyId)}`, {
       method: 'DELETE',
+      headers: {
+        Accept: 'application/json',
+      },
     })
+
+    const contentType = res.headers.get('content-type') || ''
+    if (!contentType.includes('application/json')) {
+      return {
+        success: false,
+        error: `Servidor retornou resposta inválida (${res.status}).`,
+      }
+    }
+
     const data = await res.json()
     if (res.ok && data.success) {
       return { success: true, subscription: data.subscription }
@@ -2767,5 +2822,168 @@ export async function cancelCompanySubscriptionOnServerApi(
     }
   }
 }
+
+// ---------------------------------------------------------------------------
+// External Links Management (Client-Side & Server API sync)
+// ---------------------------------------------------------------------------
+
+let memoryExternalLinks: CompanyExternalLink[] = []
+
+export function getCompanyExternalLinks(companyId: string): CompanyExternalLink[] {
+  if (!companyId) return []
+  const allLinks = getItem<CompanyExternalLink[]>(STORAGE_KEYS.EXTERNAL_LINKS, memoryExternalLinks) || []
+  return allLinks
+    .filter((l) => l.companyId === companyId)
+    .sort((a, b) => (a.order ?? 0) - (b.order ?? 0))
+}
+
+export function saveCompanyExternalLinkLocally(link: CompanyExternalLink): void {
+  if (!link || !link.id || !link.companyId) return
+  const current = getItem<CompanyExternalLink[]>(STORAGE_KEYS.EXTERNAL_LINKS, memoryExternalLinks) || []
+  const index = current.findIndex((l) => l.id === link.id)
+  let updated: CompanyExternalLink[]
+  if (index >= 0) {
+    updated = [...current]
+    updated[index] = { ...current[index], ...link }
+  } else {
+    updated = [...current, link]
+  }
+  memoryExternalLinks = updated
+  setItem(STORAGE_KEYS.EXTERNAL_LINKS, updated)
+  notifyDataChange()
+}
+
+export function deleteCompanyExternalLinkLocally(linkId: string, companyId?: string): void {
+  if (!linkId) return
+  const current = getItem<CompanyExternalLink[]>(STORAGE_KEYS.EXTERNAL_LINKS, memoryExternalLinks) || []
+  const updated = current.filter((l) => {
+    if (companyId && l.companyId !== companyId) return true
+    return l.id !== linkId
+  })
+  memoryExternalLinks = updated
+  setItem(STORAGE_KEYS.EXTERNAL_LINKS, updated)
+  notifyDataChange()
+}
+
+export async function fetchCompanyExternalLinksFromServer(companyId: string): Promise<CompanyExternalLink[]> {
+  if (!companyId) return []
+  try {
+    const res = await fetch(`/api/links?companyId=${encodeURIComponent(companyId)}`)
+    if (res.ok) {
+      const data = await res.json()
+      if (Array.isArray(data.links)) {
+        if (isBrowser()) {
+          const current = getItem<CompanyExternalLink[]>(STORAGE_KEYS.EXTERNAL_LINKS, memoryExternalLinks) || []
+          const others = current.filter((l) => l.companyId !== companyId)
+          const merged = [...data.links, ...others]
+          memoryExternalLinks = merged
+          setItem(STORAGE_KEYS.EXTERNAL_LINKS, merged)
+          notifyDataChange()
+        }
+        return data.links
+      }
+    }
+  } catch (err) {
+    console.warn('Network issue fetching external links from server, using local fallback:', err)
+  }
+  return getCompanyExternalLinks(companyId)
+}
+
+export async function saveCompanyExternalLinkOnServerApi(
+  link: Partial<CompanyExternalLink> & { companyId: string },
+  isEdit = false
+): Promise<{ success: boolean; link?: CompanyExternalLink; error?: string }> {
+  try {
+    const res = await fetch('/api/links', {
+      method: isEdit ? 'PUT' : 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(link),
+    })
+    const data = await res.json()
+    if (res.ok && data.success && data.link) {
+      saveCompanyExternalLinkLocally(data.link)
+      return { success: true, link: data.link }
+    }
+    return { success: false, error: data.error || 'Erro ao salvar link externo.' }
+  } catch (err) {
+    return {
+      success: false,
+      error: err instanceof Error ? err.message : 'Erro de conexão ao salvar link.',
+    }
+  }
+}
+
+export async function deleteCompanyExternalLinkOnServerApi(
+  linkId: string,
+  companyId: string
+): Promise<{ success: boolean; error?: string }> {
+  deleteCompanyExternalLinkLocally(linkId, companyId)
+  try {
+    const res = await fetch(`/api/links?linkId=${encodeURIComponent(linkId)}&companyId=${encodeURIComponent(companyId)}`, {
+      method: 'DELETE',
+    })
+    const data = await res.json()
+    if (res.ok && data.success) {
+      return { success: true }
+    }
+    return { success: false, error: data.error || 'Erro ao excluir link no servidor.' }
+  } catch (err) {
+    return {
+      success: false,
+      error: err instanceof Error ? err.message : 'Erro de conexão ao excluir link.',
+    }
+  }
+}
+
+export async function toggleCompanyExternalLinkOnServerApi(
+  linkId: string,
+  companyId: string,
+  enabled?: boolean
+): Promise<{ success: boolean; link?: CompanyExternalLink; error?: string }> {
+  try {
+    const res = await fetch('/api/links', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'toggle', linkId, companyId, enabled }),
+    })
+    const data = await res.json()
+    if (res.ok && data.success && data.link) {
+      saveCompanyExternalLinkLocally(data.link)
+      return { success: true, link: data.link }
+    }
+    return { success: false, error: data.error || 'Erro ao alterar status do link.' }
+  } catch (err) {
+    return {
+      success: false,
+      error: err instanceof Error ? err.message : 'Erro de conexão ao alterar status.',
+    }
+  }
+}
+
+export async function saveCompanyExternalLinksOrderOnServerApi(
+  companyId: string,
+  linkIds: string[]
+): Promise<{ success: boolean; order?: string[]; error?: string }> {
+  try {
+    const res = await fetch('/api/links', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'reorder', companyId, linkIds }),
+    })
+    const data = await res.json()
+    if (res.ok && data.success) {
+      // Re-fetch to sync locally
+      await fetchCompanyExternalLinksFromServer(companyId)
+      return { success: true, order: data.order }
+    }
+    return { success: false, error: data.error || 'Erro ao salvar ordem dos links.' }
+  } catch (err) {
+    return {
+      success: false,
+      error: err instanceof Error ? err.message : 'Erro de conexão ao reordenar links.',
+    }
+  }
+}
+
 
 

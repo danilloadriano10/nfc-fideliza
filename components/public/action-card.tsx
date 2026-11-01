@@ -112,9 +112,13 @@ export const PublicCard: React.FC<PublicCardProps> = ({
   return (
     <div
       onClick={handleCardClick}
-      className={`group w-full text-left relative flex flex-col justify-center rounded-2xl sm:rounded-3xl border transition-all duration-200 shadow-xs hover:shadow-md active:scale-[0.99] min-h-[72px] sm:min-h-[76px] p-3.5 sm:p-4 cursor-pointer select-none ${className}`}
+      className={`group w-full text-left relative flex flex-col justify-center rounded-2xl sm:rounded-3xl border-0 transition-all duration-200 shadow-xs hover:shadow-md active:scale-[0.99] min-h-[72px] sm:min-h-[76px] p-3.5 sm:p-4 cursor-pointer select-none ${className}`}
       style={{
         WebkitTapHighlightColor: 'transparent',
+        border: 'none',
+        borderWidth: 0,
+        borderColor: 'transparent',
+        outline: 'none',
         ...cardStyle,
       }}
     >

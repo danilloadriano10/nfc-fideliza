@@ -3,7 +3,7 @@
 import React, { useState, useEffect } from 'react'
 import Link from 'next/link'
 import { Store, ArrowLeft, AlertTriangle, Loader2 } from 'lucide-react'
-import { Company, CompanyProduct, CompanyService, MenuItem } from '@/types/platform'
+import { Company, CompanyProduct, CompanyService, MenuItem, CompanyExternalLink } from '@/types/platform'
 import { getCompanyBySlug, isCompanyDeleted, DATA_CHANGE_EVENT, saveCompanyLocally } from '@/lib/storage'
 import { PublicCompanyView } from '@/components/public/public-company-view'
 
@@ -13,6 +13,7 @@ interface EmpresaClientPageProps {
   initialProducts?: CompanyProduct[]
   initialServices?: CompanyService[]
   initialMenuItems?: MenuItem[]
+  initialExternalLinks?: CompanyExternalLink[]
   initialTableNumber?: string
   autoScrollToMenu?: boolean
 }
@@ -23,6 +24,7 @@ export const EmpresaClientPage: React.FC<EmpresaClientPageProps> = ({
   initialProducts,
   initialServices,
   initialMenuItems,
+  initialExternalLinks,
   initialTableNumber,
   autoScrollToMenu,
 }) => {
@@ -169,6 +171,7 @@ export const EmpresaClientPage: React.FC<EmpresaClientPageProps> = ({
       initialProducts={initialProducts}
       initialServices={initialServices}
       initialMenuItems={initialMenuItems}
+      initialExternalLinks={initialExternalLinks}
       initialTableNumber={initialTableNumber}
       autoScrollToMenu={autoScrollToMenu}
     />

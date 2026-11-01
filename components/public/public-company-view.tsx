@@ -37,7 +37,16 @@ import {
   Coffee,
   Cake,
 } from 'lucide-react'
-import { Company, CompanyService, CompanyProduct, MenuItem } from '@/types/platform'
+import {
+  Company,
+  CompanyService,
+  CompanyProduct,
+  MenuItem,
+  CompanyExternalLink,
+  isCompanyPro,
+  validateAndNormalizeExternalUrl,
+  EXTERNAL_LINK_PRESETS,
+} from '@/types/platform'
 import { PublicCard } from './action-card'
 import { LoyaltySheet } from './loyalty-sheet'
 import { WifiSheet } from './wifi-sheet'
@@ -50,6 +59,7 @@ import { ProductDetailModal } from './product-detail-modal'
 import { MenuItemModal, CartItem } from './menu-item-modal'
 import { MenuCartDrawer } from './menu-cart-drawer'
 import { MenuCatalogView } from './menu-catalog-view'
+import { renderExternalLinkIcon } from '@/components/panel/external-links-tab'
 import {
   getLocalCustomerSession,
   getCustomerByPhone,
@@ -59,6 +69,8 @@ import {
   fetchCompanyProductsFromServer,
   getCompanyMenuItems,
   fetchCompanyMenuItemsFromServer,
+  getCompanyExternalLinks,
+  fetchCompanyExternalLinksFromServer,
   DATA_CHANGE_EVENT,
 } from '@/lib/storage'
 import {
@@ -73,6 +85,7 @@ interface PublicCompanyViewProps {
   initialProducts?: CompanyProduct[]
   initialServices?: CompanyService[]
   initialMenuItems?: MenuItem[]
+  initialExternalLinks?: CompanyExternalLink[]
   initialTableNumber?: string
   autoScrollToMenu?: boolean
 }
@@ -120,6 +133,7 @@ export const PublicCompanyView: React.FC<PublicCompanyViewProps> = ({
   initialProducts = [],
   initialServices = [],
   initialMenuItems = [],
+  initialExternalLinks = [],
   initialTableNumber,
   autoScrollToMenu,
 }) => {
@@ -131,8 +145,10 @@ export const PublicCompanyView: React.FC<PublicCompanyViewProps> = ({
 
   const themedCardStyle = useMemo(() => ({
     backgroundColor: activeTheme.colors.cardBg || activeTheme.cardBg,
-    borderColor: activeTheme.colors.borderColor || activeTheme.cardBorder,
-  }), [activeTheme.colors.cardBg, activeTheme.cardBg, activeTheme.colors.borderColor, activeTheme.cardBorder])
+    borderColor: 'transparent',
+    borderWidth: 0,
+    borderStyle: 'none',
+  }), [activeTheme.colors.cardBg, activeTheme.cardBg])
 
   const cleanTableNumber = initialTableNumber ? initialTableNumber.trim() : null
   const displayTableLabel = useMemo(() => {
@@ -316,6 +332,65 @@ export const PublicCompanyView: React.FC<PublicCompanyViewProps> = ({
     }
   }, [company.id])
 
+  const isPro = useMemo(() => isCompanyPro(company), [company])
+
+  // External Links state & server sync
+  const [externalLinks, setExternalLinks] = useState<CompanyExternalLink[]>(() => {
+    if (initialExternalLinks && initialExternalLinks.length > 0) return initialExternalLinks
+    return getCompanyExternalLinks(company.id)
+  })
+
+  useEffect(() => {
+    let isMounted = true
+    const local = getCompanyExternalLinks(company.id)
+    if (local && local.length > 0) setExternalLinks(local)
+    fetchCompanyExternalLinksFromServer(company.id)
+      .then((srvLinks) => {
+        if (isMounted && Array.isArray(srvLinks)) setExternalLinks(srvLinks)
+      })
+      .catch(() => {})
+
+    const updateLinks = () => {
+      setExternalLinks(getCompanyExternalLinks(company.id))
+    }
+    window.addEventListener(DATA_CHANGE_EVENT, updateLinks)
+    window.addEventListener('storage', updateLinks)
+    return () => {
+      isMounted = false
+      window.removeEventListener(DATA_CHANGE_EVENT, updateLinks)
+      window.removeEventListener('storage', updateLinks)
+    }
+  }, [company.id])
+
+  // Safe external URL opener
+  const handleOpenExternalUrl = useCallback((rawUrl: string, type?: string) => {
+    if (!rawUrl) return
+    const validation = validateAndNormalizeExternalUrl(rawUrl, type as any)
+    if (!validation.isValid || !validation.normalizedUrl) return
+    const target = validation.normalizedUrl
+    if (target.startsWith('tel:') || target.startsWith('mailto:')) {
+      window.location.href = target
+    } else {
+      window.open(target, '_blank', 'noopener,noreferrer')
+    }
+  }, [])
+
+  // Active external links sorted by order
+  const activeExternalLinks = useMemo(() => {
+    return externalLinks
+      .filter((l) => l.enabled !== false)
+      .sort((a, b) => {
+        if (Array.isArray(company.externalLinksOrder) && company.externalLinksOrder.length > 0) {
+          const idxA = company.externalLinksOrder.indexOf(a.id)
+          const idxB = company.externalLinksOrder.indexOf(b.id)
+          if (idxA !== -1 && idxB !== -1) return idxA - idxB
+          if (idxA !== -1) return -1
+          if (idxB !== -1) return 1
+        }
+        return (a.order ?? 0) - (b.order ?? 0)
+      })
+  }, [externalLinks, company.externalLinksOrder])
+
   const isExternalMenu = useMemo(() => {
     if (company.menuMode === 'external') return true
     if (company.menuMode === 'internal') return false
@@ -495,6 +570,22 @@ export const PublicCompanyView: React.FC<PublicCompanyViewProps> = ({
       return fallback
     }
 
+    if (!isPro) {
+      return {
+        products: false,
+        appointments: false,
+        services: false,
+        loyalty: false,
+        whatsapp: isModEnabled('whatsapp', Boolean(company.whatsapp)),
+        googleReview: isModEnabled('googleReview', Boolean(company.googleReviewUrl || company.rating)),
+        menu: false,
+        wifi: false,
+        location: isModEnabled('location', Boolean(company.locationUrl || company.addressText)),
+        feedback: false,
+        instagram: isModEnabled('instagram', Boolean(company.instagram)),
+      }
+    }
+
     return {
       products: isModEnabled('products', products.length > 0),
       appointments: isModEnabled('appointments', false),
@@ -513,7 +604,7 @@ export const PublicCompanyView: React.FC<PublicCompanyViewProps> = ({
       feedback: isModEnabled('feedback', false),
       instagram: isModEnabled('instagram', Boolean(company.instagram)),
     }
-  }, [company, products.length, services.length, menuItems.length])
+  }, [isPro, company, products.length, services.length, menuItems.length])
 
   // Active menu items
   const activeMenuItemsList = useMemo(() => {
@@ -988,14 +1079,16 @@ export const PublicCompanyView: React.FC<PublicCompanyViewProps> = ({
 
       {/* Mobile-first App Container */}
       <main
-        className={`w-full max-w-md sm:rounded-3xl shadow-2xl overflow-hidden relative pb-28 sm:pb-24 flex flex-col transition-all duration-200 ${
+        className={`w-full max-w-md sm:rounded-3xl shadow-2xl overflow-hidden relative pb-28 sm:pb-24 flex flex-col transition-all duration-200 border-0 ${
           isDark
-            ? 'border-x sm:border text-white'
-            : 'border-x sm:border text-neutral-900'
+            ? 'text-white'
+            : 'text-neutral-900'
         }`}
         style={{
           ...activeTheme.containerBgStyle,
-          borderColor: activeTheme.containerBorderColor,
+          borderColor: 'transparent',
+          borderWidth: 0,
+          borderStyle: 'none',
           boxShadow: activeTheme.containerShadow,
           color: activeTheme.textPrimary,
         }}
@@ -1423,10 +1516,10 @@ export const PublicCompanyView: React.FC<PublicCompanyViewProps> = ({
               ) : null,
               products: (activeProductsList.length > 0 && !isExternalCatalog && company.modules?.products !== false && !isProductsShortcutMode) ? (
             <div
-              className={`rounded-3xl p-3 sm:p-4.5 space-y-3.5 border ${
+              className={`rounded-3xl p-3 sm:p-4.5 space-y-3.5 border-0 ${
                 isDark
-                  ? 'bg-[#121217] border-white/[0.08] shadow-sm'
-                  : 'bg-white border-neutral-200/80 shadow-2xs'
+                  ? 'bg-[#121217] shadow-sm'
+                  : 'bg-white shadow-2xs'
               }`}
             >
               {/* Cabeçalho da Vitrine */}
@@ -1981,11 +2074,87 @@ export const PublicCompanyView: React.FC<PublicCompanyViewProps> = ({
               ) : null,
             }
 
-            return effectivePageOrder.map((sectionKey) => {
-              const node = sectionElements[sectionKey]
-              if (!node) return null
-              return <React.Fragment key={sectionKey}>{node}</React.Fragment>
+            const externalLinkCards = activeExternalLinks.map((link) => {
+              const preset = EXTERNAL_LINK_PRESETS.find((p) => p.type === link.type)
+              const actionText =
+                link.type === 'menu'
+                  ? 'Ver Cardápio'
+                  : link.type === 'appointments'
+                  ? 'Agendar'
+                  : link.type === 'delivery'
+                  ? 'Fazer Pedido'
+                  : link.type === 'whatsapp'
+                  ? 'Conversar'
+                  : link.type === 'instagram'
+                  ? 'Seguir'
+                  : link.type === 'googleReview'
+                  ? 'Avaliar'
+                  : link.type === 'location'
+                  ? 'Como Chegar'
+                  : link.type === 'store'
+                  ? 'Comprar'
+                  : link.type === 'catalog'
+                  ? 'Ver Produtos'
+                  : link.type === 'services'
+                  ? 'Ver Serviços'
+                  : 'Acessar'
+
+              return (
+                <PublicCard
+                  key={`ext-link-${link.id}`}
+                  icon={
+                    <div className="w-5 h-5 flex items-center justify-center">
+                      {renderExternalLinkIcon(link.icon || preset?.defaultIcon || 'Link2', 'w-5 h-5')}
+                    </div>
+                  }
+                  iconContainerClass="border"
+                  iconContainerStyle={{
+                    backgroundColor: hexToRgba(primaryColor, isDark ? 0.2 : 0.08),
+                    borderColor: hexToRgba(primaryColor, isDark ? 0.35 : 0.2),
+                    color: isDark ? '#ffffff' : primaryColor,
+                  }}
+                  title={link.label}
+                  subtitle={link.description || preset?.defaultDescription || 'Toque para acessar'}
+                  actionText={actionText}
+                  actionIcon={<ExternalLink className="w-3.5 h-3.5" />}
+                  actionVariant="theme"
+                  onAction={() => handleOpenExternalUrl(link.url, link.type)}
+                  onClick={() => handleOpenExternalUrl(link.url, link.type)}
+                  isDark={isDark}
+                  cardStyle={themedCardStyle}
+                  primaryColor={primaryColor}
+                  buttonBgColor={activeTheme.colors.buttonBg || primaryColor}
+                  buttonTextColor={activeTheme.colors.buttonText}
+                />
+              )
             })
+
+            if (!isPro) {
+              const allowedContactKeys = ['whatsapp', 'instagram', 'location', 'googleReview']
+              return (
+                <>
+                  {externalLinkCards}
+                  {effectivePageOrder
+                    .filter((key) => allowedContactKeys.includes(key))
+                    .map((sectionKey) => {
+                      const node = sectionElements[sectionKey]
+                      if (!node) return null
+                      return <React.Fragment key={sectionKey}>{node}</React.Fragment>
+                    })}
+                </>
+              )
+            }
+
+            return (
+              <>
+                {externalLinkCards}
+                {effectivePageOrder.map((sectionKey) => {
+                  const node = sectionElements[sectionKey]
+                  if (!node) return null
+                  return <React.Fragment key={sectionKey}>{node}</React.Fragment>
+                })}
+              </>
+            )
           })()}
         </div>
 
@@ -1993,10 +2162,10 @@ export const PublicCompanyView: React.FC<PublicCompanyViewProps> = ({
         {/* RODAPÉ ELEGANTE DIRETO LINK                              */}
         {/* ========================================================= */}
         <footer
-          className={`mt-10 pt-5 pb-6 border-t text-center text-[11px] px-6 space-y-1.5 ${
+          className={`mt-10 pt-5 pb-6 border-t-0 text-center text-[11px] px-6 space-y-1.5 ${
             isDark
-              ? 'border-white/[0.06] text-neutral-500'
-              : 'border-neutral-100 text-neutral-400'
+              ? 'text-neutral-500'
+              : 'text-neutral-400'
           }`}
         >
           <p

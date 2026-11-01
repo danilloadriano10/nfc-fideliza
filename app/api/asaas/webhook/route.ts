@@ -12,7 +12,13 @@ import {
   getAsaasEnvironment,
   mapAsaasStatusToSubscriptionStatus,
 } from '@/lib/asaas-service'
-import { AsaasSubscriptionStatus, CompanySubscription } from '@/types/platform'
+import {
+  AsaasSubscriptionStatus,
+  CompanySubscription,
+  CompanyPlan,
+  getCompanyPlan,
+  getPlanPrice,
+} from '@/types/platform'
 
 export const dynamic = 'force-dynamic'
 export const revalidate = 0
@@ -186,11 +192,16 @@ export async function POST(req: NextRequest) {
       const isPaymentSuccess = eventName === 'PAYMENT_RECEIVED' || eventName === 'PAYMENT_CONFIRMED'
       const paymentDate = payment?.paymentDate || payment?.clientPaymentDate || new Date().toISOString()
 
+      const resolvedPlan: CompanyPlan = currentSubscription.plan || 'pro'
+      const resolvedValue = currentSubscription.value || getPlanPrice(resolvedPlan)
+
       const updatedSubscription: CompanySubscription = {
         ...currentSubscription,
         asaasSubscriptionId: targetSubId || currentSubscription.asaasSubscriptionId,
         asaasCustomerId: targetCustId || currentSubscription.asaasCustomerId,
         status: newStatus,
+        plan: resolvedPlan,
+        value: resolvedValue,
         paymentMethod:
           payment?.billingType === 'PIX'
             ? 'PIX'

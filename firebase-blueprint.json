@@ -17,6 +17,11 @@
           "type": "string",
           "maxLength": 100
         },
+        "plan": {
+          "type": "string",
+          "enum": ["links", "pro"],
+          "description": "Subscription tier: 'links' for link-in-bio page or 'pro' for full operational suite."
+        },
         "tagline": {
           "type": "string",
           "maxLength": 250
@@ -819,9 +824,73 @@
         "status",
         "paymentMethod"
       ]
+    },
+    "CompanyExternalLink": {
+      "title": "CompanyExternalLink",
+      "description": "External destination link configured for the company public page (menu, delivery, booking, social, custom).",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "maxLength": 128
+        },
+        "companyId": {
+          "type": "string",
+          "maxLength": 128
+        },
+        "type": {
+          "type": "string",
+          "maxLength": 50,
+          "description": "Type of link: menu, appointments, delivery, store, catalog, services, whatsapp, instagram, facebook, tiktok, youtube, googleReview, location, website, custom"
+        },
+        "label": {
+          "type": "string",
+          "maxLength": 120
+        },
+        "description": {
+          "type": "string",
+          "maxLength": 250
+        },
+        "url": {
+          "type": "string",
+          "maxLength": 2048
+        },
+        "icon": {
+          "type": "string",
+          "maxLength": 50
+        },
+        "enabled": {
+          "type": "boolean"
+        },
+        "order": {
+          "type": "number"
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "id",
+        "companyId",
+        "type",
+        "label",
+        "url",
+        "icon",
+        "enabled",
+        "order"
+      ]
     }
   },
   "firestore": {
+    "/externalLinks/{linkId}": {
+      "schema": "CompanyExternalLink",
+      "description": "External links managed per company for the public page."
+    },
     "/companies/{companyId}": {
       "schema": "Company",
       "description": "Stores company profiles and configurations."

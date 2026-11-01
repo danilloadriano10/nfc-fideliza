@@ -7,7 +7,7 @@ import {
   getServerCompanyById,
   getServerCompanyBySlug,
 } from '@/lib/server-storage'
-import { CompanyTable } from '@/types/platform'
+import { CompanyTable, isCompanyPro, isCompanyActiveOrExempt } from '@/types/platform'
 
 export const dynamic = 'force-dynamic'
 export const revalidate = 0
@@ -61,6 +61,28 @@ export async function POST(req: NextRequest) {
       return NextResponse.json(
         { success: false, error: 'Estabelecimento não encontrado.' },
         { status: 404 }
+      )
+    }
+
+    if (!isCompanyActiveOrExempt(company)) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: 'Assinatura pendente de ativação. Conclua o pagamento para gerenciar mesas.',
+          requiresActivation: true,
+        },
+        { status: 403 }
+      )
+    }
+
+    if (!isCompanyPro(company)) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: 'O gerenciamento de mesas e QR Codes é exclusivo do Plano Pro.',
+          requiresPro: true,
+        },
+        { status: 403 }
       )
     }
 

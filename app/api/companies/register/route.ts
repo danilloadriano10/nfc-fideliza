@@ -4,8 +4,9 @@ import {
   getServerCompanyBySlug,
   getServerCompanies,
 } from '@/lib/server-storage'
-import { Company } from '@/types/platform'
+import { Company, CompanyPlan, getPlanPrice } from '@/types/platform'
 import { slugify, normalizePhone } from '@/lib/utils'
+import { findOrCreateAsaasCustomer, isAsaasConfigured } from '@/lib/asaas-service'
 
 export const dynamic = 'force-dynamic'
 
@@ -80,14 +81,34 @@ export async function POST(req: NextRequest) {
       finalSlug = `${baseSlug}-${counter}`
     }
 
-    // 3. Construct New Company Record
+    // 3. Construct New Company Record with Selected Plan & Pending Subscription
     const companyId = `comp_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`
     const cleanPhone = normalizePhone(String(ownerPhone)) || String(ownerPhone).replace(/\D/g, '')
+    const selectedPlan: CompanyPlan = body?.plan === 'links' ? 'links' : 'pro'
+    const planPrice = getPlanPrice(selectedPlan)
+    const nowIso = new Date().toISOString()
+
+    const initialSubscription = {
+      id: `sub_${companyId}`,
+      companyId,
+      asaasCustomerId: '',
+      asaasSubscriptionId: '',
+      status: 'PENDING' as const,
+      paymentMethod: 'UNDEFINED' as const,
+      value: planPrice,
+      cycle: 'MONTHLY' as const,
+      plan: selectedPlan,
+      nextDueDate: null,
+      lastPaymentDate: null,
+      createdAt: nowIso,
+      updatedAt: nowIso,
+    }
 
     const newCompany: Company = {
       id: companyId,
       name: String(companyName).trim(),
       slug: finalSlug,
+      plan: selectedPlan,
       category: category ? String(category).trim() : 'Outro Estabelecimento',
       tagline: 'Aproxime e conecte-se com nossa empresa!',
       logoUrl: '',
@@ -106,21 +127,43 @@ export async function POST(req: NextRequest) {
       locationUrl: '',
       addressText: '',
       isActive: true,
-      modules: {
-        loyalty: true,
-        googleReview: true,
-        menu: false,
-        wifi: true,
-        whatsapp: true,
-        location: false,
-        feedback: true,
-        instagram: false,
-      },
+      requiresActivation: true, // Novo estabelecimento criado via fluxo comercial: bloqueado até ativação
+      subscription: initialSubscription,
+      modules:
+        selectedPlan === 'links'
+          ? {
+              loyalty: false,
+              googleReview: true,
+              menu: false,
+              wifi: false,
+              whatsapp: true,
+              location: true,
+              feedback: false,
+              instagram: true,
+              services: false,
+              appointments: false,
+              products: false,
+              tables: false,
+            }
+          : {
+              loyalty: true,
+              googleReview: true,
+              menu: false,
+              wifi: true,
+              whatsapp: true,
+              location: false,
+              feedback: true,
+              instagram: false,
+              services: false,
+              appointments: false,
+              products: false,
+              tables: false,
+            },
       loyaltyProgram: {
-        isActive: true,
-        campaignName: 'Cartão Fidelidade VIP',
+        isActive: selectedPlan === 'pro',
+        campaignName: selectedPlan === 'pro' ? 'Cartão Fidelidade VIP' : '',
         goalPoints: 10,
-        rewardDescription: '1 Cortesia Especial',
+        rewardDescription: selectedPlan === 'pro' ? '1 Cortesia Especial' : '',
       },
       ownerAuth: {
         username: cleanEmail,
@@ -131,8 +174,28 @@ export async function POST(req: NextRequest) {
       },
       origin: 'self_service',
       onboardingCompleted: false,
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
+      createdAt: nowIso,
+      updatedAt: nowIso,
+    }
+
+    // 4. Integração proativa com Asaas: cadastrar/localizar cliente antecipadamente
+    if (isAsaasConfigured()) {
+      try {
+        const custRes = await findOrCreateAsaasCustomer(newCompany, {
+          name: String(ownerName).trim(),
+          email: cleanEmail,
+          phone: cleanPhone,
+        })
+        if (custRes.success && custRes.customerId) {
+          initialSubscription.asaasCustomerId = custRes.customerId
+          newCompany.subscription = {
+            ...initialSubscription,
+            asaasCustomerId: custRes.customerId,
+          }
+        }
+      } catch (custErr) {
+        console.warn('Aviso: cadastro antecipado do cliente no Asaas:', custErr)
+      }
     }
 
     const saveRes = await saveServerCompany(newCompany)

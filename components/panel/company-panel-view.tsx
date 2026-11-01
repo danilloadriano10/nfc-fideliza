@@ -54,6 +54,8 @@ import {
   MessageCircle,
   QrCode,
   Bell,
+  Link2,
+  CreditCard,
 } from 'lucide-react'
 import confetti from 'canvas-confetti'
 import { BRAND_COLOR_PRESETS, sanitizeHex, getGradientContrastTextColor } from '@/lib/colors'
@@ -64,7 +66,12 @@ import {
   PrivateFeedback,
   WifiSecurity,
   PointRequest,
+  isCompanyPro,
+  getCompanyPlan,
+  isCompanyActiveOrExempt,
 } from '@/types/platform'
+import { SubscriptionSection } from './subscription-section'
+import { CompanyActivationView } from './company-activation-view'
 import {
   getCompanyCustomers,
   getCompanyServices,
@@ -105,6 +112,7 @@ import { TablesTab } from './tables-tab'
 import { TableOrdersTab } from './table-orders-tab'
 import { PageThemeSelector } from './page-theme-selector'
 import { CoverAdjustModal } from './cover-adjust-modal'
+import { ExternalLinksTab } from './external-links-tab'
 
 const PRESET_BANNERS = [
   { label: '☕ Cafeteria / Café', url: '/images/cafe_central_banner_1791003956057.jpg' },
@@ -131,6 +139,8 @@ type TabType =
   | 'order'
   | 'settings'
   | 'appearance'
+  | 'links'
+  | 'subscription'
 
 const ALL_ORDERABLE_MODULES: Array<{
   key: string
@@ -176,7 +186,23 @@ export const CompanyPanelView: React.FC<CompanyPanelViewProps> = ({
   initialCompany,
 }) => {
   const [company, setCompany] = useState<Company>(initialCompany)
-  const [activeTab, setActiveTab] = useState<TabType>('dashboard')
+  const [activeTab, setActiveTab] = useState<TabType>(() => {
+    if (typeof window !== 'undefined') {
+      const urlParams = new URLSearchParams(window.location.search)
+      const tabParam = urlParams.get('tab')
+      if (tabParam === 'subscription') return 'subscription'
+      if (tabParam === 'links') return 'links'
+      if (tabParam === 'menu') return 'menu'
+      if (tabParam === 'table_orders') return 'table_orders'
+      if (tabParam === 'appointments') return 'appointments'
+      if (tabParam === 'services') return 'services'
+      if (tabParam === 'products') return 'products'
+      if (tabParam === 'tables') return 'tables'
+      if (tabParam === 'settings') return 'settings'
+      if (tabParam === 'appearance') return 'appearance'
+    }
+    return 'dashboard'
+  })
   const [customers, setCustomers] = useState<Customer[]>([])
   const [logs, setLogs] = useState<ActivityLog[]>([])
   const [feedbacks, setFeedbacks] = useState<PrivateFeedback[]>([])
@@ -187,6 +213,9 @@ export const CompanyPanelView: React.FC<CompanyPanelViewProps> = ({
   const [isOnboardingOpen, setIsOnboardingOpen] = useState(
     () => initialCompany.onboardingCompleted === false
   )
+
+  const isPro = isCompanyPro(company)
+  const currentPlan = getCompanyPlan(company)
 
   // Settings form state
   const [formData, setFormData] = useState<Company>(() => ({
@@ -813,6 +842,22 @@ export const CompanyPanelView: React.FC<CompanyPanelViewProps> = ({
     )
   }
 
+  // Restrição de Acesso: Ativação obrigatória da assinatura para novas empresas
+  const isUnlocked = isCompanyActiveOrExempt(company)
+  if (!isUnlocked) {
+    return (
+      <CompanyActivationView
+        company={company}
+        onCompanyUpdate={(updated) => {
+          setCompany(updated)
+          setFormData(updated)
+          saveCompanyLocally(updated)
+        }}
+        onLogout={handleLogout}
+      />
+    )
+  }
+
   return (
     <div className="min-h-screen bg-neutral-50/70 flex flex-col selection:bg-violet-100 selection:text-violet-900 font-sans text-neutral-900 w-full max-w-full overflow-x-hidden">
       {/* Toast Notification */}
@@ -861,7 +906,7 @@ export const CompanyPanelView: React.FC<CompanyPanelViewProps> = ({
               </div>
 
               <div>
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2 flex-wrap">
                   <span className="text-[10px] text-violet-700 font-bold uppercase tracking-wider bg-violet-50 px-2 py-0.5 rounded-full border border-violet-100">
                     DiretoLink
                   </span>
@@ -876,6 +921,15 @@ export const CompanyPanelView: React.FC<CompanyPanelViewProps> = ({
                     }`}
                   >
                     {company.isActive ? 'Ativo' : 'Inativo'}
+                  </span>
+                  <span
+                    className={`text-[10px] font-black px-2.5 py-0.5 rounded-full uppercase tracking-wider ${
+                      isPro
+                        ? 'bg-gradient-to-r from-violet-600 to-indigo-600 text-white shadow-2xs'
+                        : 'bg-blue-100 text-blue-800 border border-blue-200'
+                    }`}
+                  >
+                    {isPro ? 'Plano Pro' : 'Plano Links'}
                   </span>
                 </div>
                 <div className="flex items-center gap-2 text-xs text-neutral-500 font-mono mt-0.5">
@@ -915,53 +969,63 @@ export const CompanyPanelView: React.FC<CompanyPanelViewProps> = ({
 
         {/* Navigation Tabs Bar */}
         <div className="max-w-7xl mx-auto flex items-center gap-1 overflow-x-auto pt-3 mt-1 border-t border-neutral-100">
-          {[
-            { id: 'dashboard', label: 'Visão Geral', icon: LayoutDashboard },
-            { id: 'services', label: 'Serviços', count: servicesCount > 0 ? servicesCount : undefined, icon: Scissors },
-            {
-              id: 'appointments',
-              label: 'Central de Agendamentos',
-              count: pendingAppointmentsCount > 0 ? pendingAppointmentsCount : (allAppointments.length > 0 ? allAppointments.length : undefined),
-              icon: Calendar,
-            },
-            {
-              id: 'products',
-              label: 'Produtos',
-              count: productsCount > 0 ? productsCount : undefined,
-              icon: Package,
-            },
-            {
-              id: 'menu',
-              label: 'Cardápio',
-              count: menuItemsCount > 0 ? menuItemsCount : undefined,
-              icon: UtensilsCrossed,
-            },
-            {
-              id: 'tables',
-              label: 'Mesas',
-              count: tablesCount > 0 ? tablesCount : undefined,
-              icon: QrCode,
-            },
-            {
-              id: 'table_orders',
-              label: 'Central de Pedidos',
-              count: newTableOrdersCount > 0 ? newTableOrdersCount : (allTableOrders.length > 0 ? allTableOrders.length : undefined),
-              badgeHighlight: newTableOrdersCount > 0,
-              icon: Bell,
-            },
-            { id: 'customers', label: 'Clientes', count: totalCustomers, icon: Users },
-            { id: 'loyalty', label: 'Fidelidade', icon: Gift },
-            {
-              id: 'rewards',
-              label: 'Solicitações de Pontos',
-              count: pendingRequests.length > 0 ? pendingRequests.length : undefined,
-              icon: Award,
-            },
-            { id: 'feedbacks', label: 'Feedbacks', count: totalFeedbacks, icon: MessageSquare },
-            { id: 'order', label: 'Ordem da Página', icon: SlidersHorizontal },
-            { id: 'settings', label: 'Configurações', icon: Settings },
-            { id: 'appearance', label: 'Aparência da Página', icon: Palette },
-          ].map((tab) => {
+          {(isPro
+            ? [
+                { id: 'dashboard', label: 'Visão Geral', icon: LayoutDashboard },
+                { id: 'services', label: 'Serviços', count: servicesCount > 0 ? servicesCount : undefined, icon: Scissors },
+                {
+                  id: 'appointments',
+                  label: 'Central de Agendamentos',
+                  count: pendingAppointmentsCount > 0 ? pendingAppointmentsCount : (allAppointments.length > 0 ? allAppointments.length : undefined),
+                  icon: Calendar,
+                },
+                {
+                  id: 'products',
+                  label: 'Produtos',
+                  count: productsCount > 0 ? productsCount : undefined,
+                  icon: Package,
+                },
+                {
+                  id: 'menu',
+                  label: 'Cardápio',
+                  count: menuItemsCount > 0 ? menuItemsCount : undefined,
+                  icon: UtensilsCrossed,
+                },
+                {
+                  id: 'tables',
+                  label: 'Mesas',
+                  count: tablesCount > 0 ? tablesCount : undefined,
+                  icon: QrCode,
+                },
+                {
+                  id: 'table_orders',
+                  label: 'Central de Pedidos',
+                  count: newTableOrdersCount > 0 ? newTableOrdersCount : (allTableOrders.length > 0 ? allTableOrders.length : undefined),
+                  badgeHighlight: newTableOrdersCount > 0,
+                  icon: Bell,
+                },
+                { id: 'customers', label: 'Clientes', count: totalCustomers, icon: Users },
+                { id: 'loyalty', label: 'Fidelidade', icon: Gift },
+                {
+                  id: 'rewards',
+                  label: 'Solicitações de Pontos',
+                  count: pendingRequests.length > 0 ? pendingRequests.length : undefined,
+                  icon: Award,
+                },
+                { id: 'feedbacks', label: 'Feedbacks', count: totalFeedbacks, icon: MessageSquare },
+                { id: 'links', label: 'Links da Página', icon: Link2 },
+                { id: 'order', label: 'Ordem da Página', icon: SlidersHorizontal },
+                { id: 'settings', label: 'Configurações', icon: Settings },
+                { id: 'appearance', label: 'Aparência da Página', icon: Palette },
+              ]
+            : [
+                { id: 'dashboard', label: 'Visão Geral', icon: LayoutDashboard },
+                { id: 'settings', label: 'Minha Página', icon: Settings },
+                { id: 'links', label: 'Links', icon: Link2 },
+                { id: 'appearance', label: 'Aparência', icon: Palette },
+                { id: 'subscription', label: 'Minha Assinatura', icon: CreditCard },
+              ]
+          ).map((tab) => {
             const Icon = tab.icon
             const isActive = activeTab === tab.id
             const isHighlight = 'badgeHighlight' in tab && tab.badgeHighlight
@@ -993,7 +1057,7 @@ export const CompanyPanelView: React.FC<CompanyPanelViewProps> = ({
               >
                 <Icon className="w-3.5 h-3.5" />
                 <span>{tab.label}</span>
-                {tab.count !== undefined && tab.count > 0 && (
+                {'count' in tab && tab.count !== undefined && tab.count > 0 && (
                   <span
                     className={`text-[10px] font-bold px-1.5 py-0.2 rounded-full ${
                       isHighlight
@@ -1024,9 +1088,9 @@ export const CompanyPanelView: React.FC<CompanyPanelViewProps> = ({
       {/* Main Tab View */}
       <main className="max-w-7xl w-full mx-auto p-4 sm:p-6 flex-1 space-y-6">
         {/* ============================================== */}
-        {/* TAB 1: DASHBOARD */}
+        {/* TAB 1: DASHBOARD (PRO) */}
         {/* ============================================== */}
-        {activeTab === 'dashboard' && (
+        {activeTab === 'dashboard' && isPro && (
           <div className="space-y-6">
             {/* Quick Action: Ordem da Página Pública */}
             <div className="p-4 sm:p-5 rounded-3xl bg-gradient-to-r from-violet-50 to-indigo-50 border border-violet-200/90 shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-3">
@@ -1298,9 +1362,195 @@ export const CompanyPanelView: React.FC<CompanyPanelViewProps> = ({
         )}
 
         {/* ============================================== */}
+        {/* TAB 1 (LINKS): DASHBOARD SIMPLIFICADO */}
+        {/* ============================================== */}
+        {activeTab === 'dashboard' && !isPro && (
+          <div className="space-y-6">
+            {/* Banner Boas-vindas Plano Links */}
+            <div className="p-6 rounded-3xl bg-gradient-to-r from-blue-50 via-indigo-50 to-violet-50 border border-blue-200/90 shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+              <div className="space-y-1">
+                <div className="flex items-center gap-2">
+                  <span className="px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-blue-600 text-white shadow-2xs">
+                    Plano Links Ativo
+                  </span>
+                  <span className="text-xs text-neutral-500 font-medium">Central de Links</span>
+                </div>
+                <h2 className="text-lg font-bold text-neutral-900">
+                  Bem-vindo à sua Central DiretoLink, {company.name}!
+                </h2>
+                <p className="text-xs text-neutral-600 max-w-xl">
+                  Sua Página Pública personalizada está no ar. Conecte sua placa NFC, QR Code e compartilhe todos os seus links e canais de contato em um único lugar.
+                </p>
+              </div>
+
+              <div className="flex items-center gap-2.5 shrink-0">
+                <Link
+                  href={`/empresa/${company.slug}`}
+                  target="_blank"
+                  className="px-4 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold shadow-xs transition-all flex items-center gap-2"
+                >
+                  <ExternalLink className="w-4 h-4" />
+                  <span>Ver Minha Página</span>
+                </Link>
+              </div>
+            </div>
+
+            {/* Cards de Acesso Rápido */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+              <button
+                type="button"
+                onClick={() => setActiveTab('settings')}
+                className="text-left bg-white p-5 rounded-2xl border border-neutral-200/80 hover:border-violet-300 hover:shadow-md transition-all group cursor-pointer"
+              >
+                <div className="w-10 h-10 rounded-xl bg-violet-50 text-violet-600 flex items-center justify-center mb-3 group-hover:scale-105 transition-transform">
+                  <Settings className="w-5 h-5" />
+                </div>
+                <h4 className="font-bold text-sm text-neutral-900">Minha Página</h4>
+                <p className="text-xs text-neutral-500 mt-1">
+                  Edite nome, logo, foto de capa, redes sociais e informações do estabelecimento.
+                </p>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setActiveTab('links')}
+                className="text-left bg-white p-5 rounded-2xl border border-neutral-200/80 hover:border-blue-300 hover:shadow-md transition-all group cursor-pointer"
+              >
+                <div className="w-10 h-10 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center mb-3 group-hover:scale-105 transition-transform">
+                  <Link2 className="w-5 h-5" />
+                </div>
+                <h4 className="font-bold text-sm text-neutral-900">Links</h4>
+                <p className="text-xs text-neutral-500 mt-1">
+                  Estrutura para links externos (WhatsApp, Cardápio, Agendamento, Instagram e personalizados).
+                </p>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  setActiveTab('settings')
+                  setTimeout(() => {
+                    const el = document.getElementById('secao-aparencia')
+                    if (el) el.scrollIntoView({ behavior: 'smooth' })
+                  }, 50)
+                }}
+                className="text-left bg-white p-5 rounded-2xl border border-neutral-200/80 hover:border-amber-300 hover:shadow-md transition-all group cursor-pointer"
+              >
+                <div className="w-10 h-10 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center mb-3 group-hover:scale-105 transition-transform">
+                  <Palette className="w-5 h-5" />
+                </div>
+                <h4 className="font-bold text-sm text-neutral-900">Aparência</h4>
+                <p className="text-xs text-neutral-500 mt-1">
+                  Personalize as cores da marca, gradientes e temas visuais da sua página.
+                </p>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setActiveTab('subscription')}
+                className="text-left bg-white p-5 rounded-2xl border border-neutral-200/80 hover:border-emerald-300 hover:shadow-md transition-all group cursor-pointer"
+              >
+                <div className="w-10 h-10 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center mb-3 group-hover:scale-105 transition-transform">
+                  <CreditCard className="w-5 h-5" />
+                </div>
+                <h4 className="font-bold text-sm text-neutral-900">Minha Assinatura</h4>
+                <p className="text-xs text-neutral-500 mt-1">
+                  Consulte o status do seu plano ativo, pagamentos e dados cadastrais.
+                </p>
+              </button>
+            </div>
+
+            {/* NFC Card Showcase */}
+            <div className="bg-white p-6 rounded-3xl border border-neutral-200/80 shadow-sm space-y-4">
+              <div className="flex items-center justify-between">
+                <h3 className="font-bold text-neutral-900 text-sm">
+                  Placa NFC & QR Code da Sua Central de Links
+                </h3>
+                <button
+                  onClick={handleCopyNfcUrl}
+                  className="text-xs font-semibold text-neutral-600 hover:text-neutral-900 flex items-center gap-1 cursor-pointer"
+                >
+                  <Copy className="w-3.5 h-3.5" />
+                  <span>{copiedLink ? 'Copiada!' : 'Copiar URL'}</span>
+                </button>
+              </div>
+
+              <div className="flex flex-col sm:flex-row items-center gap-4 bg-neutral-50 p-4 rounded-2xl border border-neutral-200/60">
+                <QRCodeView value={nfcUrl} size={130} />
+                <div className="space-y-1.5 text-center sm:text-left">
+                  <span className="text-[11px] uppercase tracking-wider font-semibold text-neutral-400">
+                    URL da Central de Links
+                  </span>
+                  <p className="text-xs font-mono font-bold text-neutral-900 break-all">
+                    {nfcUrl}
+                  </p>
+                  <p className="text-[11px] text-neutral-500 leading-tight">
+                    Grave esta URL no chip NFC ou compartilhe o QR Code na bio do Instagram, balcão e materiais impressos.
+                  </p>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* ============================================== */}
+        {/* TAB: LINKS (GERENCIADOR DE LINKS EXTERNOS) */}
+        {/* ============================================== */}
+        {activeTab === 'links' && (
+          <ExternalLinksTab
+            company={company}
+            onCompanyUpdate={(updated) => {
+              setCompany(updated)
+              setFormData(updated)
+            }}
+          />
+        )}
+
+        {/* ============================================== */}
+        {/* TAB: MINHA ASSINATURA */}
+        {/* ============================================== */}
+        {activeTab === 'subscription' && (
+          <SubscriptionSection
+            company={company}
+            onCompanyUpdate={(updated) => {
+              setCompany(updated)
+              setFormData(updated)
+            }}
+          />
+        )}
+
+        {/* ============================================== */}
+        {/* BLOQUEIO DE SEGURANÇA PARA RECURSOS EXCLUSIVOS PRO */}
+        {/* ============================================== */}
+        {!isPro && ['services', 'appointments', 'products', 'menu', 'tables', 'table_orders', 'customers', 'loyalty', 'rewards', 'feedbacks', 'order'].includes(activeTab) && (
+          <div className="bg-white rounded-3xl border border-neutral-200/80 shadow-sm p-8 text-center max-w-lg mx-auto my-12 space-y-4">
+            <div className="w-14 h-14 rounded-2xl bg-amber-50 text-amber-600 flex items-center justify-center mx-auto">
+              <Lock className="w-7 h-7" />
+            </div>
+            <div className="space-y-1">
+              <h3 className="text-base font-bold text-neutral-900">
+                Recurso Exclusivo do Plano PRO
+              </h3>
+              <p className="text-xs text-neutral-600 leading-relaxed">
+                Este módulo operacional (cardápio, pedidos do salão, mesas, catálogo, agendamento e programa de fidelidade) está disponível exclusivamente para estabelecimentos no <strong>Plano PRO</strong>.
+              </p>
+            </div>
+            <div className="pt-2 flex items-center justify-center gap-2">
+              <button
+                type="button"
+                onClick={() => setActiveTab('dashboard')}
+                className="px-4 py-2 bg-neutral-900 hover:bg-neutral-800 text-white rounded-xl text-xs font-semibold transition cursor-pointer"
+              >
+                Voltar para Visão Geral
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* ============================================== */}
         {/* TAB 1.5: SERVIÇOS */}
         {/* ============================================== */}
-        {activeTab === 'services' && (
+        {activeTab === 'services' && isPro && (
           <ServicesTab
             company={company}
             onEnableModule={() => setActiveTab('settings')}
@@ -1314,7 +1564,7 @@ export const CompanyPanelView: React.FC<CompanyPanelViewProps> = ({
         {/* ============================================== */}
         {/* TAB 1.6: AGENDAMENTOS */}
         {/* ============================================== */}
-        {activeTab === 'appointments' && (
+        {activeTab === 'appointments' && isPro && (
           <AppointmentsTab
             company={company}
             onUpdateCompany={(updated) => {
@@ -1327,7 +1577,7 @@ export const CompanyPanelView: React.FC<CompanyPanelViewProps> = ({
         {/* ============================================== */}
         {/* TAB 1.7: PRODUTOS */}
         {/* ============================================== */}
-        {activeTab === 'products' && (
+        {activeTab === 'products' && isPro && (
           <ProductsTab
             company={company}
             onCompanyUpdate={(updated) => {
@@ -1342,7 +1592,7 @@ export const CompanyPanelView: React.FC<CompanyPanelViewProps> = ({
         {/* ============================================== */}
         {/* TAB 1.8: CARDÁPIO */}
         {/* ============================================== */}
-        {activeTab === 'menu' && (
+        {activeTab === 'menu' && isPro && (
           <MenuTab
             company={company}
             onCompanyUpdate={(updated) => {
@@ -1355,7 +1605,7 @@ export const CompanyPanelView: React.FC<CompanyPanelViewProps> = ({
         {/* ============================================== */}
         {/* TAB 1.9: MESAS (CONSUMIR NO LOCAL) */}
         {/* ============================================== */}
-        {activeTab === 'tables' && (
+        {activeTab === 'tables' && isPro && (
           <TablesTab
             company={company}
             onOpenTableOrders={() => setActiveTab('table_orders')}
@@ -1365,7 +1615,7 @@ export const CompanyPanelView: React.FC<CompanyPanelViewProps> = ({
         {/* ============================================== */}
         {/* TAB 1.10: PEDIDOS DO SALÃO */}
         {/* ============================================== */}
-        {activeTab === 'table_orders' && (
+        {activeTab === 'table_orders' && isPro && (
           <TableOrdersTab
             company={company}
             onOpenTables={() => setActiveTab('tables')}
@@ -1379,7 +1629,7 @@ export const CompanyPanelView: React.FC<CompanyPanelViewProps> = ({
         {/* ============================================== */}
         {/* TAB 2: CLIENTES */}
         {/* ============================================== */}
-        {activeTab === 'customers' && (
+        {activeTab === 'customers' && isPro && (
           <div className="bg-white rounded-3xl border border-neutral-200/80 shadow-sm p-6 space-y-5">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
               <div>
@@ -1490,7 +1740,7 @@ export const CompanyPanelView: React.FC<CompanyPanelViewProps> = ({
         {/* ============================================== */}
         {/* TAB 3: FIDELIDADE (CONFIGURAÇÕES DO PROGRAMA) */}
         {/* ============================================== */}
-        {activeTab === 'loyalty' && (
+        {activeTab === 'loyalty' && isPro && (
           <div className="bg-white rounded-3xl border border-neutral-200/80 shadow-sm p-6 space-y-6 max-w-2xl">
             <div>
               <h2 className="text-base font-bold text-neutral-900">
@@ -1627,7 +1877,7 @@ export const CompanyPanelView: React.FC<CompanyPanelViewProps> = ({
         {/* ============================================== */}
         {/* TAB 4: RECOMPENSAS */}
         {/* ============================================== */}
-        {activeTab === 'rewards' && (
+        {activeTab === 'rewards' && isPro && (
           <div className="space-y-6">
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
               <div className="bg-white p-5 rounded-2xl border border-neutral-200/80 shadow-sm">
@@ -1699,7 +1949,7 @@ export const CompanyPanelView: React.FC<CompanyPanelViewProps> = ({
         {/* ============================================== */}
         {/* TAB 5: FEEDBACKS */}
         {/* ============================================== */}
-        {activeTab === 'feedbacks' && (
+        {activeTab === 'feedbacks' && isPro && (
           <div className="bg-white rounded-3xl border border-neutral-200/80 shadow-sm p-6 space-y-5">
             <div>
               <h2 className="text-base font-bold text-neutral-900">
@@ -2609,52 +2859,56 @@ export const CompanyPanelView: React.FC<CompanyPanelViewProps> = ({
                 <div>
                   <div className="flex items-center justify-between mb-1">
                     <label className="block text-xs font-semibold text-neutral-700">
-                      Cardápio (Externo ou DiretoLink)
+                      {isPro ? 'Cardápio (Externo ou DiretoLink)' : 'Link do Cardápio Externo (iFood, etc.)'}
                     </label>
-                    <button
-                      type="button"
-                      onClick={() => setActiveTab('menu')}
-                      className="text-[11px] font-bold text-teal-700 hover:underline flex items-center gap-1"
-                    >
-                      <UtensilsCrossed className="w-3 h-3" />
-                      <span>Gerenciar Cardápio</span>
-                    </button>
+                    {isPro && (
+                      <button
+                        type="button"
+                        onClick={() => setActiveTab('menu')}
+                        className="text-[11px] font-bold text-teal-700 hover:underline flex items-center gap-1 cursor-pointer"
+                      >
+                        <UtensilsCrossed className="w-3 h-3" />
+                        <span>Gerenciar Cardápio</span>
+                      </button>
+                    )}
                   </div>
-                  <div className="flex items-center gap-2 mb-2">
-                    <button
-                      type="button"
-                      onClick={() =>
-                        setFormData({
-                          ...formData,
-                          menuMode: 'external',
-                        })
-                      }
-                      className={`px-2.5 py-1 text-[11px] rounded-lg font-semibold transition-all ${
-                        formData.menuMode !== 'internal'
-                          ? 'bg-teal-600 text-white'
-                          : 'bg-neutral-100 text-neutral-600 hover:bg-neutral-200'
-                      }`}
-                    >
-                      1. Link Externo
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() =>
-                        setFormData({
-                          ...formData,
-                          menuMode: 'internal',
-                        })
-                      }
-                      className={`px-2.5 py-1 text-[11px] rounded-lg font-semibold transition-all ${
-                        formData.menuMode === 'internal'
-                          ? 'bg-teal-600 text-white'
-                          : 'bg-neutral-100 text-neutral-600 hover:bg-neutral-200'
-                      }`}
-                    >
-                      2. Cardápio DiretoLink
-                    </button>
-                  </div>
-                  {formData.menuMode !== 'internal' ? (
+                  {isPro && (
+                    <div className="flex items-center gap-2 mb-2">
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setFormData({
+                            ...formData,
+                            menuMode: 'external',
+                          })
+                        }
+                        className={`px-2.5 py-1 text-[11px] rounded-lg font-semibold transition-all cursor-pointer ${
+                          formData.menuMode !== 'internal'
+                            ? 'bg-teal-600 text-white'
+                            : 'bg-neutral-100 text-neutral-600 hover:bg-neutral-200'
+                        }`}
+                      >
+                        1. Link Externo
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setFormData({
+                            ...formData,
+                            menuMode: 'internal',
+                          })
+                        }
+                        className={`px-2.5 py-1 text-[11px] rounded-lg font-semibold transition-all cursor-pointer ${
+                          formData.menuMode === 'internal'
+                            ? 'bg-teal-600 text-white'
+                            : 'bg-neutral-100 text-neutral-600 hover:bg-neutral-200'
+                        }`}
+                      >
+                        2. Cardápio DiretoLink
+                      </button>
+                    </div>
+                  )}
+                  {(!isPro || formData.menuMode !== 'internal') ? (
                     <input
                       type="url"
                       value={formData.menuUrl || ''}
@@ -2903,19 +3157,29 @@ export const CompanyPanelView: React.FC<CompanyPanelViewProps> = ({
               </div>
 
               <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-                {[
-                  { key: 'products', label: 'Catálogo de Produtos' },
-                  { key: 'services', label: 'Serviços' },
-                  { key: 'appointments', label: 'Agendamento' },
-                  { key: 'loyalty', label: 'Cartão Fidelidade' },
-                  { key: 'googleReview', label: 'Avaliação Google' },
-                  { key: 'menu', label: 'Cardápio' },
-                  { key: 'wifi', label: 'Wi-Fi' },
-                  { key: 'whatsapp', label: 'WhatsApp' },
-                  { key: 'location', label: 'Localização' },
-                  { key: 'feedback', label: 'Feedback Privado' },
-                  { key: 'instagram', label: 'Instagram' },
-                ].map((mod) => (
+                {(isPro
+                  ? [
+                      { key: 'products', label: 'Catálogo de Produtos' },
+                      { key: 'services', label: 'Serviços' },
+                      { key: 'appointments', label: 'Agendamento' },
+                      { key: 'loyalty', label: 'Cartão Fidelidade' },
+                      { key: 'googleReview', label: 'Avaliação Google' },
+                      { key: 'menu', label: 'Cardápio' },
+                      { key: 'wifi', label: 'Wi-Fi' },
+                      { key: 'whatsapp', label: 'WhatsApp' },
+                      { key: 'location', label: 'Localização' },
+                      { key: 'feedback', label: 'Feedback Privado' },
+                      { key: 'instagram', label: 'Instagram' },
+                    ]
+                  : [
+                      { key: 'googleReview', label: 'Avaliação Google' },
+                      { key: 'wifi', label: 'Wi-Fi' },
+                      { key: 'whatsapp', label: 'WhatsApp' },
+                      { key: 'location', label: 'Localização' },
+                      { key: 'feedback', label: 'Feedback Privado' },
+                      { key: 'instagram', label: 'Instagram' },
+                    ]
+                ).map((mod) => (
                   <label
                     key={mod.key}
                     className={`flex items-center justify-between p-3 rounded-xl border cursor-pointer transition-all ${
@@ -3164,7 +3428,7 @@ export const CompanyPanelView: React.FC<CompanyPanelViewProps> = ({
               </div>
 
               {/* Configuração Dedicada: Opções do Catálogo de Produtos ao ativar */}
-              {Boolean(formData.modules?.products) && (
+              {isPro && Boolean(formData.modules?.products) && (
                 <div className="p-4 sm:p-5 rounded-2xl bg-violet-50/70 border border-violet-200/80 space-y-4">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2">

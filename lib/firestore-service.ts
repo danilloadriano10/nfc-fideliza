@@ -31,6 +31,7 @@ import {
   CompanyCourier,
   CompanySubscription,
   AsaasWebhookEventLog,
+  CompanyExternalLink,
 } from '@/types/platform'
 import { normalizePhone } from '@/lib/utils'
 import { hashPassword } from '@/lib/auth-crypto'
@@ -67,6 +68,7 @@ const TABLE_ORDERS_COLLECTION = 'tableOrders'
 const COURIERS_COLLECTION = 'couriers'
 const SUBSCRIPTIONS_COLLECTION = 'subscriptions'
 const ASAAS_WEBHOOK_EVENTS_COLLECTION = 'asaasWebhookEvents'
+const EXTERNAL_LINKS_COLLECTION = 'externalLinks'
 
 let migrationPromise: Promise<void> | null = null
 
@@ -2699,6 +2701,171 @@ export async function recordAsaasWebhookEvent(
     await setDoc(docRef, cleanPayload, { merge: true })
   } catch (err) {
     handleFirestoreError(err, OperationType.WRITE, ASAAS_WEBHOOK_EVENTS_COLLECTION)
+  }
+}
+
+// ==========================================
+// 12. GERENCIADOR DE LINKS EXTERNOS
+// ==========================================
+
+export async function getFirestoreExternalLinks(companyId: string): Promise<CompanyExternalLink[]> {
+  if (!companyId) return []
+  await ensureFirestoreInitialized()
+  try {
+    const coll = collection(db, EXTERNAL_LINKS_COLLECTION)
+    const q = query(coll, where('companyId', '==', companyId))
+    const snap = await getDocs(q)
+    const list: CompanyExternalLink[] = []
+    snap.forEach((d) => {
+      const data = d.data() as CompanyExternalLink
+      list.push(data)
+    })
+    return list.sort((a, b) => {
+      const orderA = typeof a.order === 'number' ? a.order : 0
+      const orderB = typeof b.order === 'number' ? b.order : 0
+      if (orderA !== orderB) return orderA - orderB
+      return new Date(a.createdAt || 0).getTime() - new Date(b.createdAt || 0).getTime()
+    })
+  } catch (err) {
+    handleFirestoreError(err, OperationType.LIST, `${EXTERNAL_LINKS_COLLECTION}?companyId=${companyId}`)
+  }
+}
+
+export async function getFirestoreExternalLinkById(
+  companyId: string,
+  linkId: string
+): Promise<CompanyExternalLink | null> {
+  if (!companyId || !linkId) return null
+  await ensureFirestoreInitialized()
+  try {
+    const docRef = doc(db, EXTERNAL_LINKS_COLLECTION, linkId)
+    const snap = await getDoc(docRef)
+    if (!snap.exists()) return null
+    const data = snap.data() as CompanyExternalLink
+    if (data.companyId !== companyId) return null
+    return data
+  } catch (err) {
+    handleFirestoreError(err, OperationType.GET, `${EXTERNAL_LINKS_COLLECTION}/${linkId}`)
+  }
+}
+
+export async function saveFirestoreExternalLink(
+  link: CompanyExternalLink
+): Promise<{ success: boolean; link?: CompanyExternalLink; error?: string }> {
+  if (!link || !link.companyId) {
+    return { success: false, error: 'companyId obrigatório para salvar link.' }
+  }
+  if (!link.label || !link.label.trim()) {
+    return { success: false, error: 'O nome exibido do link é obrigatório.' }
+  }
+  if (!link.url || !link.url.trim()) {
+    return { success: false, error: 'A URL de destino é obrigatória.' }
+  }
+
+  await ensureFirestoreInitialized()
+
+  const linkId = link.id && link.id.trim() ? link.id.trim() : `link_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`
+  const now = new Date().toISOString()
+
+  const toSave: CompanyExternalLink = {
+    id: linkId,
+    companyId: link.companyId,
+    type: link.type || 'custom',
+    label: link.label.trim(),
+    description: link.description ? link.description.trim() : '',
+    url: link.url.trim(),
+    icon: link.icon || 'Link2',
+    enabled: link.enabled !== false,
+    order: typeof link.order === 'number' ? link.order : 0,
+    createdAt: link.createdAt || now,
+    updatedAt: now,
+  }
+
+  try {
+    const docRef = doc(db, EXTERNAL_LINKS_COLLECTION, linkId)
+    await setDoc(docRef, JSON.parse(JSON.stringify(toSave)), { merge: true })
+    return { success: true, link: toSave }
+  } catch (err) {
+    handleFirestoreError(err, OperationType.WRITE, `${EXTERNAL_LINKS_COLLECTION}/${linkId}`)
+  }
+}
+
+export async function deleteFirestoreExternalLink(
+  linkId: string,
+  companyId: string
+): Promise<{ success: boolean; error?: string }> {
+  if (!linkId || !companyId) {
+    return { success: false, error: 'ID do link e companyId são obrigatórios.' }
+  }
+
+  await ensureFirestoreInitialized()
+
+  try {
+    const docRef = doc(db, EXTERNAL_LINKS_COLLECTION, linkId)
+    const snap = await getDoc(docRef)
+    if (!snap.exists()) {
+      return { success: true }
+    }
+    const data = snap.data() as CompanyExternalLink
+    if (data.companyId !== companyId) {
+      return { success: false, error: 'Permissão negada. O link não pertence a esta empresa.' }
+    }
+    await deleteDoc(docRef)
+    return { success: true }
+  } catch (err) {
+    handleFirestoreError(err, OperationType.DELETE, `${EXTERNAL_LINKS_COLLECTION}/${linkId}`)
+  }
+}
+
+export async function toggleFirestoreExternalLinkStatus(
+  linkId: string,
+  companyId: string
+): Promise<{ success: boolean; enabled?: boolean; error?: string }> {
+  if (!linkId || !companyId) {
+    return { success: false, error: 'ID do link e companyId são obrigatórios.' }
+  }
+
+  await ensureFirestoreInitialized()
+
+  try {
+    const docRef = doc(db, EXTERNAL_LINKS_COLLECTION, linkId)
+    const snap = await getDoc(docRef)
+    if (!snap.exists()) {
+      return { success: false, error: 'Link não encontrado.' }
+    }
+    const data = snap.data() as CompanyExternalLink
+    if (data.companyId !== companyId) {
+      return { success: false, error: 'Permissão negada. O link não pertence a esta empresa.' }
+    }
+    const nextEnabled = !Boolean(data.enabled)
+    await updateDoc(docRef, { enabled: nextEnabled, updatedAt: new Date().toISOString() })
+    return { success: true, enabled: nextEnabled }
+  } catch (err) {
+    handleFirestoreError(err, OperationType.UPDATE, `${EXTERNAL_LINKS_COLLECTION}/${linkId}`)
+  }
+}
+
+export async function saveFirestoreExternalLinksOrder(
+  companyId: string,
+  orderedLinkIds: string[]
+): Promise<{ success: boolean; error?: string }> {
+  if (!companyId || !Array.isArray(orderedLinkIds)) {
+    return { success: false, error: 'companyId e orderedLinkIds obrigatórios.' }
+  }
+
+  await ensureFirestoreInitialized()
+
+  try {
+    const batch = writeBatch(db)
+    orderedLinkIds.forEach((linkId, index) => {
+      if (!linkId) return
+      const docRef = doc(db, EXTERNAL_LINKS_COLLECTION, linkId)
+      batch.update(docRef, { order: index, updatedAt: new Date().toISOString() })
+    })
+    await batch.commit()
+    return { success: true }
+  } catch (err) {
+    handleFirestoreError(err, OperationType.UPDATE, `${EXTERNAL_LINKS_COLLECTION}/batch-order`)
   }
 }
 

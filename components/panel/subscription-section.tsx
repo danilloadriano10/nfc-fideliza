@@ -18,7 +18,7 @@ import {
   X,
   Trash2,
 } from 'lucide-react'
-import { Company, CompanySubscription } from '@/types/platform'
+import { Company, CompanySubscription, getCompanyPlan, getPlanPrice, getPlanLabel } from '@/types/platform'
 import {
   fetchCompanySubscriptionFromServer,
   createCompanySubscriptionOnServerApi,
@@ -42,6 +42,10 @@ export const SubscriptionSection: React.FC<SubscriptionSectionProps> = ({
   const [isConfigured, setIsConfigured] = useState<boolean>(true)
   const [isLoading, setIsLoading] = useState(false)
   const [feedback, setFeedback] = useState<{ text: string; type: 'success' | 'error' } | null>(null)
+
+  const currentPlan = subscription?.plan || getCompanyPlan(company)
+  const currentPlanPrice = subscription?.value || getPlanPrice(currentPlan)
+  const currentPlanLabel = getPlanLabel(currentPlan)
 
   // Modais de pagamento
   const [isPixModalOpen, setIsPixModalOpen] = useState(false)
@@ -300,16 +304,18 @@ export const SubscriptionSection: React.FC<SubscriptionSectionProps> = ({
 
           <div className="flex items-baseline gap-2">
             <h3 className="text-xl sm:text-2xl font-black text-neutral-900">
-              DiretoLink Pro
+              {currentPlanLabel}
             </h3>
             <span className="text-xl sm:text-2xl font-black text-teal-600 font-mono">
-              R$ 69,99
+              {formatMoneyBRL(currentPlanPrice)}
             </span>
             <span className="text-xs text-neutral-500 font-medium">/ mês</span>
           </div>
 
           <p className="text-xs text-neutral-600 max-w-lg">
-            Acesso ilimitado ao Cardápio Digital, Central de Pedidos, Agendamento Online, Mesas, Fidelidade e Motoboys.
+            {currentPlan === 'links'
+              ? 'Página pública profissional exclusiva, links externos ilimitados, personalização de capa e cores, QR Code oficial e compatibilidade total com chip NFC.'
+              : 'Acesso completo ao Cardápio Digital, Central de Pedidos, Agendamento Online, Mesas, Fidelidade e Motoboys.'}
           </p>
 
           {/* Dados da Assinatura se existente */}
@@ -426,7 +432,7 @@ export const SubscriptionSection: React.FC<SubscriptionSectionProps> = ({
           <div className="bg-white rounded-3xl max-w-md w-full p-6 shadow-2xl border border-neutral-200 space-y-5 animate-in zoom-in-95 text-center">
             <div className="flex items-center justify-between">
               <span className="px-2.5 py-1 rounded-full text-[10px] font-bold uppercase bg-teal-50 text-teal-700 border border-teal-200">
-                Pix Asaas • R$ 69,99
+                Pix Asaas • {formatMoneyBRL(currentPlanPrice)}
               </span>
               <button
                 type="button"
@@ -526,7 +532,7 @@ export const SubscriptionSection: React.FC<SubscriptionSectionProps> = ({
             </div>
 
             <p className="text-xs text-neutral-500">
-              Valor da assinatura: <strong className="text-neutral-900">R$ 69,99 / mês</strong>. No ambiente Sandbox, utilize dados de teste do Asaas.
+              Valor da assinatura: <strong className="text-neutral-900">{formatMoneyBRL(currentPlanPrice)} / mês</strong> ({currentPlanLabel}). No ambiente Sandbox, utilize dados de teste do Asaas.
             </p>
 
             <form onSubmit={handleStartCardSubscription} className="space-y-3 pt-2 text-xs">

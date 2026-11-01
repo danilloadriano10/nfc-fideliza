@@ -11,7 +11,7 @@ import {
   getServerServices,
   saveServerCompany,
 } from '@/lib/server-storage'
-import { Appointment, AppointmentStatus, DaySchedule } from '@/types/platform'
+import { Appointment, AppointmentStatus, DaySchedule, isCompanyPro, isCompanyActiveOrExempt } from '@/types/platform'
 
 export const dynamic = 'force-dynamic'
 export const revalidate = 0
@@ -207,6 +207,28 @@ export async function POST(req: NextRequest) {
       return NextResponse.json(
         { success: false, error: 'Estabelecimento não encontrado.' },
         { status: 404 }
+      )
+    }
+
+    if (!isCompanyActiveOrExempt(company)) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: 'Assinatura pendente de ativação. Conclua o pagamento para gerenciar agendamentos.',
+          requiresActivation: true,
+        },
+        { status: 403 }
+      )
+    }
+
+    if (!isCompanyPro(company)) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: 'O módulo de Agendamento Online é exclusivo do Plano Pro.',
+          requiresPro: true,
+        },
+        { status: 403 }
       )
     }
 

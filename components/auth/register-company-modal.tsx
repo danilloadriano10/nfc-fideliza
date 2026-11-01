@@ -16,6 +16,7 @@ import {
   CheckCircle2,
   Sparkles,
 } from 'lucide-react'
+import { CompanyPlan, PLAN_PRICES } from '@/types/platform'
 import { registerCompanySelfServiceAsync } from '@/lib/storage'
 import { setOwnerAuthenticatedSession } from '@/lib/auth'
 
@@ -23,6 +24,7 @@ interface RegisterCompanyModalProps {
   isOpen: boolean
   onClose: () => void
   onSuccess?: (slug: string) => void
+  initialPlan?: CompanyPlan
 }
 
 const CATEGORY_OPTIONS = [
@@ -40,8 +42,18 @@ export const RegisterCompanyModal: React.FC<RegisterCompanyModalProps> = ({
   isOpen,
   onClose,
   onSuccess,
+  initialPlan = 'pro',
 }) => {
   const router = useRouter()
+
+  // Plan state
+  const [selectedPlan, setSelectedPlan] = useState<CompanyPlan>(initialPlan || 'pro')
+
+  React.useEffect(() => {
+    if (initialPlan) {
+      setSelectedPlan(initialPlan)
+    }
+  }, [initialPlan])
 
   // Form states
   const [ownerName, setOwnerName] = useState('')
@@ -101,6 +113,7 @@ export const RegisterCompanyModal: React.FC<RegisterCompanyModalProps> = ({
         companyName: companyName.trim(),
         category,
         password: password.trim(),
+        plan: selectedPlan,
       })
 
       if (res.success && res.company) {
@@ -110,7 +123,7 @@ export const RegisterCompanyModal: React.FC<RegisterCompanyModalProps> = ({
         if (onSuccess) {
           onSuccess(res.company.slug)
         } else {
-          router.push(`/painel/${res.company.slug}`)
+          router.push(`/painel/${res.company.slug}?tab=subscription`)
         }
         onClose()
       } else {
@@ -167,6 +180,62 @@ export const RegisterCompanyModal: React.FC<RegisterCompanyModalProps> = ({
                 <span>{errorMessage}</span>
               </div>
             )}
+
+            {/* PLANO SELECIONADO */}
+            <div className="p-3.5 rounded-2xl bg-neutral-50/90 border border-neutral-200/90 space-y-2">
+              <div className="flex items-center justify-between">
+                <span className="text-[10px] font-bold uppercase tracking-wider text-neutral-500">
+                  Plano Escolhido
+                </span>
+                <span className="text-[10px] text-neutral-400 font-medium">
+                  {selectedPlan === 'links' ? 'Página & Links' : 'Operação Completa'}
+                </span>
+              </div>
+
+              <div className="grid grid-cols-2 gap-2">
+                <button
+                  type="button"
+                  onClick={() => setSelectedPlan('links')}
+                  className={`p-2.5 rounded-xl border text-left transition-all cursor-pointer ${
+                    selectedPlan === 'links'
+                      ? 'bg-white border-neutral-900 shadow-xs ring-1 ring-neutral-900'
+                      : 'bg-white/60 border-neutral-200 hover:border-neutral-300'
+                  }`}
+                >
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-bold text-neutral-900">Links</span>
+                    {selectedPlan === 'links' && (
+                      <CheckCircle2 className="w-3.5 h-3.5 text-neutral-900" />
+                    )}
+                  </div>
+                  <span className="text-xs font-black text-neutral-900 font-mono block mt-0.5">
+                    R$ 29,99<span className="text-[10px] text-neutral-500 font-normal">/mês</span>
+                  </span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setSelectedPlan('pro')}
+                  className={`p-2.5 rounded-xl border text-left transition-all cursor-pointer relative ${
+                    selectedPlan === 'pro'
+                      ? 'bg-violet-50/70 border-violet-600 shadow-xs ring-1 ring-violet-600'
+                      : 'bg-white/60 border-neutral-200 hover:border-neutral-300'
+                  }`}
+                >
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-bold text-violet-950 flex items-center gap-1">
+                      <Sparkles className="w-3 h-3 text-violet-600" /> Pro
+                    </span>
+                    {selectedPlan === 'pro' && (
+                      <CheckCircle2 className="w-3.5 h-3.5 text-violet-600" />
+                    )}
+                  </div>
+                  <span className="text-xs font-black text-violet-700 font-mono block mt-0.5">
+                    R$ 69,99<span className="text-[10px] text-violet-500 font-normal">/mês</span>
+                  </span>
+                </button>
+              </div>
+            </div>
 
             {/* SEÇÃO 1: RESPONSÁVEL */}
             <div className="space-y-3">

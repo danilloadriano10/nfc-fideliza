@@ -30,7 +30,7 @@ import {
   Gift,
   QrCode as QrCodeIcon,
 } from 'lucide-react'
-import { Company, WifiSecurity } from '@/types/platform'
+import { Company, WifiSecurity, CompanyPlan, getCompanyPlan } from '@/types/platform'
 import { saveCompany, saveCompanyAsync, getAllCompanies } from '@/lib/storage'
 import { slugify, formatPhone } from '@/lib/utils'
 import { uploadCompanyImageFromClient, isBase64Image } from '@/lib/storage-client'
@@ -74,6 +74,7 @@ export const NewCompanyModal: React.FC<NewCompanyModalProps> = ({
   const [createdCompany, setCreatedCompany] = useState<Company | null>(null)
 
   // 1. IDENTIDADE
+  const [plan, setPlan] = useState<CompanyPlan>('pro')
   const [name, setName] = useState('')
   const [slug, setSlug] = useState('')
   const [category, setCategory] = useState('Cafeteria / Bistrô')
@@ -127,6 +128,7 @@ export const NewCompanyModal: React.FC<NewCompanyModalProps> = ({
 
   useEffect(() => {
     if (companyToEdit) {
+      setPlan(getCompanyPlan(companyToEdit))
       setName(companyToEdit.name || '')
       setSlug(companyToEdit.slug || '')
       setCategory(companyToEdit.category || 'Cafeteria / Bistrô')
@@ -165,6 +167,7 @@ export const NewCompanyModal: React.FC<NewCompanyModalProps> = ({
       setLoyaltyGoal(companyToEdit.loyaltyProgram?.goalPoints || 10)
       setLoyaltyReward(companyToEdit.loyaltyProgram?.rewardDescription || '')
     } else {
+      setPlan('pro')
       setName('')
       setSlug('')
       setCategory('Cafeteria / Bistrô')
@@ -330,6 +333,7 @@ export const NewCompanyModal: React.FC<NewCompanyModalProps> = ({
       id: targetCompanyId,
       name: name.trim(),
       slug: cleanSlug,
+      plan,
       category: category.trim() || 'Cafeteria / Bistrô',
       tagline: tagline.trim() || undefined,
       logoUrl: finalLogoUrl,
@@ -593,6 +597,42 @@ export const NewCompanyModal: React.FC<NewCompanyModalProps> = ({
                     1. Identidade
                   </h3>
                   <span className="text-[11px] text-neutral-400">Informações principais da marca</span>
+                </div>
+
+                {/* Plano da Empresa */}
+                <div>
+                  <label className="block text-xs font-semibold text-neutral-800 mb-1.5">
+                    Plano da empresa:
+                  </label>
+                  <div className="grid grid-cols-2 gap-2 max-w-xs">
+                    <button
+                      type="button"
+                      onClick={() => setPlan('links')}
+                      className={`py-2 px-3 rounded-xl text-xs font-bold border transition-all cursor-pointer flex items-center justify-center gap-1.5 ${
+                        plan === 'links'
+                          ? 'bg-violet-600 text-white border-violet-600 shadow-sm'
+                          : 'bg-white text-neutral-700 border-neutral-200 hover:bg-neutral-50'
+                      }`}
+                    >
+                      Links
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setPlan('pro')}
+                      className={`py-2 px-3 rounded-xl text-xs font-bold border transition-all cursor-pointer flex items-center justify-center gap-1.5 ${
+                        plan === 'pro'
+                          ? 'bg-violet-600 text-white border-violet-600 shadow-sm'
+                          : 'bg-white text-neutral-700 border-neutral-200 hover:bg-neutral-50'
+                      }`}
+                    >
+                      Pro
+                    </button>
+                  </div>
+                  <span className="text-[11px] text-neutral-400 mt-1 block">
+                    {plan === 'links'
+                      ? 'Plano Links: central de links e página simplificada.'
+                      : 'Plano Pro: recursos completos (cardápio, pedidos, agendamento, produtos, fidelidade, etc.)'}
+                  </span>
                 </div>
 
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">

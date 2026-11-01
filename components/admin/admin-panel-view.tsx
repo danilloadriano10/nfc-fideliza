@@ -35,7 +35,7 @@ import {
   Clock,
   Loader2,
 } from 'lucide-react'
-import { Company, Customer, ActivityLog, GlobalStats, PointRequest, PrivateFeedback } from '@/types/platform'
+import { Company, Customer, ActivityLog, GlobalStats, PointRequest, PrivateFeedback, getCompanyPlan } from '@/types/platform'
 import {
   getAllCompanies,
   syncCompaniesFromServer,
@@ -772,6 +772,7 @@ export const AdminPanelView: React.FC = () => {
                 <thead>
                   <tr className="border-b border-neutral-200 text-neutral-400 uppercase tracking-wider text-[10px]">
                     <th className="py-3 px-3">Empresa</th>
+                    <th className="py-3 px-3">Plano</th>
                     <th className="py-3 px-3">WhatsApp</th>
                     <th className="py-3 px-3">URL Pública (NFC)</th>
                     <th className="py-3 px-3">Login do Proprietário</th>
@@ -808,6 +809,17 @@ export const AdminPanelView: React.FC = () => {
                               <span className="text-[10px] text-neutral-400 font-mono">ID: {c.id}</span>
                             </div>
                           </div>
+                        </td>
+                        <td className="py-3 px-3">
+                          {getCompanyPlan(c) === 'links' ? (
+                            <span className="bg-violet-50 text-violet-700 border border-violet-200/80 px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider inline-block">
+                              Links
+                            </span>
+                          ) : (
+                            <span className="bg-emerald-50 text-emerald-800 border border-emerald-200/80 px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider inline-block">
+                              Pro
+                            </span>
+                          )}
                         </td>
                         <td className="py-3 px-3 font-mono">
                           {c.whatsapp && String(c.whatsapp).trim() ? (

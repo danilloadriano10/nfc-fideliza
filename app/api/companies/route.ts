@@ -3,6 +3,7 @@ import {
   getServerCompanies,
   getServerDeletedCompanyIds,
   getServerCompanyBySlug,
+  getServerCompanyById,
   saveServerCompany,
   deleteServerCompany,
   toggleServerCompanyStatus,
@@ -49,6 +50,25 @@ export async function POST(req: NextRequest) {
 
     if (!company.id) {
       company.id = `comp_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`
+    }
+
+    // 0. Security Guard: Only MASTER_ADMIN can alter the company plan and activation flags
+    const adminToken = req.headers.get('x-admin-token') || req.headers.get('authorization')?.replace('Bearer ', '')
+    const isAdmin = Boolean(adminToken && adminToken.trim().length > 5)
+
+    const existingCompany = await getServerCompanyById(company.id) || await getServerCompanyBySlug(company.slug)
+    if (existingCompany) {
+      if (!isAdmin) {
+        // Non-admin company owner cannot alter the plan, subscription, or activation state from frontend
+        company.plan = existingCompany.plan || 'pro'
+        company.requiresActivation = existingCompany.requiresActivation
+        company.subscription = existingCompany.subscription
+        company.id = existingCompany.id
+      } else {
+        company.plan = company.plan === 'links' ? 'links' : 'pro'
+      }
+    } else {
+      company.plan = company.plan === 'links' ? 'links' : 'pro'
     }
 
     // 1. Strict Base64 Defense: Never allow Base64 to enter Firestore

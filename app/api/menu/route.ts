@@ -10,7 +10,7 @@ import {
   saveServerCompany,
   saveServerMenuItemsOrder,
 } from '@/lib/server-storage'
-import { MenuItem } from '@/types/platform'
+import { MenuItem, isCompanyPro, isCompanyActiveOrExempt } from '@/types/platform'
 import { uploadCompanyFileServer, isBase64Image } from '@/lib/storage-service'
 
 export const dynamic = 'force-dynamic'
@@ -118,6 +118,28 @@ export async function POST(req: NextRequest) {
       return NextResponse.json(
         { success: false, error: 'Empresa associada não encontrada.' },
         { status: 404 }
+      )
+    }
+
+    if (!isCompanyActiveOrExempt(company)) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: 'Assinatura pendente de ativação. Conclua o pagamento para gerenciar o cardápio.',
+          requiresActivation: true,
+        },
+        { status: 403 }
+      )
+    }
+
+    if (!isCompanyPro(company)) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: 'O Cardápio Digital interno é exclusivo do Plano Pro. Seu estabelecimento está no Plano Links.',
+          requiresPro: true,
+        },
+        { status: 403 }
       )
     }
 

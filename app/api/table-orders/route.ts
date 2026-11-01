@@ -7,7 +7,7 @@ import {
   getServerCompanyById,
   getServerCompanyBySlug,
 } from '@/lib/server-storage'
-import { TableOrder, TableOrderStatus } from '@/types/platform'
+import { TableOrder, TableOrderStatus, isCompanyPro, isCompanyActiveOrExempt } from '@/types/platform'
 
 export const dynamic = 'force-dynamic'
 export const revalidate = 0
@@ -73,7 +73,32 @@ export async function POST(req: NextRequest) {
     }
 
     const company = await getServerCompanyById(companyId)
-    const targetCompanyId = company?.id || companyId
+    if (!company) {
+      return NextResponse.json({ success: false, error: 'Empresa associada não encontrada.' }, { status: 404 })
+    }
+
+    if (!isCompanyActiveOrExempt(company)) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: 'Assinatura pendente de ativação. Conclua o pagamento para receber e gerenciar pedidos.',
+          requiresActivation: true,
+        },
+        { status: 403 }
+      )
+    }
+
+    if (!isCompanyPro(company)) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: 'A Central de Pedidos é exclusiva do Plano Pro. Seu estabelecimento está no Plano Links.',
+          requiresPro: true,
+        },
+        { status: 403 }
+      )
+    }
+    const targetCompanyId = company.id
 
     const resolvedOrigin = (orderType || origin || (deliveryAddress ? 'entrega' : tableNumber ? 'mesa' : 'retirada')) as 'mesa' | 'retirada' | 'entrega'
     const finalTableNumber =

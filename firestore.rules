@@ -91,6 +91,11 @@ service cloud.firestore {
     match /asaasWebhookEvents/{eventId} {
       allow read, write: if true;
     }
+
+    // External Links: Links externos para Página Pública (ambos planos)
+    match /externalLinks/{linkId} {
+      allow read, write: if true;
+    }
   }
 }
 
