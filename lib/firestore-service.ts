@@ -2704,6 +2704,51 @@ export async function recordAsaasWebhookEvent(
   }
 }
 
+export async function getFirestoreSubscriptionByMpPreapprovalId(
+  mpPreapprovalId: string
+): Promise<CompanySubscription | null> {
+  if (!mpPreapprovalId) return null
+  try {
+    await ensureFirestoreInitialized()
+    const cleanId = mpPreapprovalId.trim()
+    const q = query(collection(db, SUBSCRIPTIONS_COLLECTION), where('mpPreapprovalId', '==', cleanId))
+    const qSnap = await getDocs(q)
+    if (!qSnap.empty) {
+      return qSnap.docs[0].data() as CompanySubscription
+    }
+    return null
+  } catch (err) {
+    handleFirestoreError(err, OperationType.GET, SUBSCRIPTIONS_COLLECTION)
+    return null
+  }
+}
+
+export async function recordMpWebhookEvent(
+  eventId: string,
+  event: string,
+  payload: unknown,
+  companyId?: string
+): Promise<void> {
+  if (!eventId) return
+  try {
+    await ensureFirestoreInitialized()
+    const nowIso = new Date().toISOString()
+    const docRef = doc(db, 'mpWebhookEvents', eventId.trim())
+    const log = {
+      id: eventId.trim(),
+      event,
+      dateCreated: nowIso,
+      processedAt: nowIso,
+      companyId: companyId || null,
+      status: 'PROCESSED',
+      rawPayload: payload,
+    }
+    await setDoc(docRef, JSON.parse(JSON.stringify(log)), { merge: true })
+  } catch (err) {
+    console.warn('Erro ao salvar log de webhook do Mercado Pago:', err)
+  }
+}
+
 // ==========================================
 // 12. GERENCIADOR DE LINKS EXTERNOS
 // ==========================================

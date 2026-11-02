@@ -69,6 +69,8 @@ import {
   saveFirestoreSubscription,
   getFirestoreSubscriptionByAsaasId,
   getFirestoreSubscriptionByAsaasCustomerId,
+  getFirestoreSubscriptionByMpPreapprovalId,
+  recordMpWebhookEvent,
   recordAsaasWebhookEvent,
   isAsaasWebhookEventProcessed,
   getFirestoreExternalLinks,
@@ -529,6 +531,12 @@ export async function getServerSubscriptionByAsaasCustomerId(asaasCustomerId: st
   return await getFirestoreSubscriptionByAsaasCustomerId(asaasCustomerId)
 }
 
+export async function getServerSubscriptionByMpPreapprovalId(
+  mpPreapprovalId: string
+): Promise<CompanySubscription | null> {
+  return await getFirestoreSubscriptionByMpPreapprovalId(mpPreapprovalId)
+}
+
 export async function isServerWebhookEventProcessed(eventId: string): Promise<boolean> {
   return await isAsaasWebhookEventProcessed(eventId)
 }
@@ -540,6 +548,15 @@ export async function recordServerWebhookEvent(
   companyId?: string
 ): Promise<void> {
   return await recordAsaasWebhookEvent(eventId, event, payload, companyId)
+}
+
+export async function recordServerMpWebhookEvent(
+  eventId: string,
+  event: string,
+  payload: unknown,
+  companyId?: string
+): Promise<void> {
+  return await recordMpWebhookEvent(eventId, event, payload, companyId)
 }
 
 // ==========================================

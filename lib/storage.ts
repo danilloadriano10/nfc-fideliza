@@ -2823,6 +2823,87 @@ export async function cancelCompanySubscriptionOnServerApi(
   }
 }
 
+export async function createMercadoPagoSubscriptionOnServer(params: {
+  companyId: string
+  payerEmail?: string
+}): Promise<{
+  success: boolean
+  subscription?: CompanySubscription
+  initPoint?: string
+  planValue?: number
+  isUnlocked?: boolean
+  error?: string
+}> {
+  try {
+    const res = await fetch('/api/mercadopago/subscription', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Accept: 'application/json',
+      },
+      body: JSON.stringify(params),
+    })
+
+    const data = await res.json()
+    if (res.ok && data.success) {
+      return {
+        success: true,
+        subscription: data.subscription,
+        initPoint: data.initPoint,
+        planValue: data.planValue,
+        isUnlocked: data.isUnlocked,
+      }
+    }
+    return {
+      success: false,
+      error: data.error || 'Erro ao gerar assinatura no Mercado Pago.',
+    }
+  } catch (err) {
+    return {
+      success: false,
+      error: err instanceof Error ? err.message : 'Falha na conexão com Mercado Pago.',
+    }
+  }
+}
+
+export async function fetchMercadoPagoSubscriptionFromServer(companyId: string): Promise<{
+  success: boolean
+  subscription: CompanySubscription | null
+  isUnlocked?: boolean
+  requiresActivation?: boolean
+  initPoint?: string | null
+  error?: string
+}> {
+  try {
+    const res = await fetch(`/api/mercadopago/subscription?companyId=${encodeURIComponent(companyId)}`, {
+      cache: 'no-store',
+      headers: { Accept: 'application/json' },
+    })
+
+    const data = await res.json()
+    if (res.ok && data.success) {
+      return {
+        success: true,
+        subscription: data.subscription || null,
+        isUnlocked: data.isUnlocked,
+        requiresActivation: data.requiresActivation,
+        initPoint: data.initPoint,
+      }
+    }
+    return {
+      success: false,
+      subscription: null,
+      error: data.error,
+    }
+  } catch (err) {
+    return {
+      success: false,
+      subscription: null,
+      error: err instanceof Error ? err.message : 'Erro ao consultar Mercado Pago.',
+    }
+  }
+}
+
 // ---------------------------------------------------------------------------
 // External Links Management (Client-Side & Server API sync)
 // ---------------------------------------------------------------------------

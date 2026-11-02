@@ -580,8 +580,13 @@ export type AsaasPaymentMethod = 'PIX' | 'CREDIT_CARD' | 'UNDEFINED'
 export interface CompanySubscription {
   id: string
   companyId: string
-  asaasCustomerId: string
-  asaasSubscriptionId: string
+  gateway?: 'asaas' | 'mercadopago'
+  asaasCustomerId?: string
+  asaasSubscriptionId?: string
+  mpPreapprovalId?: string
+  mpCustomerId?: string
+  mpPayerEmail?: string
+  mpInitPoint?: string
   status: AsaasSubscriptionStatus
   paymentMethod: AsaasPaymentMethod
   value: number // default: 69.99

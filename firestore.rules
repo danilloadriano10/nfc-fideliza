@@ -96,6 +96,11 @@ service cloud.firestore {
     match /externalLinks/{linkId} {
       allow read, write: if true;
     }
+
+    // Mercado Pago Webhook Events: Log de eventos do Mercado Pago
+    match /mpWebhookEvents/{eventId} {
+      allow read, write: if true;
+    }
   }
 }
 

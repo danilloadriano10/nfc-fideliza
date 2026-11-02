@@ -20,6 +20,7 @@ import {
   X,
   HelpCircle,
   CheckCheck,
+  ExternalLink,
 } from 'lucide-react'
 import confetti from 'canvas-confetti'
 import {
@@ -32,6 +33,8 @@ import {
 import {
   fetchCompanySubscriptionFromServer,
   createCompanySubscriptionOnServerApi,
+  createMercadoPagoSubscriptionOnServer,
+  fetchMercadoPagoSubscriptionFromServer,
   saveCompanyLocally,
   saveCompany,
 } from '@/lib/storage'
@@ -60,13 +63,14 @@ export const CompanyActivationView: React.FC<CompanyActivationViewProps> = ({
   const currentPrice = subscription?.value || getPlanPrice(currentPlan)
   const planLabel = getPlanLabel(currentPlan)
 
-  // Payment view states: 'choice' | 'pix' | 'card'
-  const [selectedMethod, setSelectedMethod] = useState<'choice' | 'pix' | 'card'>(() => {
-    if (subscription?.paymentMethod === 'PIX' && subscription?.pixCopiaECola) {
-      return 'pix'
-    }
-    return 'choice'
-  })
+  // Payment view states: 'choice' | 'mercadopago' | 'pix' | 'card'
+  const [selectedMethod, setSelectedMethod] = useState<'choice' | 'mercadopago' | 'pix' | 'card'>('mercadopago')
+
+  // Mercado Pago Data
+  const [mpInitPoint, setMpInitPoint] = useState<string | null>(
+    () => subscription?.mpInitPoint || null
+  )
+  const [isGeneratingMp, setIsGeneratingMp] = useState(false)
 
   // PIX Data
   const [pixData, setPixData] = useState<{
@@ -107,40 +111,54 @@ export const CompanyActivationView: React.FC<CompanyActivationViewProps> = ({
     setTimeout(() => setToastFeedback(null), 4000)
   }
 
-  // Poll status from server
+  // Poll status from server (Mercado Pago + Asaas)
   const checkStatus = async (silent = false) => {
     if (isUnlockedRef.current) return
     if (!silent) setIsCheckingPayment(true)
 
     try {
-      const res = await fetchCompanySubscriptionFromServer(company.id)
-      if (res.success) {
-        if (res.environment) setEnvironment(res.environment)
-        if (res.subscription) {
-          const freshSub = res.subscription
-          setSubscription(freshSub)
+      // 1. Consulta Mercado Pago primeiro (se gateway MP ou novo fluxo)
+      const mpRes = await fetchMercadoPagoSubscriptionFromServer(company.id).catch(() => null)
+      // 2. Consulta Asaas / Firestore
+      const res = await fetchCompanySubscriptionFromServer(company.id).catch(() => null)
 
-          if (freshSub.status === 'ACTIVE' || res.isUnlocked) {
-            isUnlockedRef.current = true
-            confetti({ particleCount: 120, spread: 80, origin: { y: 0.5 } })
-            showToast('Assinatura ativada com sucesso! Liberando seu painel...', 'success')
+      const activeSub =
+        (mpRes?.subscription?.status === 'ACTIVE' ? mpRes.subscription : null) ||
+        (res?.subscription?.status === 'ACTIVE' ? res.subscription : null) ||
+        mpRes?.subscription ||
+        res?.subscription
 
-            const updatedCompany: Company = {
-              ...company,
-              subscription: freshSub,
-            }
-            saveCompanyLocally(updatedCompany)
-            saveCompany(updatedCompany)
-            setTimeout(() => {
-              onCompanyUpdate(updatedCompany)
-            }, 800)
-          } else if (freshSub.pixCopiaECola && !pixData) {
-            setPixData({
-              encodedImage: (freshSub.pixQrCodeUrl || '').replace('data:image/png;base64,', ''),
-              payload: freshSub.pixCopiaECola,
-              expirationDate: freshSub.pixExpirationDate || '',
-            })
+      const isUnlocked = Boolean(res?.isUnlocked || mpRes?.isUnlocked || activeSub?.status === 'ACTIVE')
+
+      if (res?.environment) setEnvironment(res.environment)
+
+      if (activeSub) {
+        setSubscription(activeSub)
+        if (activeSub.mpInitPoint && !mpInitPoint) {
+          setMpInitPoint(activeSub.mpInitPoint)
+        }
+
+        if (isUnlocked) {
+          isUnlockedRef.current = true
+          confetti({ particleCount: 120, spread: 80, origin: { y: 0.5 } })
+          showToast('Assinatura ativada com sucesso! Liberando seu painel...', 'success')
+
+          const updatedCompany: Company = {
+            ...company,
+            subscription: activeSub,
           }
+          saveCompanyLocally(updatedCompany)
+          saveCompany(updatedCompany)
+          setTimeout(() => {
+            onCompanyUpdate(updatedCompany)
+          }, 800)
+          return
+        } else if (activeSub.pixCopiaECola && !pixData) {
+          setPixData({
+            encodedImage: (activeSub.pixQrCodeUrl || '').replace('data:image/png;base64,', ''),
+            payload: activeSub.pixCopiaECola,
+            expirationDate: activeSub.pixExpirationDate || '',
+          })
         }
       }
     } catch (err) {
@@ -164,6 +182,36 @@ export const CompanyActivationView: React.FC<CompanyActivationViewProps> = ({
     return () => clearInterval(interval)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [company.id])
+
+  // Iniciar Assinatura no Mercado Pago
+  const handleStartMercadoPago = async () => {
+    setSelectedMethod('mercadopago')
+    if (mpInitPoint) {
+      window.open(mpInitPoint, '_blank')
+      return
+    }
+
+    setIsGeneratingMp(true)
+    try {
+      const res = await createMercadoPagoSubscriptionOnServer({
+        companyId: company.id,
+        payerEmail: company.ownerAuth?.ownerEmail,
+      })
+
+      if (res.success && res.initPoint) {
+        setMpInitPoint(res.initPoint)
+        if (res.subscription) setSubscription(res.subscription)
+        showToast('Link do Mercado Pago gerado com sucesso! Abrindo...', 'success')
+        window.open(res.initPoint, '_blank')
+      } else {
+        showToast(res.error || 'Erro ao gerar checkout do Mercado Pago.', 'error')
+      }
+    } catch {
+      showToast('Falha na comunicação com o servidor.', 'error')
+    } finally {
+      setIsGeneratingMp(false)
+    }
+  }
 
   // Iniciar PIX
   const handleStartPix = async () => {
@@ -418,79 +466,199 @@ export const CompanyActivationView: React.FC<CompanyActivationViewProps> = ({
           </div>
 
           {/* Action Choice Buttons */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-1">
+            <button
+              type="button"
+              onClick={handleStartMercadoPago}
+              disabled={isGeneratingMp}
+              className={`p-4 rounded-2xl border text-left transition-all cursor-pointer flex flex-col justify-between gap-3 ${
+                selectedMethod === 'mercadopago'
+                  ? 'bg-neutral-900 border-neutral-900 text-white shadow-md ring-2 ring-violet-500/20'
+                  : 'bg-neutral-50/80 hover:bg-neutral-100 border-neutral-200 text-neutral-900'
+              }`}
+            >
+              <div className="flex items-center justify-between w-full">
+                <div
+                  className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 ${
+                    selectedMethod === 'mercadopago'
+                      ? 'bg-sky-500/20 text-sky-300'
+                      : 'bg-sky-50 text-sky-600 border border-sky-200'
+                  }`}
+                >
+                  <ShieldCheck className="w-5 h-5" />
+                </div>
+                <span className="text-[10px] uppercase font-bold tracking-wider px-2 py-0.5 rounded-full bg-violet-600 text-white">
+                  Recomendado
+                </span>
+              </div>
+              <div>
+                <span className="text-xs font-bold block">MERCADO PAGO</span>
+                <span
+                  className={`text-[11px] font-medium block mt-0.5 ${
+                    selectedMethod === 'mercadopago' ? 'text-neutral-300' : 'text-neutral-500'
+                  }`}
+                >
+                  Cartão ou Pix com checkout seguro oficial
+                </span>
+              </div>
+            </button>
+
             <button
               type="button"
               onClick={handleStartPix}
               disabled={isGeneratingPix}
-              className={`p-4 rounded-2xl border text-left transition-all cursor-pointer flex items-center justify-between ${
+              className={`p-4 rounded-2xl border text-left transition-all cursor-pointer flex flex-col justify-between gap-3 ${
                 selectedMethod === 'pix'
                   ? 'bg-neutral-900 border-neutral-900 text-white shadow-md'
                   : 'bg-neutral-50/80 hover:bg-neutral-100 border-neutral-200 text-neutral-900'
               }`}
             >
-              <div className="flex items-center gap-3">
-                <div
-                  className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 ${
-                    selectedMethod === 'pix' ? 'bg-white/10 text-white' : 'bg-emerald-50 text-emerald-600 border border-emerald-200'
+              <div
+                className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 ${
+                  selectedMethod === 'pix' ? 'bg-white/10 text-white' : 'bg-emerald-50 text-emerald-600 border border-emerald-200'
+                }`}
+              >
+                <QrCode className="w-5 h-5" />
+              </div>
+              <div>
+                <span className="text-xs font-bold block">PIX DIRETO</span>
+                <span
+                  className={`text-[11px] font-medium block mt-0.5 ${
+                    selectedMethod === 'pix' ? 'text-neutral-300' : 'text-neutral-500'
                   }`}
                 >
-                  <QrCode className="w-5 h-5" />
-                </div>
-                <div>
-                  <span className="text-xs font-bold block">PAGAR COM PIX</span>
-                  <span
-                    className={`text-[11px] font-medium block ${
-                      selectedMethod === 'pix' ? 'text-neutral-300' : 'text-neutral-500'
-                    }`}
-                  >
-                    Liberação instantânea via QR Code
-                  </span>
-                </div>
+                  QR Code e Copia e Cola instantâneo
+                </span>
               </div>
-              <ArrowRight
-                className={`w-4 h-4 shrink-0 ${
-                  selectedMethod === 'pix' ? 'text-white' : 'text-neutral-400'
-                }`}
-              />
             </button>
 
             <button
               type="button"
               onClick={() => setSelectedMethod('card')}
-              className={`p-4 rounded-2xl border text-left transition-all cursor-pointer flex items-center justify-between ${
+              className={`p-4 rounded-2xl border text-left transition-all cursor-pointer flex flex-col justify-between gap-3 ${
                 selectedMethod === 'card'
                   ? 'bg-neutral-900 border-neutral-900 text-white shadow-md'
                   : 'bg-neutral-50/80 hover:bg-neutral-100 border-neutral-200 text-neutral-900'
               }`}
             >
-              <div className="flex items-center gap-3">
-                <div
-                  className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 ${
-                    selectedMethod === 'card' ? 'bg-white/10 text-white' : 'bg-violet-50 text-violet-600 border border-violet-200'
+              <div
+                className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 ${
+                  selectedMethod === 'card' ? 'bg-white/10 text-white' : 'bg-violet-50 text-violet-600 border border-violet-200'
+                }`}
+              >
+                <CreditCard className="w-5 h-5" />
+              </div>
+              <div>
+                <span className="text-xs font-bold block">CARTÃO DIRETO</span>
+                <span
+                  className={`text-[11px] font-medium block mt-0.5 ${
+                    selectedMethod === 'card' ? 'text-neutral-300' : 'text-neutral-500'
                   }`}
                 >
-                  <CreditCard className="w-5 h-5" />
-                </div>
-                <div>
-                  <span className="text-xs font-bold block">PAGAR COM CARTÃO</span>
-                  <span
-                    className={`text-[11px] font-medium block ${
-                      selectedMethod === 'card' ? 'text-neutral-300' : 'text-neutral-500'
-                    }`}
-                  >
-                    Renovação mensal automática no cartão
-                  </span>
-                </div>
+                  Cobrança recorrente no cartão de crédito
+                </span>
               </div>
-              <ArrowRight
-                className={`w-4 h-4 shrink-0 ${
-                  selectedMethod === 'card' ? 'text-white' : 'text-neutral-400'
-                }`}
-              />
             </button>
           </div>
         </div>
+
+        {/* 0. SEÇÃO MERCADO PAGO */}
+        {selectedMethod === 'mercadopago' && (
+          <div className="bg-white rounded-3xl border border-neutral-200/90 shadow-sm p-6 space-y-6">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-4 border-b border-neutral-100">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-sky-50 text-sky-700 border border-sky-200 flex items-center justify-center shrink-0">
+                  <ShieldCheck className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-sm font-bold text-neutral-900">
+                    Assinatura via Mercado Pago · {planLabel}
+                  </h3>
+                  <p className="text-xs text-neutral-500">
+                    Pague com Cartão de Crédito ou PIX no ambiente seguro do Mercado Pago.
+                  </p>
+                </div>
+              </div>
+
+              <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-amber-50 text-amber-800 border border-amber-200 text-xs font-semibold self-start sm:self-auto">
+                <span className="w-2 h-2 rounded-full bg-amber-500 animate-ping" />
+                <span>Aguardando ativação</span>
+              </div>
+            </div>
+
+            <div className="p-6 bg-gradient-to-br from-neutral-50 to-neutral-100/60 rounded-2xl border border-neutral-200/80 space-y-4">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                <div>
+                  <span className="text-xs font-semibold text-neutral-500 uppercase tracking-wider block">
+                    Valor da Assinatura Mensal
+                  </span>
+                  <div className="flex items-baseline gap-2 mt-1">
+                    <span className="text-3xl font-black text-neutral-950 font-mono">
+                      {formatMoneyBRL(currentPrice)}
+                    </span>
+                    <span className="text-xs text-neutral-500 font-medium">/ mês</span>
+                  </div>
+                  <span className="text-xs text-neutral-600 block mt-1 font-medium">
+                    Plano selecionado:{' '}
+                    <strong className="text-neutral-900">{planLabel}</strong>
+                  </span>
+                </div>
+
+                <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
+                  {mpInitPoint ? (
+                    <a
+                      href={mpInitPoint}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="px-5 py-3 rounded-xl bg-sky-600 hover:bg-sky-700 text-white text-xs font-bold flex items-center justify-center gap-2 shadow-sm transition-all"
+                    >
+                      <span>Abrir Checkout Seguro Mercado Pago</span>
+                      <ExternalLink className="w-4 h-4" />
+                    </a>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={handleStartMercadoPago}
+                      disabled={isGeneratingMp}
+                      className="px-5 py-3 rounded-xl bg-neutral-950 hover:bg-neutral-800 text-white text-xs font-bold flex items-center justify-center gap-2 shadow-sm transition-all cursor-pointer disabled:opacity-50"
+                    >
+                      {isGeneratingMp ? (
+                        <>
+                          <RotateCw className="w-4 h-4 animate-spin" />
+                          <span>Gerando link no Mercado Pago...</span>
+                        </>
+                      ) : (
+                        <>
+                          <ShieldCheck className="w-4 h-4 text-sky-400" />
+                          <span>Gerar Pagamento Mercado Pago</span>
+                        </>
+                      )}
+                    </button>
+                  )}
+
+                  <button
+                    type="button"
+                    onClick={() => checkStatus(false)}
+                    disabled={isCheckingPayment}
+                    className="px-4 py-3 rounded-xl border border-neutral-200 hover:border-neutral-300 bg-white text-xs font-bold text-neutral-700 flex items-center justify-center gap-2 transition-all cursor-pointer disabled:opacity-50"
+                  >
+                    <RotateCw
+                      className={`w-4 h-4 ${isCheckingPayment ? 'animate-spin text-neutral-900' : 'text-neutral-500'}`}
+                    />
+                    <span>Já paguei, verificar</span>
+                  </button>
+                </div>
+              </div>
+
+              <div className="pt-3 border-t border-neutral-200/70 text-[11px] text-neutral-500 flex items-center gap-2">
+                <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+                <span>
+                  Liberação automática: assim que o Mercado Pago confirmar o pagamento pelo webhook, seu painel será desbloqueado em instantes.
+                </span>
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* 1. SEÇÃO PIX */}
         {selectedMethod === 'pix' && (
