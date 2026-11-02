@@ -29,12 +29,25 @@ export async function generateMetadata({ params, searchParams }: PageProps): Pro
     }
   }
 
+  const canonicalUrl = `https://diretolink.com.br/empresa/${encodeURIComponent(slug)}/cardapio`
+
   return {
     title: `Cardápio Digital · ${company.name}${mesaLabel}`,
-    description: `Faça seu pedido diretamente pelo cardápio digital de ${company.name}.`,
+    description: `Faça seu pedido diretamente pelo cardápio digital oficial de ${company.name} no DiretoLink.`,
+    alternates: {
+      canonical: canonicalUrl,
+    },
     openGraph: {
       title: `Cardápio Digital · ${company.name}${mesaLabel}`,
-      description: `Cardápio digital oficial de ${company.name}`,
+      description: `Cardápio digital oficial de ${company.name} no DiretoLink`,
+      url: canonicalUrl,
+      siteName: 'DiretoLink',
+      locale: 'pt_BR',
+      type: 'website',
+    },
+    robots: {
+      index: true,
+      follow: true,
     },
   }
 }

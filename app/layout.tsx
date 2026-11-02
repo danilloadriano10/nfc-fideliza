@@ -3,17 +3,38 @@ import './globals.css'; // Global styles
 import '@/lib/suppress-firestore-logs';
 
 export const metadata: Metadata = {
-  title: 'DiretoLink | Tudo do seu negócio em um só lugar',
-  description: 'DiretoLink - Crie uma experiência digital completa para seus clientes. Reúna serviços, produtos, agendamentos, avaliações, fidelidade e WhatsApp em um único link. Compartilhe por link, QR Code ou NFC.',
+  metadataBase: new URL('https://diretolink.com.br'),
+  title: 'DiretoLink | Seu negócio inteiro em um só link',
+  description:
+    'Reúna WhatsApp, cardápio, agendamento, catálogo, avaliações, redes sociais e muito mais em uma única página profissional para o seu negócio.',
+  alternates: {
+    canonical: 'https://diretolink.com.br/',
+  },
   openGraph: {
-    title: 'DiretoLink | Tudo do seu negócio em um só lugar',
-    description: 'Um link. Várias possibilidades. Reúna serviços, produtos, agendamentos, avaliações, fidelidade e WhatsApp em um único link compartilhado por bio, QR Code ou NFC.',
+    title: 'DiretoLink | Seu negócio inteiro em um só link',
+    description:
+      'Reúna WhatsApp, cardápio, agendamento, catálogo, avaliações, redes sociais e muito mais em uma única página profissional para o seu negócio.',
+    url: 'https://diretolink.com.br/',
+    siteName: 'DiretoLink',
+    locale: 'pt_BR',
     type: 'website',
   },
   twitter: {
     card: 'summary_large_image',
-    title: 'DiretoLink | Tudo do seu negócio em um só lugar',
-    description: 'Um link. Várias possibilidades. Conecte clientes a tudo do seu negócio.',
+    title: 'DiretoLink | Seu negócio inteiro em um só link',
+    description:
+      'Reúna WhatsApp, cardápio, agendamento, catálogo, avaliações, redes sociais e muito mais em uma única página profissional para o seu negócio.',
+  },
+  robots: {
+    index: true,
+    follow: true,
+    googleBot: {
+      index: true,
+      follow: true,
+      'max-video-preview': -1,
+      'max-image-preview': 'large',
+      'max-snippet': -1,
+    },
   },
 };
 
@@ -21,6 +42,36 @@ export default function RootLayout({children}: {children: React.ReactNode}) {
   return (
     <html lang="pt-BR" suppressHydrationWarning className="w-full max-w-full overflow-x-hidden">
       <head>
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{
+            __html: JSON.stringify({
+              '@context': 'https://schema.org',
+              '@type': 'WebApplication',
+              name: 'DiretoLink',
+              url: 'https://diretolink.com.br/',
+              applicationCategory: 'BusinessApplication',
+              operatingSystem: 'All',
+              description:
+                'Reúna WhatsApp, cardápio, agendamento, catálogo, avaliações, redes sociais e muito mais em uma única página profissional para o seu negócio.',
+              inLanguage: 'pt-BR',
+              offers: [
+                {
+                  '@type': 'Offer',
+                  name: 'DiretoLink Links',
+                  price: '29.99',
+                  priceCurrency: 'BRL',
+                },
+                {
+                  '@type': 'Offer',
+                  name: 'DiretoLink Pro',
+                  price: '69.99',
+                  priceCurrency: 'BRL',
+                },
+              ],
+            }),
+          }}
+        />
         <script
           dangerouslySetInnerHTML={{
             __html: `
