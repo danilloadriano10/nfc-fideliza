@@ -34,6 +34,8 @@ import {
   Radio,
   Clock,
   Loader2,
+  QrCode,
+  X,
 } from 'lucide-react'
 import { Company, Customer, ActivityLog, GlobalStats, PointRequest, PrivateFeedback, getCompanyPlan } from '@/types/platform'
 import {
@@ -50,11 +52,26 @@ import {
   DATA_CHANGE_EVENT,
 } from '@/lib/storage'
 import { formatPhone } from '@/lib/utils'
+import { formatMoneyBRL } from '@/lib/order-delivery'
 import { isAdminAuthenticated, logoutAdmin, AUTH_CHANGE_EVENT } from '@/lib/auth'
 import { NewCompanyModal } from './new-company-modal'
 import { AdminLoginView } from './admin-login-view'
 
-type AdminTab = 'dashboard' | 'companies' | 'customers' | 'activity' | 'delete_company' | 'settings'
+export interface AdminPixRecord {
+  companyId: string
+  companyName: string
+  companySlug: string
+  plan: 'links' | 'pro'
+  planLabel: string
+  value: number
+  status: 'WAITING_CONFIRMATION' | 'CONFIRMED' | 'REJECTED'
+  subStatus: string
+  date: string
+  lastPaymentDate?: string | null
+  pixCopiaECola?: string | null
+}
+
+type AdminTab = 'dashboard' | 'companies' | 'pix_payments' | 'customers' | 'activity' | 'delete_company' | 'settings'
 
 export const AdminPanelView: React.FC = () => {
   const router = useRouter()
@@ -62,6 +79,10 @@ export const AdminPanelView: React.FC = () => {
   const [companies, setCompanies] = useState<Company[]>([])
   const [requests, setRequests] = useState<PointRequest[]>([])
   const [feedbacks, setFeedbacks] = useState<PrivateFeedback[]>([])
+  const [pixPayments, setPixPayments] = useState<AdminPixRecord[]>([])
+  const [isLoadingPix, setIsLoadingPix] = useState(false)
+  const [pixFilter, setPixFilter] = useState<'ALL' | 'WAITING_CONFIRMATION' | 'CONFIRMED'>('ALL')
+  const [pixActionLoadingId, setPixActionLoadingId] = useState<string | null>(null)
   const [stats, setStats] = useState<GlobalStats>({
     totalCompanies: 0,
     activeCompanies: 0,
@@ -90,12 +111,74 @@ export const AdminPanelView: React.FC = () => {
     return typeof window !== 'undefined' ? isAdminAuthenticated() : false
   })
 
+  const fetchPixPayments = async () => {
+    setIsLoadingPix(true)
+    try {
+      const adminToken = typeof window !== 'undefined' ? sessionStorage.getItem('nfc_admin_session_auth_v1') || 'authenticated' : 'authenticated'
+      const res = await fetch('/api/admin/pix-payments', {
+        headers: {
+          Authorization: `Bearer ${adminToken}`,
+        },
+        cache: 'no-store',
+      })
+      const data = await res.json()
+      if (res.ok && data.success && Array.isArray(data.payments)) {
+        setPixPayments(data.payments)
+      }
+    } catch (err) {
+      console.error('Erro ao carregar pagamentos PIX:', err)
+    } finally {
+      setIsLoadingPix(false)
+    }
+  }
+
+  const handleConfirmPixPayment = async (
+    companyId: string,
+    companyName: string,
+    action: 'CONFIRM' | 'REJECT'
+  ) => {
+    const isConfirm = action === 'CONFIRM'
+    const question = isConfirm
+      ? `Deseja CONFIRMAR o pagamento PIX da empresa "${companyName}"?\n\nO painel contratado será liberado imediatamente.`
+      : `Deseja RECUSAR/CANCELAR a solicitação de pagamento PIX da empresa "${companyName}"?`
+
+    if (!confirm(question)) return
+
+    setPixActionLoadingId(companyId)
+    try {
+      const adminToken = typeof window !== 'undefined' ? sessionStorage.getItem('nfc_admin_session_auth_v1') || 'authenticated' : 'authenticated'
+      const res = await fetch('/api/admin/pix-payments', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${adminToken}`,
+        },
+        body: JSON.stringify({ companyId, action }),
+      })
+
+      const data = await res.json()
+      if (res.ok && data.success) {
+        notify(data.message || (isConfirm ? 'Pagamento confirmado e painel liberado!' : 'Pagamento cancelado.'))
+        await fetchPixPayments()
+        await syncCompaniesFromServer()
+        loadData()
+      } else {
+        notify(data.error || 'Erro ao processar ação no pagamento.', 'error')
+      }
+    } catch {
+      notify('Erro de conexão ao processar pagamento.', 'error')
+    } finally {
+      setPixActionLoadingId(null)
+    }
+  }
+
   const loadData = () => {
     setCompanies(getAllCompanies() || [])
     setStats(getGlobalPlatformStats())
     setLogs(getAllActivityLogs() || [])
     setRequests(getAllPointRequests() || [])
     setFeedbacks(getAllPrivateFeedbacks() || [])
+    fetchPixPayments()
   }
 
   useEffect(() => {
@@ -105,6 +188,7 @@ export const AdminPanelView: React.FC = () => {
     }
 
     loadData()
+    fetchPixPayments()
     syncCompaniesFromServer().then((fresh) => {
       if (Array.isArray(fresh)) {
         setCompanies(fresh)
@@ -130,7 +214,7 @@ export const AdminPanelView: React.FC = () => {
     }
   }, [router])
 
-  const notify = (msg: string) => {
+  const notify = (msg: string, _type?: string) => {
     setToastText(msg)
     setTimeout(() => setToastText(null), 3500)
   }
@@ -245,6 +329,12 @@ export const AdminPanelView: React.FC = () => {
 
   const pendingRequestsCount = requests.filter((r) => r && r.status === 'pending').length
   const activeCompaniesCount = companies.filter((c) => c && c.isActive !== false).length
+  const pendingPixCount = pixPayments.filter((p) => p.status === 'WAITING_CONFIRMATION').length
+  const filteredPixPayments = pixPayments.filter((p) => {
+    if (pixFilter === 'WAITING_CONFIRMATION') return p.status === 'WAITING_CONFIRMATION'
+    if (pixFilter === 'CONFIRMED') return p.status === 'CONFIRMED'
+    return true
+  })
 
   if (!isAuthenticated) {
     return (
@@ -319,6 +409,25 @@ export const AdminPanelView: React.FC = () => {
               }`}
             >
               Empresas ({companies.length})
+            </button>
+            <button
+              onClick={() => {
+                setActiveTab('pix_payments')
+                fetchPixPayments()
+              }}
+              className={`px-3 py-1.5 rounded-xl transition-all flex items-center gap-1.5 ${
+                activeTab === 'pix_payments'
+                  ? 'bg-white text-neutral-900 font-semibold shadow-xs'
+                  : 'hover:text-neutral-900'
+              }`}
+            >
+              <QrCode className="w-3.5 h-3.5 text-emerald-600" />
+              <span>Pagamentos PIX</span>
+              {pixPayments.filter((p) => p.status === 'WAITING_CONFIRMATION').length > 0 && (
+                <span className="px-1.5 py-0.2 rounded-full text-[10px] font-bold bg-amber-500 text-white animate-pulse">
+                  {pixPayments.filter((p) => p.status === 'WAITING_CONFIRMATION').length}
+                </span>
+              )}
             </button>
             <button
               onClick={handleOpenCreate}
@@ -397,6 +506,22 @@ export const AdminPanelView: React.FC = () => {
             }`}
           >
             Empresas ({companies.length})
+          </button>
+          <button
+            onClick={() => {
+              setActiveTab('pix_payments')
+              fetchPixPayments()
+            }}
+            className={`px-2.5 py-1 rounded-lg shrink-0 flex items-center gap-1 ${
+              activeTab === 'pix_payments' ? 'bg-violet-600 text-white font-medium' : 'text-neutral-600'
+            }`}
+          >
+            <span>PIX</span>
+            {pixPayments.filter((p) => p.status === 'WAITING_CONFIRMATION').length > 0 && (
+              <span className="px-1.5 py-0.2 rounded-full text-[9px] font-bold bg-amber-500 text-white">
+                {pixPayments.filter((p) => p.status === 'WAITING_CONFIRMATION').length}
+              </span>
+            )}
           </button>
           <button
             onClick={handleOpenCreate}
@@ -925,6 +1050,225 @@ export const AdminPanelView: React.FC = () => {
                 </tbody>
               </table>
             </div>
+          </div>
+        )}
+
+        {/* ============================================== */}
+        {/* PAGAMENTOS PIX DIRETO */}
+        {/* ============================================== */}
+        {activeTab === 'pix_payments' && (
+          <div className="bg-white rounded-3xl border border-neutral-200/80 shadow-xs p-6 space-y-6">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 pb-2 border-b border-neutral-100">
+              <div>
+                <div className="flex items-center gap-2">
+                  <div className="w-8 h-8 rounded-xl bg-emerald-100 text-emerald-700 flex items-center justify-center">
+                    <QrCode className="w-4 h-4" />
+                  </div>
+                  <div>
+                    <h2 className="text-base font-bold text-neutral-900 flex items-center gap-2">
+                      <span>Pagamentos PIX Direto</span>
+                      {pendingPixCount > 0 && (
+                        <span className="px-2 py-0.5 rounded-full text-xs font-semibold bg-amber-100 text-amber-800">
+                          {pendingPixCount} aguardando confirmação
+                        </span>
+                      )}
+                    </h2>
+                    <p className="text-xs text-neutral-500">
+                      Chave oficial: <span className="font-mono font-medium text-neutral-700">oficialdiretolink@gmail.com</span> · Confirme para liberar o acesso ao painel do plano contratado.
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-2 flex-wrap">
+                {/* Filters */}
+                <div className="inline-flex items-center bg-neutral-100 p-1 rounded-xl text-xs font-medium">
+                  <button
+                    onClick={() => setPixFilter('ALL')}
+                    className={`px-3 py-1 rounded-lg transition-all ${
+                      pixFilter === 'ALL' ? 'bg-white text-neutral-900 shadow-xs font-semibold' : 'text-neutral-600 hover:text-neutral-900'
+                    }`}
+                  >
+                    Todos ({pixPayments.length})
+                  </button>
+                  <button
+                    onClick={() => setPixFilter('WAITING_CONFIRMATION')}
+                    className={`px-3 py-1 rounded-lg transition-all flex items-center gap-1 ${
+                      pixFilter === 'WAITING_CONFIRMATION'
+                        ? 'bg-white text-amber-800 shadow-xs font-semibold'
+                        : 'text-neutral-600 hover:text-neutral-900'
+                    }`}
+                  >
+                    <span>Aguardando</span>
+                    {pendingPixCount > 0 && (
+                      <span className="px-1.5 py-0.2 rounded-full text-[10px] font-bold bg-amber-500 text-white">
+                        {pendingPixCount}
+                      </span>
+                    )}
+                  </button>
+                  <button
+                    onClick={() => setPixFilter('CONFIRMED')}
+                    className={`px-3 py-1 rounded-lg transition-all ${
+                      pixFilter === 'CONFIRMED'
+                        ? 'bg-white text-emerald-800 shadow-xs font-semibold'
+                        : 'text-neutral-600 hover:text-neutral-900'
+                    }`}
+                  >
+                    Confirmados
+                  </button>
+                </div>
+
+                <button
+                  onClick={() => fetchPixPayments()}
+                  disabled={isLoadingPix}
+                  className="px-3 py-1.5 rounded-xl border border-neutral-200 hover:bg-neutral-50 text-neutral-700 text-xs font-medium transition-colors flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+                  title="Atualizar lista de pagamentos PIX"
+                >
+                  <RotateCcw className={`w-3.5 h-3.5 ${isLoadingPix ? 'animate-spin' : ''}`} />
+                  <span>Atualizar</span>
+                </button>
+              </div>
+            </div>
+
+            {/* List */}
+            {isLoadingPix ? (
+              <div className="py-12 flex flex-col items-center justify-center text-center">
+                <Loader2 className="w-8 h-8 text-violet-600 animate-spin mb-2" />
+                <p className="text-xs text-neutral-500 font-medium">Carregando solicitações de PIX...</p>
+              </div>
+            ) : filteredPixPayments.length === 0 ? (
+              <div className="py-12 text-center border-2 border-dashed border-neutral-200 rounded-2xl">
+                <QrCode className="w-10 h-10 text-neutral-300 mx-auto mb-2" />
+                <p className="text-sm font-semibold text-neutral-700">Nenhum pagamento PIX encontrado</p>
+                <p className="text-xs text-neutral-500 mt-1 max-w-sm mx-auto">
+                  {pixFilter === 'WAITING_CONFIRMATION'
+                    ? 'Nenhuma solicitação de PIX pendente de confirmação no momento.'
+                    : 'Nenhuma empresa gerou PIX com o filtro selecionado.'}
+                </p>
+              </div>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full text-left text-xs border-collapse">
+                  <thead>
+                    <tr className="border-b border-neutral-100 text-neutral-400 font-semibold uppercase tracking-wider text-[10px]">
+                      <th className="py-3 px-3">Empresa</th>
+                      <th className="py-3 px-3">Plano</th>
+                      <th className="py-3 px-3">Valor</th>
+                      <th className="py-3 px-3">Data / Hora</th>
+                      <th className="py-3 px-3">Status</th>
+                      <th className="py-3 px-3 text-right">Ações do Administrador</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-neutral-100">
+                    {filteredPixPayments.map((p) => {
+                      const isWaiting = p.status === 'WAITING_CONFIRMATION'
+                      const isConfirmed = p.status === 'CONFIRMED'
+                      const isLoadingThis = pixActionLoadingId === p.companyId
+
+                      return (
+                        <tr key={p.companyId} className="hover:bg-neutral-50/60 transition-colors">
+                          <td className="py-3 px-3">
+                            <div className="font-semibold text-neutral-900">{p.companyName}</div>
+                            <div className="text-[11px] text-neutral-500 font-mono">/{p.companySlug}</div>
+                          </td>
+                          <td className="py-3 px-3">
+                            <span className={`inline-flex items-center px-2 py-0.5 rounded-md text-[11px] font-semibold ${
+                              p.plan === 'pro'
+                                ? 'bg-violet-50 text-violet-700 border border-violet-200'
+                                : 'bg-blue-50 text-blue-700 border border-blue-200'
+                            }`}>
+                              {p.planLabel}
+                            </span>
+                          </td>
+                          <td className="py-3 px-3 font-semibold text-neutral-900">
+                            {formatMoneyBRL(p.value)}
+                            <span className="text-[10px] text-neutral-400 font-normal">/mês</span>
+                          </td>
+                          <td className="py-3 px-3 text-neutral-600">
+                            {p.date ? new Date(p.date).toLocaleString('pt-BR') : '—'}
+                          </td>
+                          <td className="py-3 px-3">
+                            {isWaiting && (
+                              <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-semibold bg-amber-50 text-amber-800 border border-amber-200">
+                                <Clock className="w-3 h-3 text-amber-600" />
+                                <span>Aguardando Confirmação</span>
+                              </span>
+                            )}
+                            {isConfirmed && (
+                              <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-semibold bg-emerald-50 text-emerald-800 border border-emerald-200">
+                                <CheckCircle2 className="w-3 h-3 text-emerald-600" />
+                                <span>Confirmado · Painel Liberado</span>
+                              </span>
+                            )}
+                            {!isWaiting && !isConfirmed && (
+                              <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-semibold bg-neutral-100 text-neutral-600 border border-neutral-200">
+                                <X className="w-3 h-3 text-neutral-500" />
+                                <span>Recusado / Cancelado</span>
+                              </span>
+                            )}
+                          </td>
+                          <td className="py-3 px-3 text-right">
+                            <div className="inline-flex items-center justify-end gap-1.5">
+                              {isWaiting && (
+                                <>
+                                  <button
+                                    onClick={() => handleConfirmPixPayment(p.companyId, p.companyName, 'CONFIRM')}
+                                    disabled={Boolean(pixActionLoadingId)}
+                                    className="px-3 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-semibold text-xs transition-colors flex items-center gap-1 shadow-xs cursor-pointer disabled:opacity-50"
+                                    title="Confirmar pagamento e liberar painel imediatamente"
+                                  >
+                                    {isLoadingThis ? (
+                                      <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                                    ) : (
+                                      <CheckCircle2 className="w-3.5 h-3.5" />
+                                    )}
+                                    <span>Confirmar pagamento</span>
+                                  </button>
+
+                                  <button
+                                    onClick={() => handleConfirmPixPayment(p.companyId, p.companyName, 'REJECT')}
+                                    disabled={Boolean(pixActionLoadingId)}
+                                    className="px-2.5 py-1.5 rounded-xl bg-neutral-100 hover:bg-red-50 text-neutral-600 hover:text-red-700 text-xs font-medium transition-colors cursor-pointer disabled:opacity-50"
+                                    title="Recusar ou cancelar pagamento PIX"
+                                  >
+                                    <span>Recusar</span>
+                                  </button>
+                                </>
+                              )}
+
+                              {isConfirmed && (
+                                <div className="flex items-center gap-2">
+                                  <span className="text-[11px] text-emerald-700 font-medium">Acesso Ativo</span>
+                                  <Link
+                                    href={`/painel`}
+                                    className="px-2.5 py-1 rounded-lg bg-neutral-100 hover:bg-neutral-200 text-neutral-700 text-[11px] font-semibold transition-colors flex items-center gap-1"
+                                    title="Ir para o painel"
+                                  >
+                                    <Store className="w-3 h-3" />
+                                    <span>Painel</span>
+                                  </Link>
+                                </div>
+                              )}
+
+                              {!isWaiting && !isConfirmed && (
+                                <button
+                                  onClick={() => handleConfirmPixPayment(p.companyId, p.companyName, 'CONFIRM')}
+                                  disabled={Boolean(pixActionLoadingId)}
+                                  className="px-2.5 py-1 rounded-lg border border-neutral-200 hover:bg-emerald-50 text-neutral-600 hover:text-emerald-700 text-[11px] font-medium transition-colors"
+                                  title="Reativar e confirmar"
+                                >
+                                  Reativar
+                                </button>
+                              )}
+                            </div>
+                          </td>
+                        </tr>
+                      )
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            )}
           </div>
         )}
 

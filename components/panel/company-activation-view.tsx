@@ -21,6 +21,8 @@ import {
   HelpCircle,
   CheckCheck,
   ExternalLink,
+  Mail,
+  MessageCircle,
 } from 'lucide-react'
 import confetti from 'canvas-confetti'
 import {
@@ -32,7 +34,6 @@ import {
 } from '@/types/platform'
 import {
   fetchCompanySubscriptionFromServer,
-  createCompanySubscriptionOnServerApi,
   createMercadoPagoSubscriptionOnServer,
   fetchMercadoPagoSubscriptionFromServer,
   saveCompanyLocally,
@@ -54,8 +55,7 @@ export const CompanyActivationView: React.FC<CompanyActivationViewProps> = ({
   const [subscription, setSubscription] = useState<CompanySubscription | null>(
     () => company.subscription || null
   )
-  const [environment, setEnvironment] = useState<'SANDBOX' | 'PRODUCTION'>('SANDBOX')
-  const [isLoading, setIsLoading] = useState(false)
+  const [environment, setEnvironment] = useState<'SANDBOX' | 'PRODUCTION'>('PRODUCTION')
   const [isCheckingPayment, setIsCheckingPayment] = useState(false)
   const [toastFeedback, setToastFeedback] = useState<{ text: string; type: 'success' | 'error' } | null>(null)
 
@@ -63,8 +63,8 @@ export const CompanyActivationView: React.FC<CompanyActivationViewProps> = ({
   const currentPrice = subscription?.value || getPlanPrice(currentPlan)
   const planLabel = getPlanLabel(currentPlan)
 
-  // Payment view states: 'choice' | 'mercadopago' | 'pix' | 'card'
-  const [selectedMethod, setSelectedMethod] = useState<'choice' | 'mercadopago' | 'pix' | 'card'>('mercadopago')
+  // Apenas as duas opções oficiais solicitadas: Mercado Pago e Pix Direto
+  const [selectedMethod, setSelectedMethod] = useState<'mercadopago' | 'pix'>('mercadopago')
 
   // Mercado Pago Data
   const [mpInitPoint, setMpInitPoint] = useState<string | null>(
@@ -72,13 +72,17 @@ export const CompanyActivationView: React.FC<CompanyActivationViewProps> = ({
   )
   const [isGeneratingMp, setIsGeneratingMp] = useState(false)
 
-  // PIX Data
+  // PIX Direto Data (oficialdiretolink@gmail.com)
   const [pixData, setPixData] = useState<{
     encodedImage: string
     payload: string
     expirationDate: string
   } | null>(() => {
-    if (subscription?.pixCopiaECola) {
+    if (
+      subscription?.gateway === 'pix_direto' &&
+      subscription?.pixCopiaECola &&
+      subscription.pixCopiaECola.includes('oficialdiretolink@gmail.com')
+    ) {
       return {
         encodedImage: (subscription.pixQrCodeUrl || '').replace('data:image/png;base64,', ''),
         payload: subscription.pixCopiaECola,
@@ -89,20 +93,6 @@ export const CompanyActivationView: React.FC<CompanyActivationViewProps> = ({
   })
   const [copiedPix, setCopiedPix] = useState(false)
   const [isGeneratingPix, setIsGeneratingPix] = useState(false)
-
-  // Card Form State
-  const [cardHolderName, setCardHolderName] = useState('')
-  const [cardNumber, setCardNumber] = useState('')
-  const [cardExpiry, setCardExpiry] = useState('')
-  const [cardCcv, setCardCcv] = useState('')
-  const [cardCpfCnpj, setCardCpfCnpj] = useState('')
-  const [cardPostalCode, setCardPostalCode] = useState('')
-  const [cardAddressNumber, setCardAddressNumber] = useState('')
-  const [cardPhone, setCardPhone] = useState('')
-  const [isSubmittingCard, setIsSubmittingCard] = useState(false)
-
-  // Sandbox simulation state
-  const [isSimulatingSandbox, setIsSimulatingSandbox] = useState(false)
 
   const isUnlockedRef = useRef(false)
 
@@ -153,7 +143,12 @@ export const CompanyActivationView: React.FC<CompanyActivationViewProps> = ({
             onCompanyUpdate(updatedCompany)
           }, 800)
           return
-        } else if (activeSub.pixCopiaECola && !pixData) {
+        } else if (
+          activeSub.gateway === 'pix_direto' &&
+          activeSub.pixCopiaECola &&
+          activeSub.pixCopiaECola.includes('oficialdiretolink@gmail.com') &&
+          !pixData
+        ) {
           setPixData({
             encodedImage: (activeSub.pixQrCodeUrl || '').replace('data:image/png;base64,', ''),
             payload: activeSub.pixCopiaECola,
@@ -213,31 +208,32 @@ export const CompanyActivationView: React.FC<CompanyActivationViewProps> = ({
     }
   }
 
-  // Iniciar PIX
+  // Iniciar PIX Direto (oficialdiretolink@gmail.com)
   const handleStartPix = async () => {
     setSelectedMethod('pix')
     if (pixData?.payload) return // Já tem dados do Pix gerados
 
     setIsGeneratingPix(true)
     try {
-      const res = await createCompanySubscriptionOnServerApi({
-        companyId: company.id,
-        paymentMethod: 'PIX',
-        billingInfo: {
-          name: company.ownerAuth?.ownerName || company.name,
-          email: company.ownerAuth?.ownerEmail || `${company.slug}@diretolink.com.br`,
-          phone: company.ownerAuth?.ownerPhone || company.whatsapp,
-        },
+      const res = await fetch('/api/pix-direto', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ companyId: company.id }),
       })
 
-      if (res.success && res.subscription) {
-        setSubscription(res.subscription)
-        if (res.pix) {
-          setPixData(res.pix)
+      const data = await res.json()
+      if (res.ok && data.success) {
+        setPixData({
+          encodedImage: data.qrCodeBase64.replace('data:image/png;base64,', ''),
+          payload: data.copiaECola,
+          expirationDate: '',
+        })
+        if (data.subscription) {
+          setSubscription(data.subscription)
         }
-        showToast('Cobrança PIX gerada com sucesso!', 'success')
+        showToast('PIX Direto gerado com sucesso! Aguardando confirmação.', 'success')
       } else {
-        showToast(res.error || 'Erro ao gerar PIX no Asaas.', 'error')
+        showToast(data.error || 'Erro ao gerar PIX Direto.', 'error')
       }
     } catch {
       showToast('Falha na comunicação com o servidor.', 'error')
@@ -246,118 +242,12 @@ export const CompanyActivationView: React.FC<CompanyActivationViewProps> = ({
     }
   }
 
-  // Submeter Cartão de Crédito
-  const handleStartCard = async (e: React.FormEvent) => {
-    e.preventDefault()
-
-    const cleanCard = cardNumber.replace(/\D/g, '')
-    if (cleanCard.length < 13) {
-      showToast('Número de cartão inválido.', 'error')
-      return
-    }
-
-    const [expMonth, expYearRaw] = cardExpiry.split('/')
-    if (!expMonth || !expYearRaw) {
-      showToast('Validade inválida (use MM/AA).', 'error')
-      return
-    }
-    const expYear = expYearRaw.length === 2 ? `20${expYearRaw}` : expYearRaw
-
-    setIsSubmittingCard(true)
-    try {
-      const res = await createCompanySubscriptionOnServerApi({
-        companyId: company.id,
-        paymentMethod: 'CREDIT_CARD',
-        creditCard: {
-          holderName: cardHolderName.trim(),
-          number: cleanCard,
-          expiryMonth: expMonth.trim(),
-          expiryYear: expYear.trim(),
-          ccv: cardCcv.trim(),
-        },
-        creditCardHolderInfo: {
-          name: cardHolderName.trim(),
-          email: company.ownerAuth?.ownerEmail || `${company.slug}@diretolink.com.br`,
-          cpfCnpj: cardCpfCnpj.replace(/\D/g, '') || '00000000000',
-          postalCode: cardPostalCode.replace(/\D/g, '') || '89201000',
-          addressNumber: cardAddressNumber.trim() || '100',
-          phone: cardPhone.replace(/\D/g, '') || company.whatsapp || '47999999999',
-        },
-      })
-
-      if (res.success && res.subscription) {
-        setSubscription(res.subscription)
-        if (res.subscription.status === 'ACTIVE') {
-          confetti({ particleCount: 120, spread: 80, origin: { y: 0.5 } })
-          showToast('Cartão aprovado com sucesso! Liberando painel...', 'success')
-          const updatedCompany: Company = {
-            ...company,
-            subscription: res.subscription,
-          }
-          saveCompanyLocally(updatedCompany)
-          saveCompany(updatedCompany)
-          setTimeout(() => {
-            onCompanyUpdate(updatedCompany)
-          }, 800)
-        } else {
-          showToast('Cartão processado. Aguardando confirmação da operadora...', 'success')
-          checkStatus(false)
-        }
-      } else {
-        showToast(res.error || 'Erro ao processar cartão no Asaas.', 'error')
-      }
-    } catch {
-      showToast('Falha na comunicação com o servidor.', 'error')
-    } finally {
-      setIsSubmittingCard(false)
-    }
-  }
-
-  // Copiar código Copia e Cola
+  // Copiar chave PIX oficial (oficialdiretolink@gmail.com)
   const handleCopyPix = () => {
-    if (pixData?.payload) {
-      navigator.clipboard.writeText(pixData.payload)
-      setCopiedPix(true)
-      showToast('Código Pix copiado para a área de transferência!', 'success')
-      setTimeout(() => setCopiedPix(false), 2500)
-    }
-  }
-
-  // Simular Pagamento no Sandbox (1 clique para testes)
-  const handleSimulateSandboxPayment = async () => {
-    setIsSimulatingSandbox(true)
-    try {
-      const res = await fetch('/api/asaas/webhook', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          id: `evt_sim_${Date.now()}`,
-          event: 'PAYMENT_RECEIVED',
-          dateCreated: new Date().toISOString(),
-          payment: {
-            id: `pay_sim_${Date.now()}`,
-            subscription: subscription?.asaasSubscriptionId || `sub_${company.id}`,
-            customer: subscription?.asaasCustomerId || '',
-            status: 'RECEIVED',
-            billingType: 'PIX',
-            value: currentPrice,
-            externalReference: company.id,
-            paymentDate: new Date().toISOString(),
-          },
-        }),
-      })
-
-      if (res.ok) {
-        showToast('Confirmação simulada com sucesso! Atualizando...', 'success')
-        await checkStatus(false)
-      } else {
-        showToast('Erro ao simular webhook no Sandbox.', 'error')
-      }
-    } catch {
-      showToast('Erro ao disparar simulação.', 'error')
-    } finally {
-      setIsSimulatingSandbox(false)
-    }
+    navigator.clipboard.writeText('oficialdiretolink@gmail.com')
+    setCopiedPix(true)
+    showToast('Chave PIX copiada!', 'success')
+    setTimeout(() => setCopiedPix(false), 2500)
   }
 
   return (
@@ -465,8 +355,8 @@ export const CompanyActivationView: React.FC<CompanyActivationViewProps> = ({
             </div>
           </div>
 
-          {/* Action Choice Buttons */}
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-1">
+          {/* Action Choice Buttons: Apenas Mercado Pago e PIX Direto */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
             <button
               type="button"
               onClick={handleStartMercadoPago}
@@ -498,7 +388,7 @@ export const CompanyActivationView: React.FC<CompanyActivationViewProps> = ({
                     selectedMethod === 'mercadopago' ? 'text-neutral-300' : 'text-neutral-500'
                   }`}
                 >
-                  Cartão ou Pix com checkout seguro oficial
+                  Cartão de Crédito ou Pix com liberação automática
                 </span>
               </div>
             </button>
@@ -509,7 +399,7 @@ export const CompanyActivationView: React.FC<CompanyActivationViewProps> = ({
               disabled={isGeneratingPix}
               className={`p-4 rounded-2xl border text-left transition-all cursor-pointer flex flex-col justify-between gap-3 ${
                 selectedMethod === 'pix'
-                  ? 'bg-neutral-900 border-neutral-900 text-white shadow-md'
+                  ? 'bg-neutral-900 border-neutral-900 text-white shadow-md ring-2 ring-emerald-500/20'
                   : 'bg-neutral-50/80 hover:bg-neutral-100 border-neutral-200 text-neutral-900'
               }`}
             >
@@ -527,35 +417,7 @@ export const CompanyActivationView: React.FC<CompanyActivationViewProps> = ({
                     selectedMethod === 'pix' ? 'text-neutral-300' : 'text-neutral-500'
                   }`}
                 >
-                  QR Code e Copia e Cola instantâneo
-                </span>
-              </div>
-            </button>
-
-            <button
-              type="button"
-              onClick={() => setSelectedMethod('card')}
-              className={`p-4 rounded-2xl border text-left transition-all cursor-pointer flex flex-col justify-between gap-3 ${
-                selectedMethod === 'card'
-                  ? 'bg-neutral-900 border-neutral-900 text-white shadow-md'
-                  : 'bg-neutral-50/80 hover:bg-neutral-100 border-neutral-200 text-neutral-900'
-              }`}
-            >
-              <div
-                className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 ${
-                  selectedMethod === 'card' ? 'bg-white/10 text-white' : 'bg-violet-50 text-violet-600 border border-violet-200'
-                }`}
-              >
-                <CreditCard className="w-5 h-5" />
-              </div>
-              <div>
-                <span className="text-xs font-bold block">CARTÃO DIRETO</span>
-                <span
-                  className={`text-[11px] font-medium block mt-0.5 ${
-                    selectedMethod === 'card' ? 'text-neutral-300' : 'text-neutral-500'
-                  }`}
-                >
-                  Cobrança recorrente no cartão de crédito
+                  QR Code e Chave Pix oficial (e-mail)
                 </span>
               </div>
             </button>
@@ -660,7 +522,7 @@ export const CompanyActivationView: React.FC<CompanyActivationViewProps> = ({
           </div>
         )}
 
-        {/* 1. SEÇÃO PIX */}
+        {/* 1. SEÇÃO PIX DIRETO (oficialdiretolink@gmail.com) */}
         {selectedMethod === 'pix' && (
           <div className="bg-white rounded-3xl border border-neutral-200/90 shadow-sm p-6 space-y-6">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-4 border-b border-neutral-100">
@@ -670,18 +532,32 @@ export const CompanyActivationView: React.FC<CompanyActivationViewProps> = ({
                 </div>
                 <div>
                   <h3 className="text-sm font-bold text-neutral-900">
-                    Pagamento via PIX · {planLabel}
+                    Pagamento via PIX Direto · {planLabel}
                   </h3>
-                  <p className="text-xs text-neutral-500">
-                    Escaneie o QR Code ou copie a chave Copia e Cola no app do seu banco.
-                  </p>
+                  <div className="flex items-center gap-2 mt-0.5">
+                    <p className="text-xs text-neutral-500">
+                      Chave PIX Oficial (E-mail): <strong className="text-neutral-800 font-mono">oficialdiretolink@gmail.com</strong>
+                    </p>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        navigator.clipboard.writeText('oficialdiretolink@gmail.com')
+                        showToast('Chave PIX copiada!', 'success')
+                      }}
+                      className="px-2 py-0.5 rounded-md bg-neutral-100 hover:bg-neutral-200 text-[11px] font-semibold text-neutral-700 inline-flex items-center gap-1 cursor-pointer transition-colors"
+                      title="Copiar chave PIX"
+                    >
+                      <Copy className="w-3 h-3" />
+                      <span>Copiar Chave</span>
+                    </button>
+                  </div>
                 </div>
               </div>
 
-              {/* Status "Aguardando pagamento" */}
+              {/* Status: AGUARDANDO CONFIRMAÇÃO */}
               <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-amber-50 text-amber-800 border border-amber-200 text-xs font-semibold self-start sm:self-auto">
                 <span className="w-2 h-2 rounded-full bg-amber-500 animate-ping" />
-                <span>Aguardando pagamento</span>
+                <span>AGUARDANDO CONFIRMAÇÃO</span>
               </div>
             </div>
 
@@ -689,7 +565,7 @@ export const CompanyActivationView: React.FC<CompanyActivationViewProps> = ({
               <div className="py-12 text-center space-y-3">
                 <RotateCw className="w-8 h-8 animate-spin text-neutral-800 mx-auto" />
                 <p className="text-xs text-neutral-500 font-medium">
-                  Gerando cobrança PIX com Asaas...
+                  Gerando QR Code do PIX Direto...
                 </p>
               </div>
             ) : pixData ? (
@@ -712,71 +588,44 @@ export const CompanyActivationView: React.FC<CompanyActivationViewProps> = ({
                     </div>
                   )}
 
-                  <div className="mt-3 text-center">
-                    <span className="text-base font-black text-neutral-900 font-mono">
+                  <div className="mt-3 text-center space-y-1">
+                    <span className="text-base font-black text-neutral-900 font-mono block">
                       {formatMoneyBRL(currentPrice)}
                     </span>
-                    <span className="text-[11px] text-neutral-500 block">
-                      Vencimento: {pixData.expirationDate ? new Date(pixData.expirationDate).toLocaleDateString('pt-BR') : 'Hoje'}
+                    <span className="text-[11px] text-neutral-600 block font-medium">
+                      Plano: {planLabel}
                     </span>
                   </div>
                 </div>
 
-                {/* Copia e Cola & Live Status */}
+                {/* Ações PIX */}
                 <div className="space-y-4">
-                  <div>
-                    <label className="text-xs font-bold text-neutral-700 block mb-1">
-                      Código PIX Copia e Cola
-                    </label>
-                    <div className="relative">
-                      <textarea
-                        readOnly
-                        value={pixData.payload}
-                        rows={3}
-                        className="w-full p-2.5 text-[11px] font-mono bg-neutral-50 border border-neutral-200 rounded-xl text-neutral-700 focus:outline-hidden resize-none select-all"
-                      />
+                  <button
+                    type="button"
+                    onClick={handleCopyPix}
+                    className="w-full py-3 px-4 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-semibold text-xs flex items-center justify-center gap-2 transition-all shadow-xs cursor-pointer"
+                  >
+                    {copiedPix ? (
+                      <>
+                        <Check className="w-4 h-4 text-white" />
+                        <span>Chave PIX copiada!</span>
+                      </>
+                    ) : (
+                      <>
+                        <Copy className="w-4 h-4" />
+                        <span>Copiar Chave PIX</span>
+                      </>
+                    )}
+                  </button>
+
+                  {/* Mensagem obrigatória de confirmação manual */}
+                  <div className="p-4 rounded-2xl bg-amber-50/90 border border-amber-200/90 space-y-1.5">
+                    <div className="flex items-center gap-2 text-amber-900 font-bold text-xs">
+                      <Clock className="w-4 h-4 text-amber-700 shrink-0" />
+                      <span>Aguardando confirmação do pagamento</span>
                     </div>
-
-                    <button
-                      type="button"
-                      onClick={handleCopyPix}
-                      className="mt-2 w-full py-2.5 px-4 rounded-xl bg-violet-600 hover:bg-violet-700 text-white font-semibold text-xs flex items-center justify-center gap-2 transition-all shadow-xs cursor-pointer"
-                    >
-                      {copiedPix ? (
-                        <>
-                          <Check className="w-4 h-4 text-white" />
-                          <span>Código Copiado!</span>
-                        </>
-                      ) : (
-                        <>
-                          <Copy className="w-4 h-4" />
-                          <span>Copiar Código PIX</span>
-                        </>
-                      )}
-                    </button>
-                  </div>
-
-                  {/* Live status check */}
-                  <div className="p-4 rounded-2xl bg-neutral-50 border border-neutral-200/80 space-y-2">
-                    <div className="flex items-center justify-between">
-                      <span className="text-xs font-bold text-neutral-800 flex items-center gap-1.5">
-                        <Clock className="w-3.5 h-3.5 text-neutral-500" />
-                        <span>Verificação Automática</span>
-                      </span>
-
-                      <button
-                        type="button"
-                        onClick={() => checkStatus(false)}
-                        disabled={isCheckingPayment}
-                        className="text-xs font-semibold text-violet-700 hover:text-violet-900 flex items-center gap-1 cursor-pointer disabled:opacity-50"
-                      >
-                        <RotateCw className={`w-3.5 h-3.5 ${isCheckingPayment ? 'animate-spin' : ''}`} />
-                        <span>Verificar Agora</span>
-                      </button>
-                    </div>
-
-                    <p className="text-[11px] text-neutral-500 leading-relaxed">
-                      Assim que o pagamento for confirmado pelo banco ou gateway, seu painel será liberado automaticamente em poucos segundos.
+                    <p className="text-[11px] text-amber-900 leading-relaxed font-medium">
+                      Após realizar o PIX, aguarde a confirmação do pagamento. Assim que confirmado, seu acesso será liberado.
                     </p>
                   </div>
                 </div>
@@ -786,219 +635,48 @@ export const CompanyActivationView: React.FC<CompanyActivationViewProps> = ({
                 <button
                   type="button"
                   onClick={handleStartPix}
-                  className="px-5 py-2.5 rounded-xl bg-violet-600 hover:bg-violet-700 text-white text-xs font-semibold shadow-xs cursor-pointer"
+                  className="px-5 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold shadow-xs cursor-pointer"
                 >
-                  Gerar QR Code PIX
+                  Gerar QR Code e Copia e Cola PIX
                 </button>
               </div>
             )}
           </div>
         )}
 
-        {/* 2. SEÇÃO CARTÃO DE CRÉDITO */}
-        {selectedMethod === 'card' && (
-          <div className="bg-white rounded-3xl border border-neutral-200/90 shadow-sm p-6 space-y-5">
-            <div className="flex items-center gap-3 pb-4 border-b border-neutral-100">
-              <div className="w-10 h-10 rounded-xl bg-violet-50 text-violet-700 border border-violet-200 flex items-center justify-center shrink-0">
-                <CreditCard className="w-5 h-5" />
-              </div>
-              <div>
-                <h3 className="text-sm font-bold text-neutral-900">
-                  Assinatura Recorrente no Cartão de Crédito
-                </h3>
-                <p className="text-xs text-neutral-500">
-                  Cobrança mensal automática de {formatMoneyBRL(currentPrice)}/mês. Cancele quando quiser.
-                </p>
-              </div>
-            </div>
-
-            <form onSubmit={handleStartCard} className="space-y-4">
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <div className="sm:col-span-2">
-                  <label className="text-xs font-semibold text-neutral-700 mb-1 block">
-                    Nome Impresso no Cartão *
-                  </label>
-                  <input
-                    type="text"
-                    required
-                    placeholder="Ex: CARLOS SILVA"
-                    value={cardHolderName}
-                    onChange={(e) => setCardHolderName(e.target.value.toUpperCase())}
-                    className="w-full px-3 py-2 text-xs rounded-xl border border-neutral-300 focus:border-violet-600 bg-white"
-                  />
-                </div>
-
-                <div className="sm:col-span-2">
-                  <label className="text-xs font-semibold text-neutral-700 mb-1 block">
-                    Número do Cartão *
-                  </label>
-                  <input
-                    type="text"
-                    required
-                    placeholder="0000 0000 0000 0000"
-                    maxLength={19}
-                    value={cardNumber}
-                    onChange={(e) => {
-                      const v = e.target.value.replace(/\D/g, '').replace(/(.{4})/g, '$1 ').trim()
-                      setCardNumber(v)
-                    }}
-                    className="w-full px-3 py-2 text-xs rounded-xl border border-neutral-300 focus:border-violet-600 bg-white font-mono"
-                  />
-                </div>
-
-                <div>
-                  <label className="text-xs font-semibold text-neutral-700 mb-1 block">
-                    Validade (MM/AA) *
-                  </label>
-                  <input
-                    type="text"
-                    required
-                    placeholder="12/28"
-                    maxLength={5}
-                    value={cardExpiry}
-                    onChange={(e) => {
-                      let v = e.target.value.replace(/\D/g, '')
-                      if (v.length > 2) v = `${v.slice(0, 2)}/${v.slice(2, 4)}`
-                      setCardExpiry(v)
-                    }}
-                    className="w-full px-3 py-2 text-xs rounded-xl border border-neutral-300 focus:border-violet-600 bg-white font-mono"
-                  />
-                </div>
-
-                <div>
-                  <label className="text-xs font-semibold text-neutral-700 mb-1 block">
-                    CVV / Código de Segurança *
-                  </label>
-                  <input
-                    type="password"
-                    required
-                    placeholder="123"
-                    maxLength={4}
-                    value={cardCcv}
-                    onChange={(e) => setCardCcv(e.target.value.replace(/\D/g, ''))}
-                    className="w-full px-3 py-2 text-xs rounded-xl border border-neutral-300 focus:border-violet-600 bg-white font-mono"
-                  />
-                </div>
-
-                <div>
-                  <label className="text-xs font-semibold text-neutral-700 mb-1 block">
-                    CPF ou CNPJ do Titular *
-                  </label>
-                  <input
-                    type="text"
-                    required
-                    placeholder="000.000.000-00"
-                    value={cardCpfCnpj}
-                    onChange={(e) => setCardCpfCnpj(e.target.value)}
-                    className="w-full px-3 py-2 text-xs rounded-xl border border-neutral-300 focus:border-violet-600 bg-white"
-                  />
-                </div>
-
-                <div>
-                  <label className="text-xs font-semibold text-neutral-700 mb-1 block">
-                    Telefone de Contato *
-                  </label>
-                  <input
-                    type="tel"
-                    required
-                    placeholder="(11) 99999-8888"
-                    value={cardPhone || company.whatsapp}
-                    onChange={(e) => setCardPhone(e.target.value)}
-                    className="w-full px-3 py-2 text-xs rounded-xl border border-neutral-300 focus:border-violet-600 bg-white"
-                  />
-                </div>
-
-                <div>
-                  <label className="text-xs font-semibold text-neutral-700 mb-1 block">
-                    CEP do Titular *
-                  </label>
-                  <input
-                    type="text"
-                    required
-                    placeholder="89201-000"
-                    value={cardPostalCode}
-                    onChange={(e) => setCardPostalCode(e.target.value)}
-                    className="w-full px-3 py-2 text-xs rounded-xl border border-neutral-300 focus:border-violet-600 bg-white"
-                  />
-                </div>
-
-                <div>
-                  <label className="text-xs font-semibold text-neutral-700 mb-1 block">
-                    Número do Endereço *
-                  </label>
-                  <input
-                    type="text"
-                    required
-                    placeholder="Ex: 100"
-                    value={cardAddressNumber}
-                    onChange={(e) => setCardAddressNumber(e.target.value)}
-                    className="w-full px-3 py-2 text-xs rounded-xl border border-neutral-300 focus:border-violet-600 bg-white"
-                  />
-                </div>
-              </div>
-
-              <div className="pt-2">
-                <button
-                  type="submit"
-                  disabled={isSubmittingCard}
-                  className="w-full py-3 px-4 rounded-xl bg-violet-600 hover:bg-violet-700 text-white font-semibold text-xs transition-all shadow-xs flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
-                >
-                  {isSubmittingCard ? (
-                    <>
-                      <RotateCw className="w-4 h-4 animate-spin" />
-                      <span>Processando assinatura no Asaas...</span>
-                    </>
-                  ) : (
-                    <>
-                      <ShieldCheck className="w-4 h-4" />
-                      <span>Confirmar Assinatura ({formatMoneyBRL(currentPrice)}/mês)</span>
-                    </>
-                  )}
-                </button>
-              </div>
-
-              <p className="text-[11px] text-neutral-500 text-center flex items-center justify-center gap-1.5 pt-1">
-                <Lock className="w-3.5 h-3.5 text-neutral-400" />
-                <span>Dados de cartão transmitidos de forma segura e tokenizados diretamente pelo Asaas.</span>
-              </p>
-            </form>
-          </div>
-        )}
-
-        {/* Sandbox Test Helper */}
-        {environment === 'SANDBOX' && (
-          <div className="p-4 rounded-2xl bg-amber-50/70 border border-amber-200/80 space-y-2.5">
-            <div className="flex items-center justify-between">
-              <span className="text-xs font-bold text-amber-900 flex items-center gap-1.5">
-                <ShieldCheck className="w-4 h-4 text-amber-700" />
-                <span>Ambiente de Testes Sandbox Ativo</span>
-              </span>
-              <span className="text-[10px] font-bold uppercase tracking-wider bg-amber-100 text-amber-800 px-2 py-0.5 rounded-md">
-                Asaas Sandbox
-              </span>
-            </div>
-
-            <p className="text-[11px] text-amber-800/90 leading-relaxed">
-              Você está testando no ambiente seguro Sandbox da Asaas. Para validar a liberação automática do painel sem precisar abrir o app do banco, você pode simular a confirmação imediata do pagamento abaixo:
+        {/* 3. SUPORTE DISCRETO AO CLIENTE */}
+        <div className="p-5 rounded-3xl bg-white border border-neutral-200/90 shadow-2xs text-center space-y-3 max-w-xl mx-auto">
+          <div className="space-y-1">
+            <h4 className="text-xs font-bold text-neutral-900 uppercase tracking-wider">
+              Precisa de ajuda com seu pagamento?
+            </h4>
+            <p className="text-[11px] text-neutral-500 font-medium">
+              Nossa equipe está disponível para tirar dúvidas e ajudar na ativação da sua empresa.
             </p>
-
-            <button
-              type="button"
-              onClick={handleSimulateSandboxPayment}
-              disabled={isSimulatingSandbox}
-              className="py-2 px-3 rounded-xl bg-amber-600 hover:bg-amber-700 text-white text-xs font-bold flex items-center gap-1.5 shadow-xs transition-colors cursor-pointer disabled:opacity-50"
-            >
-              <CheckCheck className="w-4 h-4" />
-              <span>
-                {isSimulatingSandbox
-                  ? 'Simulando pagamento no Sandbox...'
-                  : 'Simular Confirmação de Pagamento PIX (Sandbox)'}
-              </span>
-            </button>
           </div>
-        )}
 
-        {/* Security & Logout Bar */}
+          <div className="flex flex-col sm:flex-row items-center justify-center gap-3 pt-1">
+            <a
+              href="https://wa.me/5562993449462?text=Ol%C3%A1!%20Preciso%20de%20ajuda%20com%20a%20ativa%C3%A7%C3%A3o%20da%20minha%20DiretoLink."
+              target="_blank"
+              rel="noopener noreferrer"
+              className="w-full sm:w-auto px-4 py-2 rounded-xl bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 text-emerald-800 text-xs font-bold flex items-center justify-center gap-2 transition-colors"
+            >
+              <MessageCircle className="w-4 h-4 text-emerald-600" />
+              <span>WhatsApp: (62) 99344-9462</span>
+            </a>
+
+            <a
+              href="mailto:oficialdiretolink@gmail.com"
+              className="w-full sm:w-auto px-4 py-2 rounded-xl bg-violet-50 hover:bg-violet-100 border border-violet-200 text-violet-800 text-xs font-bold flex items-center justify-center gap-2 transition-colors"
+            >
+              <Mail className="w-4 h-4 text-violet-600" />
+              <span>E-mail: oficialdiretolink@gmail.com</span>
+            </a>
+          </div>
+        </div>
+
+        {/* Sair da conta */}
         <div className="text-center pt-2 pb-6 space-y-2">
           <p className="text-xs text-neutral-500">
             Deseja utilizar outra conta?{' '}
