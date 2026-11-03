@@ -15,6 +15,7 @@ import {
 import { Company, CompanyProduct } from '@/types/platform'
 import { getPublicTheme } from '@/lib/public-themes'
 import { ProductDetailModal } from './product-detail-modal'
+import { SafeImage } from './safe-image'
 
 interface ProductsSheetProps {
   isOpen: boolean
@@ -318,27 +319,13 @@ export const ProductsSheet: React.FC<ProductsSheetProps> = ({
                     >
                       {/* Foto Ampla: 1:1 no celular à esquerda e 1:1 no desktop no topo */}
                       <div className="w-[136px] h-[136px] min-w-[136px] min-[390px]:w-[148px] min-[390px]:h-[148px] min-[390px]:min-w-[148px] sm:w-full sm:h-auto sm:aspect-square relative overflow-hidden bg-neutral-100 dark:bg-neutral-800 shrink-0 border-b-0 sm:border-b border-black/5 dark:border-white/5">
-                        {itemPhoto ? (
-                          /* eslint-disable-next-line @next/next/no-img-element */
-                          <img
-                            src={itemPhoto}
-                            alt={item.name}
-                            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-                            loading="lazy"
-                            referrerPolicy="no-referrer"
-                          />
-                        ) : (
-                          <div
-                            className="w-full h-full flex flex-col items-center justify-center p-3 text-center"
-                            style={{
-                              backgroundColor: `${primaryColor}14`,
-                              color: primaryColor,
-                            }}
-                          >
-                            <Package className="w-8 h-8 opacity-70 mb-1" />
-                            <span className="text-[10px] font-bold">Produto</span>
-                          </div>
-                        )}
+                        <SafeImage
+                          src={itemPhoto}
+                          alt={item.name}
+                          className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                          placeholderType="product"
+                          fallbackColor={`${primaryColor}14`}
+                        />
 
                         {/* Badge de Promoção */}
                         {hasPromo && (

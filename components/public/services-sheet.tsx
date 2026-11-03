@@ -17,6 +17,7 @@ import {
 import { Company, CompanyService } from '@/types/platform'
 import { normalizePhone } from '@/lib/utils'
 import { getPublicTheme } from '@/lib/public-themes'
+import { SafeImage } from './safe-image'
 
 interface ServicesSheetProps {
   isOpen: boolean
@@ -316,26 +317,13 @@ export const ServicesSheet: React.FC<ServicesSheetProps> = ({
                     >
                       {/* Foto Ampla do Serviço */}
                       <div className="w-full sm:w-36 h-44 sm:h-auto sm:aspect-square rounded-2xl overflow-hidden shrink-0 relative bg-neutral-100 dark:bg-neutral-800 border border-black/5 dark:border-white/5">
-                        {hasPhoto ? (
-                          /* eslint-disable-next-line @next/next/no-img-element */
-                          <img
-                            src={servicePhoto}
-                            alt={srv.name}
-                            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-                            loading="lazy"
-                          />
-                        ) : (
-                          <div
-                            className="w-full h-full flex flex-col items-center justify-center p-3 text-center"
-                            style={{
-                              backgroundColor: `${primaryColor}14`,
-                              color: primaryColor,
-                            }}
-                          >
-                            <Scissors className="w-8 h-8 opacity-70 mb-1" />
-                            <span className="text-[10px] font-bold">Serviço</span>
-                          </div>
-                        )}
+                        <SafeImage
+                          src={servicePhoto}
+                          alt={srv.name}
+                          className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                          placeholderType="service"
+                          fallbackColor={`${primaryColor}14`}
+                        />
 
                         {srv.category && (
                           <span className="absolute top-2 left-2 px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider bg-black/60 backdrop-blur-xs text-white z-10">

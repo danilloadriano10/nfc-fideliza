@@ -23,10 +23,17 @@ export const PainelClientPage: React.FC<PainelClientPageProps> = ({
     let isMounted = true
 
     const fetchCompanyData = async () => {
+      // Se os dados da empresa já vieram do servidor, evita requisição repetida
+      if (initialCompany) {
+        setIsLoading(false)
+        return
+      }
+
       const local = getCompanyBySlug(slug)
       if (local && isMounted) {
         setCompany(local)
         setIsLoading(false)
+        return
       }
 
       try {
@@ -61,7 +68,7 @@ export const PainelClientPage: React.FC<PainelClientPageProps> = ({
       window.removeEventListener(DATA_CHANGE_EVENT, update)
       window.removeEventListener('storage', update)
     }
-  }, [slug])
+  }, [slug, initialCompany])
 
   if (isLoading) {
     return (

@@ -89,10 +89,18 @@ export default async function EmpresaPage({ params, searchParams }: PageProps) {
   const { slug } = await params
   const sp = searchParams ? await searchParams : {}
   const company = await getServerCompanyBySlug(slug)
-  const initialProducts = company ? await getServerProducts(company.id) : []
-  const initialServices = company ? await getServerServices(company.id) : []
-  const initialMenuItems = company ? await getServerMenuItems(company.id) : []
-  const initialExternalLinks = company ? await getServerExternalLinks(company.id) : []
+  const isProductsActive = Boolean(company?.modules?.products)
+  const isServicesActive = Boolean(company?.modules?.services)
+  const isMenuActive = Boolean(company?.modules?.menu)
+
+  const [initialProducts, initialServices, initialMenuItems, initialExternalLinks] = company
+    ? await Promise.all([
+        isProductsActive ? getServerProducts(company.id) : Promise.resolve([]),
+        isServicesActive ? getServerServices(company.id) : Promise.resolve([]),
+        isMenuActive ? getServerMenuItems(company.id) : Promise.resolve([]),
+        getServerExternalLinks(company.id),
+      ])
+    : [[], [], [], []]
 
   const schemaJsonLd = company
     ? {

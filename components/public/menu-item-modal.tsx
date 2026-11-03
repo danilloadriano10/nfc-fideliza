@@ -16,6 +16,7 @@ import {
 } from 'lucide-react'
 import { MenuItem, Company } from '@/types/platform'
 import { getPublicTheme } from '@/lib/public-themes'
+import { SafeImage } from './safe-image'
 
 export interface CartItemOption {
   size?: { name: string; price: number }
@@ -241,30 +242,16 @@ export const MenuItemModal: React.FC<MenuItemModalProps> = ({
       >
         {/* FOTO GRANDE NO TOPO - Cores e iluminação originais, sem filtros ou escurecimento */}
         <div className="relative shrink-0">
-          {item.photoUrl ? (
-            <div className="relative h-72 sm:h-88 md:h-96 w-full bg-neutral-100 dark:bg-neutral-900 overflow-hidden">
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img
-                src={item.photoUrl}
-                alt={item.name}
-                className="w-full h-full object-cover"
-                loading="lazy"
-                referrerPolicy="no-referrer"
-                onError={(e) => {
-                  ;(e.target as HTMLElement).style.display = 'none'
-                }}
-              />
-            </div>
-          ) : (
-            <div
-              className={`h-40 sm:h-48 w-full flex flex-col items-center justify-center ${
-                isDark ? 'bg-neutral-800' : 'bg-neutral-100'
-              }`}
-            >
-              <UtensilsCrossed className="w-10 h-10 opacity-30 text-neutral-400 mb-1" />
-              <span className="text-xs text-neutral-400">Cardápio Digital</span>
-            </div>
-          )}
+          <div className="relative h-72 sm:h-88 md:h-96 w-full bg-neutral-100 dark:bg-neutral-900 overflow-hidden">
+            <SafeImage
+              src={item.photoUrl}
+              alt={item.name}
+              className="w-full h-full object-cover"
+              placeholderType="food"
+              placeholderLabel="Cardápio Digital"
+              priority
+            />
+          </div>
 
           {/* Botão de Fechar visível sobre a foto */}
           <button

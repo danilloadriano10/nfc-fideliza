@@ -620,9 +620,14 @@ export const CompanyPanelView: React.FC<CompanyPanelViewProps> = ({
     })
   }, [company.id])
 
-  // Live polling for requests every 2.5 seconds
+  // Live polling for requests (apenas com aba visível e usuário autenticado)
   useEffect(() => {
+    if (!isAuthenticated) return
+
     const interval = setInterval(async () => {
+      // Evita requisições quando a aba do navegador estiver em segundo plano / celular com tela bloqueada
+      if (typeof document !== 'undefined' && document.hidden) return
+
       try {
         const fresh = await fetchCompanyRequestsFromServer(company.id, 'pending')
         if (Array.isArray(fresh)) {
@@ -631,9 +636,9 @@ export const CompanyPanelView: React.FC<CompanyPanelViewProps> = ({
       } catch (err) {
         console.warn('Silent polling error in CompanyPanelView:', err)
       }
-    }, 2500)
+    }, 3500)
     return () => clearInterval(interval)
-  }, [company.id])
+  }, [company.id, isAuthenticated])
 
   const handleApproveRequest = async (req: PointRequest) => {
     const res = await approvePointRequestOnServerApi(req.id, 'Painel do Estabelecimento')

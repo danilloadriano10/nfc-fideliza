@@ -18,6 +18,7 @@ import {
 import { Company, MenuItem } from '@/types/platform'
 import { getPublicTheme } from '@/lib/public-themes'
 import { CartItem } from './menu-item-modal'
+import { SafeImage } from './safe-image'
 
 export interface MenuCatalogViewProps {
   company: Company
@@ -391,24 +392,12 @@ export const MenuCatalogView: React.FC<MenuCatalogViewProps> = ({
               >
                 {/* 1. FOTO PERFEITAMENTE QUADRADA (1:1) ENCOSTANDO NAS BORDAS ESQUERDA, SUPERIOR E INFERIOR */}
                 <div className="w-[160px] h-[160px] min-w-[160px] min-[390px]:w-[172px] min-[390px]:h-[172px] min-[390px]:min-w-[172px] sm:w-[185px] sm:h-[185px] sm:min-w-[185px] aspect-square shrink-0 relative overflow-hidden bg-neutral-100 dark:bg-neutral-800">
-                  {item.photoUrl ? (
-                    /* eslint-disable-next-line @next/next/no-img-element */
-                    <img
-                      src={item.photoUrl}
-                      alt={item.name}
-                      className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-                      loading="lazy"
-                      referrerPolicy="no-referrer"
-                      onError={(e) => {
-                        ;(e.target as HTMLElement).style.display = 'none'
-                      }}
-                    />
-                  ) : (
-                    <div className="w-full h-full flex flex-col items-center justify-center text-neutral-400 dark:text-neutral-600 p-2 text-center">
-                      <UtensilsCrossed className="w-8 h-8 opacity-40 mb-1" />
-                      <span className="text-[10px] font-medium">Sem foto</span>
-                    </div>
-                  )}
+                  <SafeImage
+                    src={item.photoUrl}
+                    alt={item.name}
+                    className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                    placeholderType="food"
+                  />
 
                   {/* Selos SOBRE a foto no canto superior esquerdo: Mais pedido, Destaque, Novidade */}
                   <div className="absolute top-2 left-2 flex flex-col gap-1 z-10 pointer-events-none items-start">

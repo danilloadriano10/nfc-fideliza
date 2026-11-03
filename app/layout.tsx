@@ -41,7 +41,7 @@ export const metadata: Metadata = {
 export default function RootLayout({children}: {children: React.ReactNode}) {
   return (
     <html lang="pt-BR" suppressHydrationWarning className="w-full max-w-full overflow-x-hidden">
-      <head>
+      <body suppressHydrationWarning className="w-full max-w-full overflow-x-hidden min-h-screen antialiased bg-white text-neutral-900">
         <script
           type="application/ld+json"
           dangerouslySetInnerHTML={{
@@ -133,8 +133,6 @@ export default function RootLayout({children}: {children: React.ReactNode}) {
             `,
           }}
         />
-      </head>
-      <body suppressHydrationWarning className="w-full max-w-full overflow-x-hidden min-h-screen antialiased bg-white text-neutral-900">
         {children}
       </body>
     </html>

@@ -2,6 +2,8 @@
 
 import React, { useState, useEffect, useMemo, useCallback } from 'react'
 import Image from 'next/image'
+import { SafeImage } from '@/components/public/safe-image'
+import { normalizeImageUrl, isImgbbErrorImage } from '@/lib/image-utils'
 import {
   Gift,
   Star,
@@ -1116,10 +1118,10 @@ export const PublicCompanyView: React.FC<PublicCompanyViewProps> = ({
         <div className="relative w-full">
           {/* Foto de Capa Imersiva (Proporção Padrão 2:1, Horizontal e Compacta no Mobile) */}
           <div className="relative w-full aspect-[2/1] bg-neutral-950 overflow-hidden">
-            {company.coverUrl && !coverError ? (
+            {normalizeImageUrl(company.coverUrl) && !coverError ? (
               <>
                 <Image
-                  src={company.coverUrl}
+                  src={normalizeImageUrl(company.coverUrl)!}
                   alt={company.name}
                   fill
                   priority
@@ -1137,6 +1139,12 @@ export const PublicCompanyView: React.FC<PublicCompanyViewProps> = ({
                   sizes="(max-width: 480px) 100vw, 448px"
                   referrerPolicy="no-referrer"
                   unoptimized={Boolean(typeof company.coverUrl === 'string' && company.coverUrl.includes('ibb.co'))}
+                  onLoad={(e) => {
+                    const img = e.currentTarget as HTMLImageElement
+                    if (isImgbbErrorImage(img)) {
+                      setCoverError(true)
+                    }
+                  }}
                   onError={() => setCoverError(true)}
                 />
                 {/* Gradiente concentrado na base da foto para transição suave com o fundo do tema */}
@@ -1383,12 +1391,13 @@ export const PublicCompanyView: React.FC<PublicCompanyViewProps> = ({
                             key={srv.id}
                             icon={
                               srvPhoto ? (
-                                /* eslint-disable-next-line @next/next/no-img-element */
-                                <img
+                                <SafeImage
                                   src={srvPhoto}
                                   alt={srv.name}
                                   className="w-full h-full object-cover rounded-xl"
-                                  loading="lazy"
+                                  placeholderType="service"
+                                  placeholderLabel=""
+                                  fallbackColor={hexToRgba(secondaryColor || primaryColor, isDark ? 0.2 : 0.08)}
                                 />
                               ) : (
                                 <Scissors
@@ -1620,26 +1629,13 @@ export const PublicCompanyView: React.FC<PublicCompanyViewProps> = ({
                     >
                       <div>
                         {/* Foto do Produto - Sem container cinza, aproveitando 100% da largura da coluna com object-contain */}
-                        <div className="relative w-full aspect-square mb-2 flex items-center justify-center overflow-hidden">
-                          {prodPhoto ? (
-                            /* eslint-disable-next-line @next/next/no-img-element */
-                            <img
-                              src={prodPhoto}
-                              alt={prod.name}
-                              className="w-full h-full object-contain"
-                              loading="lazy"
-                              referrerPolicy="no-referrer"
-                            />
-                          ) : (
-                            <div
-                              className={`w-full h-full rounded-2xl flex flex-col items-center justify-center ${
-                                isDark ? 'bg-white/[0.04] text-neutral-500' : 'bg-neutral-100/80 text-neutral-400'
-                              }`}
-                            >
-                              <Package className="w-8 h-8 opacity-40 mb-1" />
-                              <span className="text-[10px] font-medium">Sem foto</span>
-                            </div>
-                          )}
+                        <div className="relative w-full aspect-square mb-2 flex items-center justify-center overflow-hidden rounded-2xl">
+                          <SafeImage
+                            src={prodPhoto}
+                            alt={prod.name}
+                            className="w-full h-full object-contain"
+                            placeholderType="product"
+                          />
 
                           {hasPromo && (
                             <span className="absolute top-1.5 left-1.5 px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider bg-rose-600 text-white shadow-xs z-10">

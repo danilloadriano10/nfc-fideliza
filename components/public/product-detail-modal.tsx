@@ -20,6 +20,7 @@ import {
 import { Company, CompanyProduct } from '@/types/platform'
 import { getPublicTheme } from '@/lib/public-themes'
 import { DeliveryOptionsForm } from './delivery-options-form'
+import { SafeImage } from './safe-image'
 import {
   OrderDeliveryInfo,
   buildProductOrderWhatsAppMessage,
@@ -290,26 +291,15 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
               >
                 {/* Foto Principal do Produto */}
                 <div className="space-y-2">
-                  <div className="relative w-full aspect-square sm:aspect-[4/3] flex items-center justify-center overflow-hidden">
-                    {activePhoto ? (
-                      /* eslint-disable-next-line @next/next/no-img-element */
-                      <img
-                        src={activePhoto}
-                        alt={product.name}
-                        className="w-full h-full object-contain"
-                        loading="lazy"
-                        referrerPolicy="no-referrer"
-                      />
-                    ) : (
-                      <div
-                        className={`w-full h-full rounded-2xl flex flex-col items-center justify-center ${
-                          isDark ? 'bg-white/[0.04] text-neutral-500' : 'bg-neutral-100/80 text-neutral-400'
-                        }`}
-                      >
-                        <Package className="w-12 h-12 opacity-40 mb-1" />
-                        <span className="text-xs font-medium">Sem imagem cadastrada</span>
-                      </div>
-                    )}
+                  <div className="relative w-full aspect-square sm:aspect-[4/3] flex items-center justify-center overflow-hidden rounded-2xl">
+                    <SafeImage
+                      src={activePhoto}
+                      alt={product.name}
+                      className="w-full h-full object-contain"
+                      placeholderType="product"
+                      placeholderLabel="Sem imagem cadastrada"
+                      priority
+                    />
 
                     {/* Badges sobre a foto */}
                     <div className="absolute top-3 left-3 flex flex-wrap gap-1.5 z-10">
@@ -364,12 +354,12 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
                               : 'border-transparent opacity-70 hover:opacity-100'
                           }`}
                         >
-                          {/* eslint-disable-next-line @next/next/no-img-element */}
-                          <img
+                          <SafeImage
                             src={photo}
                             alt={`Foto ${idx + 1}`}
                             className="w-full h-full object-contain"
-                            loading="lazy"
+                            placeholderType="product"
+                            placeholderLabel=""
                           />
                         </button>
                       ))}
@@ -539,20 +529,13 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
                   }`}
                 >
                   <div className="w-14 h-14 rounded-xl overflow-hidden bg-neutral-800 shrink-0 border border-neutral-700/50">
-                    {activePhoto ? (
-                      /* eslint-disable-next-line @next/next/no-img-element */
-                      <img
-                        src={activePhoto}
-                        alt={product.name}
-                        className="w-full h-full object-cover"
-                        loading="lazy"
-                        referrerPolicy="no-referrer"
-                      />
-                    ) : (
-                      <div className="w-full h-full flex items-center justify-center text-neutral-500">
-                        <Package className="w-6 h-6" />
-                      </div>
-                    )}
+                    <SafeImage
+                      src={activePhoto}
+                      alt={product.name}
+                      className="w-full h-full object-cover"
+                      placeholderType="product"
+                      placeholderLabel=""
+                    />
                   </div>
 
                   <div className="flex-1 min-w-0">

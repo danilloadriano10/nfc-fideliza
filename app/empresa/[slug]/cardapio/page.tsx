@@ -56,16 +56,14 @@ export default async function EmpresaCardapioPage({ params, searchParams }: Page
   const { slug } = await params
   const { mesa } = await searchParams
   const company = await getServerCompanyBySlug(slug)
-  const initialProducts = company ? await getServerProducts(company.id) : []
-  const initialServices = company ? await getServerServices(company.id) : []
   const initialMenuItems = company ? await getServerMenuItems(company.id) : []
 
   return (
     <EmpresaClientPage
       slug={slug}
       initialCompany={company}
-      initialProducts={initialProducts}
-      initialServices={initialServices}
+      initialProducts={[]}
+      initialServices={[]}
       initialMenuItems={initialMenuItems}
       initialTableNumber={mesa}
       autoScrollToMenu={true}

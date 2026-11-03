@@ -31,6 +31,7 @@ import {
 } from '@/lib/storage'
 import { normalizePhone } from '@/lib/utils'
 import { getPublicTheme } from '@/lib/public-themes'
+import { SafeImage } from './safe-image'
 
 interface BookingSheetProps {
   isOpen: boolean
@@ -491,27 +492,15 @@ export const BookingSheet: React.FC<BookingSheetProps> = ({
                           }`}
                         >
                           <div className="flex items-center gap-3.5 min-w-0 flex-1">
-                            {srvPhoto ? (
-                              <div className="w-16 h-16 sm:w-18 sm:h-18 rounded-2xl overflow-hidden shrink-0 bg-neutral-100 dark:bg-neutral-800 border border-black/5 dark:border-white/5">
-                                {/* eslint-disable-next-line @next/next/no-img-element */}
-                                <img
-                                  src={srvPhoto}
-                                  alt={srv.name}
-                                  className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-                                  loading="lazy"
-                                />
-                              </div>
-                            ) : (
-                              <div
-                                className="w-16 h-16 sm:w-18 sm:h-18 rounded-2xl flex items-center justify-center shrink-0"
-                                style={{
-                                  backgroundColor: `${primaryColor}18`,
-                                  color: primaryColor,
-                                }}
-                              >
-                                <Scissors className="w-6 h-6 opacity-80" />
-                              </div>
-                            )}
+                            <div className="w-16 h-16 sm:w-18 sm:h-18 rounded-2xl overflow-hidden shrink-0 bg-neutral-100 dark:bg-neutral-800 border border-black/5 dark:border-white/5">
+                              <SafeImage
+                                src={srvPhoto}
+                                alt={srv.name}
+                                className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                                placeholderType="service"
+                                fallbackColor={`${primaryColor}18`}
+                              />
+                            </div>
 
                             <div className="min-w-0 flex-1">
                               {srv.category && (

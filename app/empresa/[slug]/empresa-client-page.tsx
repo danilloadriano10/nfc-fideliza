@@ -44,14 +44,21 @@ export const EmpresaClientPage: React.FC<EmpresaClientPageProps> = ({
     }
 
     const fetchCompanyData = async () => {
-      // 1. Try local storage first
+      // Se a empresa já veio carregada pelo servidor (SSR), não refaz requisição de rede desnecessária no celular
+      if (initialCompany) {
+        setIsLoading(false)
+        return
+      }
+
+      // 1. Tenta recuperar do armazenamento local
       const local = getCompanyBySlug(slug)
       if (local && isMounted) {
         setCompany(local)
         setIsLoading(false)
+        return
       }
 
-      // 2. Query real server API by slug
+      // 2. Consulta API somente se não tiver dados iniciais
       try {
         const res = await fetch(`/api/companies?slug=${encodeURIComponent(slug)}`)
         if (res.ok) {
@@ -97,7 +104,7 @@ export const EmpresaClientPage: React.FC<EmpresaClientPageProps> = ({
       window.removeEventListener(DATA_CHANGE_EVENT, onDataChange)
       window.removeEventListener('storage', onDataChange)
     }
-  }, [slug])
+  }, [slug, initialCompany])
 
   if (isLoading) {
     return (

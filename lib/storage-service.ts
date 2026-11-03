@@ -53,7 +53,8 @@ async function uploadToImgBB(
     throw new Error(`Falha no upload para o ImgBB: ${errorMsg}`)
   }
 
-  const publicUrl = data?.data?.url || data?.data?.display_url
+  // Prioriza o link direto do arquivo na CDN (display_url ou image.url) e nunca a página de visualização web (data.data.url)
+  const publicUrl = data?.data?.display_url || data?.data?.image?.url || data?.data?.url
   console.log(`[ImgBB CDN] Upload com sucesso para ${cleanCompId}/${type}: ${publicUrl}`)
 
   return {
