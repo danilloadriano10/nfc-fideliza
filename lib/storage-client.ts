@@ -67,14 +67,29 @@ export async function compressImageClient(
         ctx.imageSmoothingQuality = 'high'
         ctx.drawImage(img, 0, 0, width, height)
 
-        const outputFormat = file.type === 'image/png' ? 'image/png' : 'image/jpeg'
+        // Verifica suporte nativo a WebP no navegador para máxima compactação sem perda perceptível de qualidade
+        let outputFormat = 'image/jpeg'
+        let ext = '.jpg'
+        try {
+          if (canvas.toDataURL('image/webp').startsWith('data:image/webp')) {
+            outputFormat = 'image/webp'
+            ext = '.webp'
+          } else if (file.type === 'image/png') {
+            outputFormat = 'image/png'
+            ext = '.png'
+          }
+        } catch {
+          outputFormat = file.type === 'image/png' ? 'image/png' : 'image/jpeg'
+          ext = file.type === 'image/png' ? '.png' : '.jpg'
+        }
+
         canvas.toBlob(
           (blob) => {
             if (!blob) {
               resolve(file)
               return
             }
-            const cleanName = file.name.replace(/\.[^/.]+$/, '') + (outputFormat === 'image/png' ? '.png' : '.jpg')
+            const cleanName = file.name.replace(/\.[^/.]+$/, '') + ext
             const compressed = new File([blob], cleanName, {
               type: outputFormat,
               lastModified: Date.now(),
@@ -82,7 +97,7 @@ export async function compressImageClient(
             resolve(compressed)
           },
           outputFormat,
-          quality
+          Math.max(quality, 0.88)
         )
       }
 

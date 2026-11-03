@@ -1379,7 +1379,7 @@ export const PublicCompanyView: React.FC<PublicCompanyViewProps> = ({
 
                     {/* Vitrine de Serviços padronizada no formato horizontal compacto */}
                     <div className="space-y-2.5">
-                      {activeServicesList.slice(0, 4).map((srv) => {
+                      {activeServicesList.slice(0, 4).map((srv, idx) => {
                         const srvPhoto =
                           srv.photoUrl ||
                           (srv as unknown as { imageUrl?: string }).imageUrl ||
@@ -1397,6 +1397,7 @@ export const PublicCompanyView: React.FC<PublicCompanyViewProps> = ({
                                   className="w-full h-full object-cover rounded-xl"
                                   placeholderType="service"
                                   placeholderLabel=""
+                                  priority={idx < 2}
                                   fallbackColor={hexToRgba(secondaryColor || primaryColor, isDark ? 0.2 : 0.08)}
                                 />
                               ) : (
@@ -1607,7 +1608,7 @@ export const PublicCompanyView: React.FC<PublicCompanyViewProps> = ({
 
               {/* Vitrine Visual de Produtos: Cards em Grid de 2 colunas moderno, sem bordas e imagens ampliadas */}
               <div className="grid grid-cols-2 gap-2 sm:gap-3">
-                {displayedVitrineProducts.slice(0, 6).map((prod) => {
+                {displayedVitrineProducts.slice(0, 6).map((prod, idx) => {
                   const isConsult = prod.priceType === 'consult' || prod.price == null
                   const hasPromo = !isConsult && prod.promotionalPrice != null && prod.promotionalPrice > 0
                   const discountPercent =
@@ -1635,6 +1636,7 @@ export const PublicCompanyView: React.FC<PublicCompanyViewProps> = ({
                             alt={prod.name}
                             className="w-full h-full object-contain"
                             placeholderType="product"
+                            priority={idx < 2}
                           />
 
                           {hasPromo && (

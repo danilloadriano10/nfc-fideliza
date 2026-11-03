@@ -39,14 +39,25 @@ export function normalizeImageUrl(url: string | null | undefined): string | null
       return parsed.toString()
     }
 
-    // Se for images.unsplash.com, otimiza para carregamento móvel rápido
-    if (parsed.hostname === 'images.unsplash.com' && !parsed.searchParams.has('auto')) {
+    // Se for images.unsplash.com, otimiza para carregamento móvel rápido mantendo alta nitidez (Retina 800px max)
+    if (parsed.hostname === 'images.unsplash.com') {
       parsed.searchParams.set('auto', 'format')
-      parsed.searchParams.set('q', '75')
-      if (!parsed.searchParams.has('w')) {
-        parsed.searchParams.set('w', '600')
+      const currentW = Number(parsed.searchParams.get('w'))
+      if (!currentW || currentW > 800) {
+        parsed.searchParams.set('w', '800')
+      }
+      if (!parsed.searchParams.has('q')) {
+        parsed.searchParams.set('q', '80')
       }
       return parsed.toString()
+    }
+
+    // Se for Cloudinary CDN, ativa conversão automática para WebP/AVIF e limites inteligentes de resolução
+    if (parsed.hostname.includes('cloudinary.com') && parsed.pathname.includes('/image/upload/')) {
+      if (!parsed.pathname.includes('/f_auto') && !parsed.pathname.includes('/q_auto')) {
+        parsed.pathname = parsed.pathname.replace('/image/upload/', '/image/upload/f_auto,q_auto,w_800,c_limit/')
+        return parsed.toString()
+      }
     }
 
     return parsed.toString()

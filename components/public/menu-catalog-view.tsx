@@ -344,7 +344,7 @@ export const MenuCatalogView: React.FC<MenuCatalogViewProps> = ({
         </div>
       ) : (
         <div className="flex flex-col gap-3.5 sm:gap-4 pt-1 w-full">
-          {filteredItems.map((item) => {
+          {filteredItems.map((item, idx) => {
             const hasPromo =
               item.promotionalPrice != null &&
               typeof item.price === 'number' &&
@@ -397,6 +397,7 @@ export const MenuCatalogView: React.FC<MenuCatalogViewProps> = ({
                     alt={item.name}
                     className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
                     placeholderType="food"
+                    priority={idx < 3}
                   />
 
                   {/* Selos SOBRE a foto no canto superior esquerdo: Mais pedido, Destaque, Novidade */}

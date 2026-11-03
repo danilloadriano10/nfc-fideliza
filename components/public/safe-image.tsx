@@ -112,6 +112,7 @@ export const SafeImage: React.FC<SafeImageProps> = ({
         alt={alt}
         loading={priority ? 'eager' : 'lazy'}
         decoding="async"
+        fetchPriority={priority ? 'high' : 'auto'}
         referrerPolicy="no-referrer"
         onLoad={(e) => {
           if (isImgbbErrorImage(e.currentTarget)) {
