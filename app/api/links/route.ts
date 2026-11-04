@@ -224,7 +224,7 @@ export async function POST(req: NextRequest) {
 }
 
 // ==========================================
-// PUT /api/links (Reordenar ou Alternar Status)
+// PUT /api/links (Editar Link, Reordenar ou Alternar Status)
 // ==========================================
 export async function PUT(req: NextRequest) {
   try {
@@ -265,8 +265,9 @@ export async function PUT(req: NextRequest) {
     }
 
     // Ação 1: Alternar Status Ativo / Inativo
-    if (action === 'toggle' && linkId) {
-      const res = await toggleServerExternalLinkStatus(linkId, realCompany.id)
+    if (action === 'toggle' && (linkId || body.id)) {
+      const targetId = linkId || body.id
+      const res = await toggleServerExternalLinkStatus(targetId, realCompany.id)
       if (!res.success) {
         return NextResponse.json(
           { success: false, error: res.error || 'Erro ao alternar status do link.' },
@@ -288,8 +289,63 @@ export async function PUT(req: NextRequest) {
       return NextResponse.json({ success: true }, { status: 200 })
     }
 
+    // Ação 3: Edição completa do Link (quando enviado via PUT sem action)
+    const targetLinkId = body.id || body.linkId
+    if (targetLinkId || body.label || body.url) {
+      const { label, url, type, description, icon, enabled, order } = body
+
+      if (!label || typeof label !== 'string' || !label.trim()) {
+        return NextResponse.json(
+          { success: false, error: 'O nome exibido do link é obrigatório.' },
+          { status: 400 }
+        )
+      }
+
+      const urlValidation = validateAndNormalizeExternalUrl(url, type as ExternalLinkType)
+      if (!urlValidation.isValid || !urlValidation.normalizedUrl) {
+        return NextResponse.json(
+          { success: false, error: urlValidation.error || 'URL inválida ou insegura.' },
+          { status: 400 }
+        )
+      }
+
+      if (targetLinkId) {
+        const existing = await getServerExternalLinkById(realCompany.id, targetLinkId)
+        if (existing && existing.companyId !== realCompany.id) {
+          return NextResponse.json(
+            { success: false, error: 'Isolamento violado: Link não pertence a esta empresa.' },
+            { status: 403 }
+          )
+        }
+      }
+
+      const linkToSave: CompanyExternalLink = {
+        id: targetLinkId || `link_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
+        companyId: realCompany.id,
+        type: (type as ExternalLinkType) || 'custom',
+        label: label.trim().slice(0, 120),
+        description: description ? String(description).trim().slice(0, 250) : '',
+        url: urlValidation.normalizedUrl,
+        icon: icon && typeof icon === 'string' ? icon.trim() : 'Link2',
+        enabled: enabled !== false,
+        order: typeof order === 'number' ? order : 0,
+        createdAt: body.createdAt || new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      }
+
+      const res = await saveServerExternalLink(linkToSave)
+      if (!res.success || !res.link) {
+        return NextResponse.json(
+          { success: false, error: res.error || 'Erro ao salvar link externo.' },
+          { status: 500 }
+        )
+      }
+
+      return NextResponse.json({ success: true, link: res.link }, { status: 200 })
+    }
+
     return NextResponse.json(
-      { success: false, error: 'Ação não suportada. Use action: "toggle" ou action: "reorder".' },
+      { success: false, error: 'Ação não suportada. Use action: "toggle", action: "reorder" ou dados completos do link.' },
       { status: 400 }
     )
   } catch (error) {
@@ -309,7 +365,7 @@ export async function DELETE(req: NextRequest) {
     const body = await req.json().catch(() => ({}))
     const searchParams = req.nextUrl.searchParams
     const companyId = body.companyId || searchParams.get('companyId')
-    const linkId = body.linkId || searchParams.get('id')
+    const linkId = body.linkId || body.id || searchParams.get('linkId') || searchParams.get('id')
 
     if (!companyId || !linkId) {
       return NextResponse.json(

@@ -51,6 +51,7 @@ import {
   OrderOrigin,
   TableOrderHistoryEvent,
   CompanyCourier,
+  CompanyTableCall,
 } from '@/types/platform'
 import {
   getCompanyTableOrders,
@@ -432,6 +433,7 @@ export const TableOrdersTab: React.FC<TableOrdersTabProps> = ({
   const [viewingReceiptOrder, setViewingReceiptOrder] = useState<TableOrder | null>(null)
   const [deletingOrder, setDeletingOrder] = useState<TableOrder | null>(null)
   const [isDeletingOrder, setIsDeletingOrder] = useState(false)
+  const [tableCalls, setTableCalls] = useState<CompanyTableCall[]>([])
 
   // Configurações da Central de Pedidos
   const [soundAlertEnabled, setSoundAlertEnabled] = useState<boolean>(() => company.soundAlertNewOrders !== false)
@@ -598,6 +600,15 @@ export const TableOrdersTab: React.FC<TableOrdersTabProps> = ({
       if (serverCouriers && Array.isArray(serverCouriers)) {
         setCouriers(serverCouriers)
       }
+
+      fetch(`/api/table-calls?companyId=${company.id}`)
+        .then((res) => res.json())
+        .then((data) => {
+          if (data.success && Array.isArray(data.calls)) {
+            setTableCalls(data.calls.filter((c: CompanyTableCall) => c.status === 'pending'))
+          }
+        })
+        .catch(() => {})
     } catch {
       const local = getCompanyTableOrders(company.id) || []
       setOrders(local.map(normalizeTableOrder))
@@ -608,6 +619,20 @@ export const TableOrdersTab: React.FC<TableOrdersTabProps> = ({
       }
     }
   }, [company.id])
+
+  const handleResolveTableCall = async (callId: string) => {
+    try {
+      await fetch('/api/table-calls', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: callId, companyId: company.id, action: 'resolve' }),
+      })
+      setTableCalls((prev) => prev.filter((c) => c.id !== callId))
+      showToast('Chamado atendido com sucesso!')
+    } catch {
+      setTableCalls((prev) => prev.filter((c) => c.id !== callId))
+    }
+  }
 
   // Polling automático para novos pedidos com respeito a visibilidade e desmontagem
   useEffect(() => {
@@ -649,28 +674,76 @@ export const TableOrdersTab: React.FC<TableOrdersTabProps> = ({
     const nowIso = historyEvent.timestamp
 
     try {
-      const ok = await updateTableOrderStatusOnServerApi(orderId, company.id, nextStatus, historyEvent)
-      if (ok) {
-        setOrders((prev) =>
-          prev.map((o) =>
-            o.id === orderId
-              ? {
-                  ...o,
-                  status: nextStatus,
-                  history: [...(o.history || []), historyEvent],
-                  updatedAt: nowIso,
-                }
-              : o
-          )
-        )
-        const statusLabel = STATUS_META[nextStatus]?.label || nextStatus
-        showToast(`Status atualizado para: ${statusLabel}`)
+      const targetOrder = orders.find((o) => o.id === orderId)
+      const origin = targetOrder ? getOrderOrigin(targetOrder) : 'mesa'
+      const generatedCode =
+        origin === 'entrega' && !targetOrder?.deliveryCode
+          ? Math.floor(1000 + Math.random() * 9000).toString()
+          : targetOrder?.deliveryCode
+
+      if (origin === 'entrega' && generatedCode && targetOrder) {
+        const orderToSave: TableOrder = {
+          ...targetOrder,
+          status: nextStatus,
+          deliveryCode: generatedCode,
+          history: [...(targetOrder.history || []), historyEvent],
+          updatedAt: nowIso,
+        }
+        await updateTableOrderOnServerApi(orderToSave)
+        setOrders((prev) => prev.map((o) => (o.id === orderId ? orderToSave : o)))
       } else {
-        showToast('Erro ao atualizar status', 'error')
+        const ok = await updateTableOrderStatusOnServerApi(orderId, company.id, nextStatus, historyEvent)
+        if (ok) {
+          setOrders((prev) =>
+            prev.map((o) =>
+              o.id === orderId
+                ? {
+                    ...o,
+                    status: nextStatus,
+                    history: [...(o.history || []), historyEvent],
+                    updatedAt: nowIso,
+                  }
+                : o
+            )
+          )
+        }
       }
+      const statusLabel = STATUS_META[nextStatus]?.label || nextStatus
+      showToast(`Status atualizado para: ${statusLabel}`)
     } catch (err) {
       console.error('Error updating status:', err)
       showToast('Erro ao atualizar status', 'error')
+    } finally {
+      setUpdatingId(null)
+    }
+  }
+
+  // Fallback: Confirmar entrega manualmente pelo estabelecimento sem código
+  const handleConfirmDeliveryManual = async (order: TableOrder) => {
+    setUpdatingId(order.id)
+    const nowIso = new Date().toISOString()
+    const historyEvent: TableOrderHistoryEvent = {
+      id: `hist_${Date.now()}_manual_delivery`,
+      timestamp: nowIso,
+      action: 'entregue (confirmação manual)',
+      description: 'Entrega confirmada manualmente pelo estabelecimento (sem código).',
+      performedBy: 'Estabelecimento',
+    }
+
+    const updatedOrder: TableOrder = {
+      ...order,
+      status: 'entregue',
+      history: [...(order.history || []), historyEvent],
+      updatedAt: nowIso,
+    }
+
+    try {
+      await updateTableOrderOnServerApi(updatedOrder)
+      setOrders((prev) => prev.map((o) => (o.id === order.id ? updatedOrder : o)))
+      showToast('Entrega confirmada com sucesso!')
+    } catch {
+      setOrders((prev) => prev.map((o) => (o.id === order.id ? updatedOrder : o)))
+      showToast('Entrega confirmada!')
     } finally {
       setUpdatingId(null)
     }
@@ -940,6 +1013,66 @@ export const TableOrdersTab: React.FC<TableOrdersTabProps> = ({
             </button>
           </div>
         </div>
+
+        {/* BANNER DE CHAMADOS DE MESA (GARÇOM & PEDIDOS DE CONTA) */}
+        {tableCalls.length > 0 && (
+          <div className="space-y-2 animate-in fade-in">
+            {tableCalls.map((call) => (
+              <div
+                key={call.id}
+                className={`p-3.5 sm:p-4 rounded-2xl border flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-md ${
+                  call.type === 'conta'
+                    ? 'bg-gradient-to-r from-amber-50 to-amber-100 border-amber-300'
+                    : 'bg-gradient-to-r from-rose-50 to-rose-100 border-rose-300'
+                }`}
+              >
+                <div className="flex items-center gap-3">
+                  <div
+                    className={`w-10 h-10 rounded-2xl flex items-center justify-center shrink-0 ${
+                      call.type === 'conta'
+                        ? 'bg-amber-500 text-white shadow-amber-500/30'
+                        : 'bg-rose-500 text-white shadow-rose-500/30'
+                    }`}
+                  >
+                    <Bell className="w-5 h-5 animate-bounce" />
+                  </div>
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <span className="font-black text-sm text-neutral-900">
+                        {call.tableNumber}
+                      </span>
+                      <span
+                        className={`px-2.5 py-0.5 rounded-full text-xs font-black uppercase tracking-wider ${
+                          call.type === 'conta'
+                            ? 'bg-amber-200 text-amber-900'
+                            : 'bg-rose-200 text-rose-900'
+                        }`}
+                      >
+                        {call.type === 'conta' ? 'Solicitou a Conta' : 'Chamou o Garçom'}
+                      </span>
+                    </div>
+                    <p className="text-xs text-neutral-600 mt-0.5">
+                      {call.type === 'conta' && call.paymentMethodPreference && (
+                        <span>Forma preferida: <strong>{call.paymentMethodPreference}</strong> • </span>
+                      )}
+                      {call.notes && <span>&quot;{call.notes}&quot; • </span>}
+                      <span className="text-neutral-400 font-mono">{formatOrderTime(call.createdAt)}</span>
+                    </p>
+                  </div>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => handleResolveTableCall(call.id)}
+                  className="px-4 py-2 rounded-xl bg-neutral-900 hover:bg-neutral-800 text-white font-bold text-xs shadow-sm transition-all flex items-center gap-1.5 self-end sm:self-auto cursor-pointer"
+                >
+                  <CheckCircle2 className="w-4 h-4 text-emerald-400" />
+                  <span>Marcar como Atendido</span>
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
 
         {/* 8 INDICADORES PRINCIPAIS DA CENTRAL */}
         <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-2.5 pt-1">
@@ -1587,46 +1720,93 @@ export const TableOrdersTab: React.FC<TableOrdersTabProps> = ({
 
                   {/* SEÇÃO MOTOBOY DO PEDIDO DE ENTREGA */}
                   {origin === 'entrega' && (
-                    <div className="p-3 rounded-2xl bg-indigo-50/60 border border-indigo-200/70 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs">
-                      <div className="flex items-center gap-2.5">
-                        <div className="p-1.5 rounded-lg bg-indigo-100 text-indigo-700">
-                          <Bike className="w-4 h-4" />
-                        </div>
-                        <div>
-                          <span className="font-bold text-[10px] uppercase tracking-wider text-indigo-800 block">
-                            Entregador / Motoboy:
-                          </span>
-                          <span className="font-bold text-neutral-900">
-                            {order.courierName ? order.courierName : 'Nenhum motoboy atribuído'}
-                          </span>
-                          {order.courierPhone && (
-                            <span className="text-neutral-500 text-[11px] ml-1">
-                              ({formatPhone(order.courierPhone)})
+                    <div className="p-3.5 rounded-2xl bg-indigo-50/70 border border-indigo-200/80 space-y-2.5 text-xs">
+                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                        <div className="flex items-center gap-2.5">
+                          <div className="p-1.5 rounded-lg bg-indigo-100 text-indigo-700">
+                            <Bike className="w-4 h-4" />
+                          </div>
+                          <div>
+                            <span className="font-bold text-[10px] uppercase tracking-wider text-indigo-800 block">
+                              Entregador / Motoboy:
                             </span>
+                            <span className="font-bold text-neutral-900">
+                              {order.courierName ? order.courierName : 'Nenhum motoboy atribuído'}
+                            </span>
+                            {order.courierPhone && (
+                              <span className="text-neutral-500 text-[11px] ml-1">
+                                ({formatPhone(order.courierPhone)})
+                              </span>
+                            )}
+                          </div>
+                        </div>
+
+                        <div className="flex items-center gap-2 self-end sm:self-center flex-wrap">
+                          {order.courierPhone ? (
+                            <button
+                              type="button"
+                              onClick={() => handleSendToMotoboyWhatsApp(order)}
+                              className="px-3 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs flex items-center gap-1.5 transition-all shadow-xs cursor-pointer"
+                            >
+                              <MessageCircle className="w-3.5 h-3.5" />
+                              <span>Enviar WhatsApp</span>
+                            </button>
+                          ) : (
+                            <button
+                              type="button"
+                              onClick={() => setManagingOrder(order)}
+                              className="px-3 py-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs flex items-center gap-1.5 transition-all shadow-xs cursor-pointer"
+                            >
+                              <Bike className="w-3.5 h-3.5" />
+                              <span>Chamar Motoboy</span>
+                            </button>
                           )}
                         </div>
                       </div>
 
-                      <div className="flex items-center gap-2 self-end sm:self-center">
-                        {order.courierPhone ? (
+                      {/* Código de Entrega (4 dígitos) e Ações de Entrega */}
+                      <div className="pt-2 border-t border-indigo-200/60 flex flex-wrap items-center justify-between gap-2.5">
+                        <div className="flex items-center gap-2">
+                          <span className="text-[11px] font-bold text-indigo-950 flex items-center gap-1">
+                            <span>🔑 Código de Entrega:</span>
+                          </span>
+                          {order.deliveryCode ? (
+                            <span className="px-2.5 py-1 rounded-xl bg-indigo-900 text-white font-mono font-black text-sm tracking-widest shadow-xs">
+                              {order.deliveryCode}
+                            </span>
+                          ) : (
+                            <span className="text-[11px] text-neutral-500 italic">
+                              (Gerado ao enviar para entrega)
+                            </span>
+                          )}
+                        </div>
+
+                        <div className="flex items-center gap-2 flex-wrap">
                           <button
                             type="button"
-                            onClick={() => handleSendToMotoboyWhatsApp(order)}
-                            className="px-3 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs flex items-center gap-1.5 transition-all shadow-xs cursor-pointer"
+                            onClick={() => {
+                              const url = `${window.location.origin}/entrega/${order.id}`
+                              navigator.clipboard.writeText(url)
+                              showToast('Link do entregador copiado!')
+                            }}
+                            className="px-2.5 py-1 rounded-lg border border-indigo-200 bg-white hover:bg-indigo-50 text-indigo-800 text-[11px] font-bold transition-all shadow-2xs cursor-pointer"
+                            title="Copiar link da rota e confirmação para o motoboy"
                           >
-                            <MessageCircle className="w-3.5 h-3.5" />
-                            <span>Enviar Entrega p/ WhatsApp</span>
+                            Copiar Link do Motoboy
                           </button>
-                        ) : (
-                          <button
-                            type="button"
-                            onClick={() => setManagingOrder(order)}
-                            className="px-3 py-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs flex items-center gap-1.5 transition-all shadow-xs cursor-pointer"
-                          >
-                            <Bike className="w-3.5 h-3.5" />
-                            <span>Chamar Motoboy</span>
-                          </button>
-                        )}
+
+                          {order.status === 'saiu_entrega' && (
+                            <button
+                              type="button"
+                              disabled={updatingId === order.id}
+                              onClick={() => handleConfirmDeliveryManual(order)}
+                              className="px-3 py-1 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-[11px] font-bold transition-all shadow-2xs cursor-pointer disabled:opacity-50"
+                              title="Confirmar entrega sem exigir código do cliente"
+                            >
+                              Confirmar Entrega (Sem Código)
+                            </button>
+                          )}
+                        </div>
                       </div>
                     </div>
                   )}

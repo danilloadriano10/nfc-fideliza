@@ -414,6 +414,12 @@ export function buildCourierDeliveryWhatsAppMessage(options: {
     msg += `\n📝 *OBSERVAÇÕES DA ENTREGA:*\n"${order.notes.trim()}"\n`
   }
 
+  const originUrl = typeof window !== 'undefined' ? window.location.origin : ''
+  if (originUrl) {
+    msg += `\n📲 *LINK DO ENTREGADOR (ROTA & CONFIRMAÇÃO):*\n${originUrl}/entrega/${order.id}\n`
+    msg += `🔑 *CONFIRMAÇÃO:* Ao entregar, solicite o código de 4 dígitos ao cliente e confirme no link acima!\n`
+  }
+
   msg += `\nPor favor, confirme se pode retirar e realizar esta entrega!`
 
   return msg

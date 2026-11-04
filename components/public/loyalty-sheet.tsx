@@ -385,7 +385,7 @@ export const LoyaltySheet: React.FC<LoyaltySheetProps> = ({
                         value={phoneInput || ''}
                         onChange={(e) => setPhoneInput(formatPhone(e.target.value))}
                         placeholder="(62) 99999-9999"
-                        className="w-full pl-9 pr-3 py-3 rounded-xl border border-neutral-300 focus:outline-none focus:ring-2 focus:ring-neutral-900 text-sm font-medium"
+                        className="w-full pl-9 pr-3 py-3 rounded-xl border border-neutral-300 focus:outline-none focus:ring-2 focus:ring-neutral-900 text-sm font-medium bg-white text-neutral-900 placeholder:text-neutral-400"
                       />
                     </div>
                   </div>
@@ -423,7 +423,7 @@ export const LoyaltySheet: React.FC<LoyaltySheetProps> = ({
                         value={nameInput || ''}
                         onChange={(e) => setNameInput(e.target.value)}
                         placeholder="Ex: Maria Silva"
-                        className="w-full pl-9 pr-3 py-3 rounded-xl border border-neutral-300 focus:outline-none focus:ring-2 focus:ring-neutral-900 text-sm"
+                        className="w-full pl-9 pr-3 py-3 rounded-xl border border-neutral-300 focus:outline-none focus:ring-2 focus:ring-neutral-900 text-sm bg-white text-neutral-900 placeholder:text-neutral-400"
                       />
                     </div>
                   </div>
@@ -440,7 +440,7 @@ export const LoyaltySheet: React.FC<LoyaltySheetProps> = ({
                         value={phoneInput || ''}
                         onChange={(e) => setPhoneInput(formatPhone(e.target.value))}
                         placeholder="(62) 99999-9999"
-                        className="w-full pl-9 pr-3 py-3 rounded-xl border border-neutral-300 focus:outline-none focus:ring-2 focus:ring-neutral-900 text-sm"
+                        className="w-full pl-9 pr-3 py-3 rounded-xl border border-neutral-300 focus:outline-none focus:ring-2 focus:ring-neutral-900 text-sm bg-white text-neutral-900 placeholder:text-neutral-400"
                       />
                     </div>
                     <p className="text-[11px] text-neutral-500 mt-1">

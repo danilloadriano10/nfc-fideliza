@@ -556,11 +556,25 @@ export interface TableOrder {
   courierId?: string
   courierName?: string
   courierPhone?: string
+  deliveryCode?: string
   // Histórico de eventos operacionais
   history?: TableOrderHistoryEvent[]
   isManualOrder?: boolean // Pedido lançado manualmente pelo estabelecimento (balcão/telefone)
   createdAt: string
   updatedAt?: string
+}
+
+export interface CompanyTableCall {
+  id: string
+  companyId: string
+  tableId?: string
+  tableNumber: string
+  type: 'garcom' | 'conta'
+  paymentMethodPreference?: string
+  notes?: string
+  status: 'pending' | 'resolved'
+  createdAt: string
+  resolvedAt?: string
 }
 
 // ==========================================
@@ -908,4 +922,51 @@ export function validateAndNormalizeExternalUrl(
     }
   }
 }
+
+// ==========================================
+// 13. ANALYTICS & RELATÓRIOS PROFISSIONAIS
+// ==========================================
+
+export type AnalyticsEventType =
+  | 'PAGE_VIEW'
+  | 'WHATSAPP_CLICK'
+  | 'MAP_CLICK'
+  | 'MENU_CLICK'
+  | 'SCHEDULING_CLICK'
+  | 'PRODUCT_CLICK'
+  | 'SERVICE_CLICK'
+  | 'GOOGLE_REVIEW_CLICK'
+  | 'INSTAGRAM_CLICK'
+  | 'SOCIAL_CLICK'
+  | 'CUSTOM_LINK_CLICK'
+
+export interface DailyCompanyAnalytics {
+  id: string // `${companyId}_${date}`
+  companyId: string
+  date: string // "YYYY-MM-DD"
+  pageViews: number
+  whatsappClicks: number
+  mapClicks: number
+  menuClicks: number
+  schedulingClicks: number
+  productClicks: number
+  serviceClicks: number
+  googleReviewClicks: number
+  instagramClicks: number
+  socialClicks: number
+  customLinkClicks: number
+  totalActions: number
+  updatedAt: string
+}
+
+export type ReportPeriodKey =
+  | 'today'
+  | '7d'
+  | '30d'
+  | 'last_7_days'
+  | 'last_30_days'
+  | 'this_month'
+  | 'last_month'
+  | 'custom'
+
 

@@ -10,6 +10,7 @@ import {
   where,
   runTransaction,
   writeBatch,
+  increment,
 } from 'firebase/firestore'
 import { db } from '@/lib/firebase'
 import {
@@ -32,6 +33,9 @@ import {
   CompanySubscription,
   AsaasWebhookEventLog,
   CompanyExternalLink,
+  DailyCompanyAnalytics,
+  AnalyticsEventType,
+  CompanyTableCall,
 } from '@/types/platform'
 import { normalizePhone } from '@/lib/utils'
 import { hashPassword } from '@/lib/auth-crypto'
@@ -65,10 +69,12 @@ const PROFESSIONALS_COLLECTION = 'professionals'
 const DELETED_COMPANIES_COLLECTION = 'deleted_companies'
 const TABLES_COLLECTION = 'tables'
 const TABLE_ORDERS_COLLECTION = 'tableOrders'
+const TABLE_CALLS_COLLECTION = 'tableCalls'
 const COURIERS_COLLECTION = 'couriers'
 const SUBSCRIPTIONS_COLLECTION = 'subscriptions'
 const ASAAS_WEBHOOK_EVENTS_COLLECTION = 'asaasWebhookEvents'
 const EXTERNAL_LINKS_COLLECTION = 'externalLinks'
+const ANALYTICS_DAILY_COLLECTION = 'analytics_daily'
 
 let migrationPromise: Promise<void> | null = null
 
@@ -218,14 +224,8 @@ export async function ensureFirestoreInitialized(): Promise<void> {
         }
       }
 
-      // 10.6 Migrate Initial Table Orders
-      for (const ord of INITIAL_TABLE_ORDERS) {
-        const ordRef = doc(db, TABLE_ORDERS_COLLECTION, ord.id)
-        const ordDoc = await getDoc(ordRef)
-        if (!ordDoc.exists()) {
-          await setDoc(ordRef, ord)
-        }
-      }
+      // 10.6 Table Orders: No demo orders seeded into production
+
 
       // 11. Mark migration as completed in Firestore
       await setDoc(settingsRef, {
@@ -2354,25 +2354,39 @@ export async function getFirestoreTableOrders(companyId: string): Promise<TableO
     const snap = await getDocs(q)
     const list: TableOrder[] = []
     snap.forEach((d) => {
+      if (d.id.startsWith('order_table_demo_')) return
       const data = d.data() as TableOrder
+      if (data?.id && data.id.startsWith('order_table_demo_')) return
       list.push({
         ...data,
         items: Array.isArray(data?.items) ? data.items : [],
       })
     })
 
-    if (list.length === 0 && companyId) {
-      const initMatch = INITIAL_TABLE_ORDERS.filter((o) => o.companyId === companyId)
-      if (initMatch.length > 0) return initMatch
-    }
-
     return list.sort((a, b) => (b.createdAt || '').localeCompare(a.createdAt || ''))
   } catch (err) {
-    console.warn('Could not read table orders from Firestore (returning initial fallback):', err)
-    if (companyId) {
-      return INITIAL_TABLE_ORDERS.filter((o) => o.companyId === companyId)
+    console.warn('Could not read table orders from Firestore:', err)
+    return []
+  }
+}
+
+export async function getFirestoreTableOrderById(orderId: string): Promise<TableOrder | null> {
+  const cleanId = (orderId || '').trim()
+  if (!cleanId) return null
+  try {
+    await ensureFirestoreInitialized()
+    const docRef = doc(db, TABLE_ORDERS_COLLECTION, cleanId)
+    const snap = await getDoc(docRef)
+    if (!snap.exists()) return null
+    const data = snap.data() as TableOrder
+    return {
+      ...data,
+      items: Array.isArray(data?.items) ? data.items : [],
+      history: Array.isArray(data?.history) ? data.history : [],
     }
-    return INITIAL_TABLE_ORDERS
+  } catch (err) {
+    console.warn('Could not read table order by ID:', err)
+    return null
   }
 }
 
@@ -2500,6 +2514,60 @@ export async function deleteFirestoreTableOrder(
   } catch (err) {
     handleFirestoreError(err, OperationType.DELETE, `${TABLE_ORDERS_COLLECTION}/${cleanId}`)
     return { success: false, error: 'Erro ao excluir pedido.' }
+  }
+}
+
+// ==========================================
+// 13.2 CHAMADOS DE MESA (GARÇOM & CONTA)
+// ==========================================
+
+export async function getFirestoreTableCalls(companyId: string): Promise<CompanyTableCall[]> {
+  try {
+    await ensureFirestoreInitialized()
+    const q = query(collection(db, TABLE_CALLS_COLLECTION), where('companyId', '==', companyId))
+    const snap = await getDocs(q)
+    const list: CompanyTableCall[] = []
+    snap.forEach((d) => {
+      list.push(d.data() as CompanyTableCall)
+    })
+    return list.sort((a, b) => (b.createdAt || '').localeCompare(a.createdAt || ''))
+  } catch (err) {
+    console.warn('Could not read table calls from Firestore:', err)
+    return []
+  }
+}
+
+export async function saveFirestoreTableCall(call: CompanyTableCall): Promise<CompanyTableCall> {
+  await ensureFirestoreInitialized()
+  const cleanId = call.id || `call_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`
+  const toSave: CompanyTableCall = {
+    ...call,
+    id: cleanId,
+    createdAt: call.createdAt || new Date().toISOString(),
+  }
+  const docRef = doc(db, TABLE_CALLS_COLLECTION, cleanId)
+  await setDoc(docRef, JSON.parse(JSON.stringify(toSave)), { merge: true })
+  return toSave
+}
+
+export async function resolveFirestoreTableCall(callId: string, companyId: string): Promise<boolean> {
+  const cleanId = (callId || '').trim()
+  if (!cleanId) return false
+  try {
+    await ensureFirestoreInitialized()
+    const docRef = doc(db, TABLE_CALLS_COLLECTION, cleanId)
+    const snap = await getDoc(docRef)
+    if (!snap.exists()) return false
+    const data = snap.data() as CompanyTableCall
+    if (data.companyId !== companyId) return false
+    await updateDoc(docRef, {
+      status: 'resolved',
+      resolvedAt: new Date().toISOString(),
+    })
+    return true
+  } catch (err) {
+    console.warn('Could not resolve table call:', err)
+    return false
   }
 }
 
@@ -2911,6 +2979,114 @@ export async function saveFirestoreExternalLinksOrder(
     return { success: true }
   } catch (err) {
     handleFirestoreError(err, OperationType.UPDATE, `${EXTERNAL_LINKS_COLLECTION}/batch-order`)
+  }
+}
+
+// ==========================================
+// 13. ANALYTICS & EVENT TRACKING (ATOMIC)
+// ==========================================
+
+export async function recordFirestoreAnalyticsEvent(
+  companyId: string,
+  eventType: AnalyticsEventType,
+  customDate?: string
+): Promise<{ success: boolean; error?: string }> {
+  if (!companyId || !eventType) {
+    return { success: false, error: 'companyId e eventType obrigatórios.' }
+  }
+
+  await ensureFirestoreInitialized()
+  const cleanCompId = companyId.trim()
+  const today = customDate || new Date().toISOString().split('T')[0]
+  const docId = `${cleanCompId}_${today}`
+
+  const fieldMap: Record<AnalyticsEventType, string> = {
+    PAGE_VIEW: 'pageViews',
+    WHATSAPP_CLICK: 'whatsappClicks',
+    MAP_CLICK: 'mapClicks',
+    MENU_CLICK: 'menuClicks',
+    SCHEDULING_CLICK: 'schedulingClicks',
+    PRODUCT_CLICK: 'productClicks',
+    SERVICE_CLICK: 'serviceClicks',
+    GOOGLE_REVIEW_CLICK: 'googleReviewClicks',
+    INSTAGRAM_CLICK: 'instagramClicks',
+    SOCIAL_CLICK: 'socialClicks',
+    CUSTOM_LINK_CLICK: 'customLinkClicks',
+  }
+
+  const targetField = fieldMap[eventType]
+  if (!targetField) {
+    return { success: false, error: `Tipo de evento desconhecido: ${eventType}` }
+  }
+
+  try {
+    const docRef = doc(db, ANALYTICS_DAILY_COLLECTION, docId)
+    const updateData: Record<string, unknown> = {
+      id: docId,
+      companyId: cleanCompId,
+      date: today,
+      [targetField]: increment(1),
+      updatedAt: new Date().toISOString(),
+    }
+
+    if (eventType !== 'PAGE_VIEW') {
+      updateData.totalActions = increment(1)
+    }
+
+    await setDoc(docRef, updateData, { merge: true })
+    return { success: true }
+  } catch (err) {
+    console.warn(`[Analytics] Erro ao gravar evento ${eventType} para ${cleanCompId}:`, err)
+    return { success: false, error: 'Falha ao registrar métrica analítica.' }
+  }
+}
+
+export async function getFirestoreDailyAnalytics(
+  companyId: string,
+  startDate: string,
+  endDate: string
+): Promise<DailyCompanyAnalytics[]> {
+  if (!companyId) return []
+  await ensureFirestoreInitialized()
+  const cleanCompId = companyId.trim()
+
+  try {
+    const colRef = collection(db, ANALYTICS_DAILY_COLLECTION)
+    const q = query(
+      colRef,
+      where('companyId', '==', cleanCompId),
+      where('date', '>=', startDate),
+      where('date', '<=', endDate)
+    )
+
+    const snap = await getDocs(q)
+    const list: DailyCompanyAnalytics[] = []
+    snap.forEach((d) => {
+      const data = d.data()
+      list.push({
+        id: d.id,
+        companyId: data.companyId || cleanCompId,
+        date: data.date || '',
+        pageViews: Number(data.pageViews) || 0,
+        whatsappClicks: Number(data.whatsappClicks) || 0,
+        mapClicks: Number(data.mapClicks) || 0,
+        menuClicks: Number(data.menuClicks) || 0,
+        schedulingClicks: Number(data.schedulingClicks) || 0,
+        productClicks: Number(data.productClicks) || 0,
+        serviceClicks: Number(data.serviceClicks) || 0,
+        googleReviewClicks: Number(data.googleReviewClicks) || 0,
+        instagramClicks: Number(data.instagramClicks) || 0,
+        socialClicks: Number(data.socialClicks) || 0,
+        customLinkClicks: Number(data.customLinkClicks) || 0,
+        totalActions: Number(data.totalActions) || 0,
+        updatedAt: data.updatedAt || new Date().toISOString(),
+      })
+    })
+
+    return list.sort((a, b) => a.date.localeCompare(b.date))
+  } catch (err) {
+    console.warn(`[Analytics] Erro ao ler métricas da empresa ${cleanCompId}:`, err)
+    return []
   }
 }
 

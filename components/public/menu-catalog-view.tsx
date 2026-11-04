@@ -26,6 +26,7 @@ export interface MenuCatalogViewProps {
   cart?: CartItem[]
   onSelectItem: (item: MenuItem) => void
   onOpenCart?: () => void
+  onOpenTracker?: () => void
   tableNumber?: string
   showHeader?: boolean
   showSearch?: boolean
@@ -44,6 +45,7 @@ export const MenuCatalogView: React.FC<MenuCatalogViewProps> = ({
   cart = [],
   onSelectItem,
   onOpenCart,
+  onOpenTracker,
   tableNumber,
   showHeader = true,
   showSearch = true,
@@ -240,16 +242,34 @@ export const MenuCatalogView: React.FC<MenuCatalogViewProps> = ({
             </div>
           </div>
 
-          {totalCartCount > 0 && onOpenCart && (
-            <button
-              type="button"
-              onClick={onOpenCart}
-              className="px-3 py-1.5 rounded-xl bg-teal-600 hover:bg-teal-500 text-white font-bold text-xs flex items-center gap-1.5 shadow-md shadow-teal-600/20 transition-all cursor-pointer shrink-0"
-            >
-              <ShoppingBag className="w-3.5 h-3.5" />
-              <span>Ver Pedido ({totalCartCount})</span>
-            </button>
-          )}
+          <div className="flex items-center gap-2 shrink-0">
+            {onOpenTracker && (
+              <button
+                type="button"
+                onClick={onOpenTracker}
+                className={`px-2.5 py-1.5 rounded-xl border text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer ${
+                  isDark
+                    ? 'border-white/10 text-neutral-300 hover:bg-white/5'
+                    : 'border-neutral-200 text-neutral-700 hover:bg-neutral-100'
+                }`}
+                title="Acompanhar meus pedidos"
+              >
+                <Package className="w-3.5 h-3.5 text-teal-500" />
+                <span className="hidden sm:inline">Acompanhar Pedido</span>
+              </button>
+            )}
+
+            {totalCartCount > 0 && onOpenCart && (
+              <button
+                type="button"
+                onClick={onOpenCart}
+                className="px-3 py-1.5 rounded-xl bg-teal-600 hover:bg-teal-500 text-white font-bold text-xs flex items-center gap-1.5 shadow-md shadow-teal-600/20 transition-all cursor-pointer shrink-0"
+              >
+                <ShoppingBag className="w-3.5 h-3.5" />
+                <span>Ver Carrinho ({totalCartCount})</span>
+              </button>
+            )}
+          </div>
         </div>
       )}
 

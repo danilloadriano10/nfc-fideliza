@@ -162,7 +162,7 @@ export const FeedbackSheet: React.FC<FeedbackSheetProps> = ({
                 value={message || ''}
                 onChange={(e) => setMessage(e.target.value)}
                 placeholder="Conte com detalhes o que podemos melhorar ou o que você mais gostou..."
-                className="w-full p-3 rounded-xl border border-neutral-300 focus:outline-none focus:ring-2 focus:ring-neutral-900 text-sm resize-none"
+                className="w-full p-3 rounded-xl border border-neutral-300 focus:outline-none focus:ring-2 focus:ring-neutral-900 text-sm resize-none bg-white text-neutral-900 placeholder:text-neutral-400"
               />
             </div>
 
@@ -177,7 +177,7 @@ export const FeedbackSheet: React.FC<FeedbackSheetProps> = ({
                   value={name || ''}
                   onChange={(e) => setName(e.target.value)}
                   placeholder="Nome"
-                  className="w-full px-3 py-2 rounded-xl border border-neutral-300 text-xs focus:outline-none"
+                  className="w-full px-3 py-2 rounded-xl border border-neutral-300 text-xs focus:outline-none bg-white text-neutral-900 placeholder:text-neutral-400"
                 />
               </div>
               <div>
@@ -189,7 +189,7 @@ export const FeedbackSheet: React.FC<FeedbackSheetProps> = ({
                   value={phone || ''}
                   onChange={(e) => setPhone(formatPhone(e.target.value))}
                   placeholder="(62) 99999-9999"
-                  className="w-full px-3 py-2 rounded-xl border border-neutral-300 text-xs focus:outline-none"
+                  className="w-full px-3 py-2 rounded-xl border border-neutral-300 text-xs focus:outline-none bg-white text-neutral-900 placeholder:text-neutral-400"
                 />
               </div>
             </div>

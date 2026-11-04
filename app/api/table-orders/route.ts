@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import {
   getServerTableOrders,
+  getServerTableOrderById,
   saveServerTableOrder,
   updateServerTableOrderStatus,
   deleteServerTableOrder,
@@ -15,11 +16,37 @@ export const revalidate = 0
 export async function GET(req: NextRequest) {
   try {
     const searchParams = req.nextUrl.searchParams
+    const orderId = searchParams.get('orderId') || searchParams.get('id')
+
+    // Se estiver buscando um pedido específico (ex: motoboy na entrega ou cliente)
+    if (orderId) {
+      const order = await getServerTableOrderById(orderId)
+      if (!order) {
+        return NextResponse.json({ success: false, error: 'Pedido não encontrado.' }, { status: 404 })
+      }
+      let company = null
+      if (order.companyId) {
+        company = await getServerCompanyById(order.companyId)
+      }
+      return NextResponse.json(
+        {
+          success: true,
+          order: {
+            ...order,
+            items: Array.isArray(order.items) ? order.items : [],
+            history: Array.isArray(order.history) ? order.history : [],
+          },
+          company: company ? { id: company.id, name: company.name, whatsapp: company.whatsapp } : null,
+        },
+        { status: 200 }
+      )
+    }
+
     const companyIdOrSlug = searchParams.get('companyId') || searchParams.get('slug')
 
     if (!companyIdOrSlug) {
       return NextResponse.json(
-        { success: false, error: 'companyId ou slug é obrigatório.' },
+        { success: false, error: 'companyId, slug ou orderId é obrigatório.' },
         { status: 400 }
       )
     }
@@ -100,6 +127,18 @@ export async function POST(req: NextRequest) {
     }
     const targetCompanyId = company.id
 
+    // Idempotency guard: prevent accidental duplicate order creation
+    if (body.id) {
+      const existingOrders = await getServerTableOrders(targetCompanyId)
+      const existing = existingOrders.find((o) => o.id === body.id)
+      if (existing) {
+        return NextResponse.json(
+          { success: true, order: existing, duplicatePrevented: true },
+          { status: 200 }
+        )
+      }
+    }
+
     const resolvedOrigin = (orderType || origin || (deliveryAddress ? 'entrega' : tableNumber ? 'mesa' : 'retirada')) as 'mesa' | 'retirada' | 'entrega'
     const finalTableNumber =
       tableNumber?.trim() ||
@@ -168,6 +207,7 @@ export async function POST(req: NextRequest) {
       courierId: body.courierId || undefined,
       courierName: body.courierName || undefined,
       courierPhone: body.courierPhone || undefined,
+      deliveryCode: body.deliveryCode || undefined,
       history: initialHistory,
       createdAt: body.createdAt || nowIso,
       updatedAt: nowIso,
@@ -191,7 +231,81 @@ export async function PUT(req: NextRequest) {
   let body: any = null
   try {
     body = await req.json()
-    const { id, status, companyId, order, historyEvent } = body || {}
+    const { id, status, companyId, order, historyEvent, action, code } = body || {}
+
+    // Ação Especial: Confirmação de Entrega por Código de 4 Dígitos
+    if (action === 'confirm_delivery_code') {
+      const orderIdToConfirm = id || body.orderId
+      if (!orderIdToConfirm || !code) {
+        return NextResponse.json(
+          { success: false, error: 'ID do pedido e código de 4 dígitos são obrigatórios.' },
+          { status: 400 }
+        )
+      }
+
+      const existing = await getServerTableOrderById(orderIdToConfirm)
+      if (!existing) {
+        return NextResponse.json({ success: false, error: 'Pedido não encontrado.' }, { status: 404 })
+      }
+
+      const enteredCode = String(code).trim()
+      const expectedCode = String(existing.deliveryCode || '').trim()
+
+      if (!expectedCode || enteredCode !== expectedCode) {
+        return NextResponse.json(
+          {
+            success: false,
+            error: 'Código de entrega incorreto. Solicite ao cliente o código de 4 dígitos informado no aplicativo.',
+          },
+          { status: 400 }
+        )
+      }
+
+      const nowIso = new Date().toISOString()
+      const deliveryEvent = {
+        id: `hist_${Date.now()}_delivery_code_verified`,
+        timestamp: nowIso,
+        action: 'entregue (código confirmado)',
+        description: `Entrega confirmada pelo entregador via código de 4 dígitos (${enteredCode}).`,
+        performedBy: existing.courierName ? `Motoboy ${existing.courierName}` : 'Entregador',
+      }
+
+      const updated = await saveServerTableOrder({
+        ...existing,
+        status: 'entregue',
+        history: [...(existing.history || []), deliveryEvent],
+        updatedAt: nowIso,
+      })
+
+      return NextResponse.json({ success: true, order: updated, message: 'Entrega confirmada com sucesso!' }, { status: 200 })
+    }
+
+    // Ação Especial: Confirmação manual de entrega pelo estabelecimento (fallback sem código)
+    if (action === 'confirm_delivery_manual') {
+      const orderIdToConfirm = id || body.orderId
+      const existing = await getServerTableOrderById(orderIdToConfirm)
+      if (!existing) {
+        return NextResponse.json({ success: false, error: 'Pedido não encontrado.' }, { status: 404 })
+      }
+
+      const nowIso = new Date().toISOString()
+      const manualEvent = {
+        id: `hist_${Date.now()}_manual_delivery_confirmed`,
+        timestamp: nowIso,
+        action: 'entregue (confirmação manual)',
+        description: 'Entrega confirmada manualmente pelo estabelecimento (sem código).',
+        performedBy: 'Estabelecimento',
+      }
+
+      const updated = await saveServerTableOrder({
+        ...existing,
+        status: 'entregue',
+        history: [...(existing.history || []), manualEvent],
+        updatedAt: nowIso,
+      })
+
+      return NextResponse.json({ success: true, order: updated }, { status: 200 })
+    }
 
     // Caso 1: Atualização completa do pedido (edição de itens, dados do cliente, motoboy, totais, etc.)
     if (order && order.id) {

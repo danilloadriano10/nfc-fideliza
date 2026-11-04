@@ -17,6 +17,7 @@ import {
   Loader2,
   Sparkles,
   Check,
+  Phone,
 } from 'lucide-react'
 import {
   Company,
@@ -28,8 +29,10 @@ import {
   getCompanyServices,
   getCompanyProfessionals,
   createAppointmentOnServerApi,
+  getCompanyAppointments,
+  fetchCompanyAppointmentsFromServer,
 } from '@/lib/storage'
-import { normalizePhone } from '@/lib/utils'
+import { normalizePhone, formatPhone } from '@/lib/utils'
 import { getPublicTheme } from '@/lib/public-themes'
 import { SafeImage } from './safe-image'
 
@@ -65,6 +68,44 @@ export const BookingSheet: React.FC<BookingSheetProps> = ({
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
   const [createdAppointment, setCreatedAppointment] = useState<Appointment | null>(null)
+
+  // "Ver meus agendamentos" state
+  const [isViewingMyAppointments, setIsViewingMyAppointments] = useState(false)
+  const [lookupPhone, setLookupPhone] = useState('')
+  const [myAppointments, setMyAppointments] = useState<Appointment[]>([])
+  const [isLoadingMyAppointments, setIsLoadingMyAppointments] = useState(false)
+  const [hasSearched, setHasSearched] = useState(false)
+
+  const handleSearchMyAppointments = async (phoneToSearch?: string) => {
+    const raw = phoneToSearch !== undefined ? phoneToSearch : lookupPhone
+    const clean = normalizePhone(raw)
+    if (!clean || clean.length < 8) return
+    setIsLoadingMyAppointments(true)
+    setHasSearched(true)
+    try {
+      const all = await fetchCompanyAppointmentsFromServer(company.id)
+      const filtered = all.filter((a) => {
+        if (a.companyId !== company.id) return false
+        const p1 = normalizePhone(a.customerPhone || '')
+        return p1.includes(clean) || clean.includes(p1)
+      })
+      setMyAppointments(
+        filtered.sort((a, b) => `${b.date} ${b.time}`.localeCompare(`${a.date} ${a.time}`))
+      )
+    } catch {
+      const all = getCompanyAppointments(company.id)
+      const filtered = all.filter((a) => {
+        if (a.companyId !== company.id) return false
+        const p1 = normalizePhone(a.customerPhone || '')
+        return p1.includes(clean) || clean.includes(p1)
+      })
+      setMyAppointments(
+        filtered.sort((a, b) => `${b.date} ${b.time}`.localeCompare(`${a.date} ${a.time}`))
+      )
+    } finally {
+      setIsLoadingMyAppointments(false)
+    }
+  }
 
   // Theme configuration
   const activeTheme = useMemo(
@@ -343,6 +384,27 @@ export const BookingSheet: React.FC<BookingSheetProps> = ({
             <div className="flex items-center gap-2 shrink-0">
               <button
                 type="button"
+                onClick={() => {
+                  const nextState = !isViewingMyAppointments
+                  setIsViewingMyAppointments(nextState)
+                  if (nextState && (customerPhone || lookupPhone)) {
+                    handleSearchMyAppointments(customerPhone || lookupPhone)
+                  }
+                }}
+                className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
+                  isViewingMyAppointments
+                    ? 'bg-neutral-900 text-white dark:bg-white dark:text-neutral-900 shadow-xs'
+                    : isDark
+                    ? 'bg-white/10 hover:bg-white/15 text-white'
+                    : 'bg-neutral-100 hover:bg-neutral-200 text-neutral-800'
+                }`}
+              >
+                <Clock className="w-3.5 h-3.5" />
+                <span>{isViewingMyAppointments ? 'Novo Agendamento' : 'Meus Agendamentos'}</span>
+              </button>
+
+              <button
+                type="button"
                 onClick={onClose}
                 className={`p-2 rounded-xl transition-colors cursor-pointer ${
                   isDark ? 'bg-white/5 hover:bg-white/10 text-neutral-300' : 'bg-neutral-100 hover:bg-neutral-200 text-neutral-700'
@@ -355,7 +417,7 @@ export const BookingSheet: React.FC<BookingSheetProps> = ({
           </div>
 
           {/* Barra de Etapas (Step Progress) */}
-          {step < 5 && (
+          {!isViewingMyAppointments && step < 5 && (
             <div
               className={`px-4 py-2.5 border-b shrink-0 flex items-center gap-2 overflow-x-auto scrollbar-none text-xs font-semibold ${
                 isDark ? 'bg-[#101015] border-white/[0.06]' : 'bg-neutral-50/70 border-neutral-100'
@@ -444,8 +506,188 @@ export const BookingSheet: React.FC<BookingSheetProps> = ({
               </div>
             )}
 
-            {/* ETAPA 1: SERVIÇOS DISPONÍVEIS */}
-            {step === 1 && (
+            {isViewingMyAppointments ? (
+              <div className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h4 className="text-sm sm:text-base font-black">
+                      Consultar Meus Agendamentos
+                    </h4>
+                    <p className={`text-xs ${isDark ? 'text-neutral-400' : 'text-neutral-500'}`}>
+                      Digite seu WhatsApp para ver o histórico e status dos seus agendamentos
+                    </p>
+                  </div>
+                </div>
+
+                {/* Formulário de Busca por Telefone */}
+                <form
+                  onSubmit={(e) => {
+                    e.preventDefault()
+                    handleSearchMyAppointments()
+                  }}
+                  className="flex gap-2"
+                >
+                  <div className="relative flex-1">
+                    <Phone className="w-4 h-4 text-neutral-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                    <input
+                      type="tel"
+                      value={lookupPhone}
+                      onChange={(e) => setLookupPhone(formatPhone(e.target.value))}
+                      placeholder="DDD + Seu WhatsApp (ex: 62999999999)"
+                      required
+                      className="w-full pl-9 pr-3 py-2.5 rounded-xl border border-neutral-300 text-xs sm:text-sm font-medium bg-white text-neutral-900 placeholder:text-neutral-400 focus:outline-none focus:ring-2 focus:ring-violet-500"
+                    />
+                  </div>
+                  <button
+                    type="submit"
+                    disabled={isLoadingMyAppointments}
+                    className="px-4 py-2.5 rounded-xl font-bold text-xs text-white shadow-sm flex items-center gap-1.5 cursor-pointer disabled:opacity-50 shrink-0"
+                    style={{ backgroundColor: primaryColor }}
+                  >
+                    {isLoadingMyAppointments ? (
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                    ) : (
+                      <span>Buscar</span>
+                    )}
+                  </button>
+                </form>
+
+                {/* Lista de Agendamentos */}
+                {isLoadingMyAppointments ? (
+                  <div className="py-12 text-center text-xs text-neutral-400 flex flex-col items-center gap-2">
+                    <Loader2 className="w-6 h-6 animate-spin text-neutral-500" />
+                    <span>Carregando seus agendamentos...</span>
+                  </div>
+                ) : hasSearched && myAppointments.length === 0 ? (
+                  <div
+                    className={`py-12 text-center rounded-2xl border border-dashed space-y-2.5 ${
+                      isDark ? 'border-white/10 text-neutral-400' : 'border-neutral-200 text-neutral-500'
+                    }`}
+                  >
+                    <CalendarIcon className="w-8 h-8 mx-auto opacity-40 text-neutral-400" />
+                    <p className="font-bold text-sm">Nenhum agendamento encontrado</p>
+                    <p className="text-xs max-w-xs mx-auto">
+                      Não encontramos horários agendados para este número de WhatsApp neste estabelecimento.
+                    </p>
+                    <button
+                      type="button"
+                      onClick={() => setIsViewingMyAppointments(false)}
+                      className="px-4 py-2 rounded-xl text-xs font-bold text-white shadow-sm inline-flex items-center gap-1.5 mt-2 cursor-pointer"
+                      style={{ backgroundColor: primaryColor }}
+                    >
+                      <span>Fazer meu primeiro agendamento</span>
+                    </button>
+                  </div>
+                ) : myAppointments.length > 0 ? (
+                  <div className="space-y-3">
+                    <div className="flex items-center justify-between text-xs text-neutral-400 px-1">
+                      <span>{myAppointments.length} {myAppointments.length === 1 ? 'agendamento encontrado' : 'agendamentos encontrados'}:</span>
+                      <button
+                        type="button"
+                        onClick={() => setIsViewingMyAppointments(false)}
+                        className="text-xs font-bold hover:underline"
+                        style={{ color: primaryColor }}
+                      >
+                        + Novo Agendamento
+                      </button>
+                    </div>
+
+                    {myAppointments.map((appt) => {
+                      const [y, m, d] = (appt.date || '').split('-')
+                      const formattedDate = d && m && y ? `${d}/${m}/${y}` : appt.date
+                      const isPending = !appt.status || (appt.status as string) === 'pending' || (appt.status as string) === 'pendente'
+                      const isConfirmed = (appt.status as string) === 'confirmed' || (appt.status as string) === 'confirmado'
+                      const isCompleted = (appt.status as string) === 'completed' || (appt.status as string) === 'concluido'
+
+                      const statusBadge = isConfirmed ? (
+                        <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 border border-emerald-200">
+                          Confirmado
+                        </span>
+                      ) : isPending ? (
+                        <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-100 text-amber-800 border border-amber-200">
+                          Aguardando Confirmação
+                        </span>
+                      ) : isCompleted ? (
+                        <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-blue-100 text-blue-800 border border-blue-200">
+                          Concluído
+                        </span>
+                      ) : (
+                        <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-rose-100 text-rose-800 border border-rose-200">
+                          Cancelado
+                        </span>
+                      )
+
+                      return (
+                        <div
+                          key={appt.id}
+                          className={`p-3.5 sm:p-4 rounded-2xl border transition-all ${
+                            isDark
+                              ? 'bg-[#15151c] border-white/[0.08]'
+                              : 'bg-white border-neutral-200 shadow-2xs'
+                          }`}
+                        >
+                          <div className="flex items-center justify-between gap-2 border-b border-black/5 dark:border-white/5 pb-2.5">
+                            <div>
+                              <span className="text-[10px] font-bold uppercase tracking-wider text-neutral-400 block">
+                                Serviço
+                              </span>
+                              <h5 className="font-black text-sm">{appt.serviceName}</h5>
+                            </div>
+                            <div>{statusBadge}</div>
+                          </div>
+
+                          <div className="grid grid-cols-2 gap-2 pt-2.5 text-xs">
+                            <div>
+                              <span className="text-[10px] font-bold uppercase tracking-wider text-neutral-400 block">
+                                Data & Horário
+                              </span>
+                              <span className="font-bold flex items-center gap-1 mt-0.5">
+                                <Clock className="w-3.5 h-3.5 text-neutral-400" />
+                                {formattedDate} às {appt.time}
+                              </span>
+                            </div>
+                            {appt.professionalName && (
+                              <div>
+                                <span className="text-[10px] font-bold uppercase tracking-wider text-neutral-400 block">
+                                  Profissional
+                                </span>
+                                <span className="font-bold flex items-center gap-1 mt-0.5">
+                                  <User className="w-3.5 h-3.5 text-neutral-400" />
+                                  {appt.professionalName}
+                                </span>
+                              </div>
+                            )}
+                          </div>
+
+                          {appt.servicePrice != null && appt.servicePrice > 0 && (
+                            <div className="mt-2.5 pt-2 border-t border-black/5 dark:border-white/5 flex items-center justify-between text-xs font-mono">
+                              <span className="text-neutral-400">Valor do serviço:</span>
+                              <span className="font-black" style={{ color: priceColor }}>
+                                R$ {appt.servicePrice.toFixed(2).replace('.', ',')}
+                              </span>
+                            </div>
+                          )}
+                        </div>
+                      )
+                    })}
+                  </div>
+                ) : (
+                  <div
+                    className={`py-8 text-center rounded-2xl border border-dashed space-y-2 ${
+                      isDark ? 'border-white/10 text-neutral-400' : 'border-neutral-200 text-neutral-500'
+                    }`}
+                  >
+                    <Phone className="w-6 h-6 mx-auto opacity-40 text-neutral-400" />
+                    <p className="text-xs">
+                      Digite seu WhatsApp acima e clique em &quot;Buscar&quot; para consultar seus horários.
+                    </p>
+                  </div>
+                )}
+              </div>
+            ) : (
+              <>
+                {/* ETAPA 1: SERVIÇOS DISPONÍVEIS */}
+                {step === 1 && (
               <div className="space-y-3.5">
                 <div className="flex items-center justify-between">
                   <div>
@@ -929,6 +1171,8 @@ export const BookingSheet: React.FC<BookingSheetProps> = ({
                 </div>
               </div>
             )}
+            </>
+          )}
           </div>
         </motion.div>
       </div>

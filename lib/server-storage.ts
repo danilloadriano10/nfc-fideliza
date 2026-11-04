@@ -95,6 +95,7 @@ import {
   deleteFirestoreTable,
   toggleFirestoreTableStatus,
   getFirestoreTableOrders,
+  getFirestoreTableOrderById,
   saveFirestoreTableOrder,
   updateFirestoreTableOrderStatus,
   updateFirestoreTableOrderFull,
@@ -116,6 +117,8 @@ import {
   deleteFirestoreExternalLink,
   toggleFirestoreExternalLinkStatus,
   saveFirestoreExternalLinksOrder,
+  recordFirestoreAnalyticsEvent,
+  getFirestoreDailyAnalytics,
   ensureFirestoreInitialized,
 } from './firestore-service'
 
@@ -137,6 +140,8 @@ import {
   CompanyCourier,
   CompanySubscription,
   CompanyExternalLink,
+  DailyCompanyAnalytics,
+  AnalyticsEventType,
 } from '@/types/platform'
 
 // Ensure system migration is initialized on startup
@@ -563,6 +568,10 @@ export async function getServerTableOrders(companyId: string): Promise<TableOrde
   return await getFirestoreTableOrders(companyId)
 }
 
+export async function getServerTableOrderById(orderId: string): Promise<TableOrder | null> {
+  return await getFirestoreTableOrderById(orderId)
+}
+
 export async function saveServerTableOrder(order: TableOrder): Promise<TableOrder> {
   return await saveFirestoreTableOrder(order)
 }
@@ -701,6 +710,26 @@ export async function saveServerExternalLinksOrder(
 ): Promise<{ success: boolean; error?: string }> {
   invalidateServerStorageCache(`links:${companyId}`)
   return await saveFirestoreExternalLinksOrder(companyId, orderedLinkIds)
+}
+
+// ==========================================
+// 13. ANALYTICS & RELATÓRIOS
+// ==========================================
+
+export async function recordServerAnalyticsEvent(
+  companyId: string,
+  eventType: AnalyticsEventType,
+  customDate?: string
+): Promise<{ success: boolean; error?: string }> {
+  return await recordFirestoreAnalyticsEvent(companyId, eventType, customDate)
+}
+
+export async function getServerDailyAnalytics(
+  companyId: string,
+  startDate: string,
+  endDate: string
+): Promise<DailyCompanyAnalytics[]> {
+  return await getFirestoreDailyAnalytics(companyId, startDate, endDate)
 }
 
 

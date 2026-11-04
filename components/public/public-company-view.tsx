@@ -38,6 +38,11 @@ import {
   Pizza,
   Coffee,
   Cake,
+  Bell,
+  CreditCard,
+  X,
+  Banknote,
+  QrCode,
 } from 'lucide-react'
 import {
   Company,
@@ -61,6 +66,7 @@ import { ProductDetailModal } from './product-detail-modal'
 import { MenuItemModal, CartItem } from './menu-item-modal'
 import { MenuCartDrawer } from './menu-cart-drawer'
 import { MenuCatalogView } from './menu-catalog-view'
+import { OrderTrackerSheet } from './order-tracker-sheet'
 import { renderExternalLinkIcon } from '@/components/panel/external-links-tab'
 import {
   getLocalCustomerSession,
@@ -81,6 +87,7 @@ import {
   hexToRgba,
 } from '@/lib/colors'
 import { getPublicTheme } from '@/lib/public-themes'
+import { trackPublicEvent } from '@/lib/analytics-client'
 
 interface PublicCompanyViewProps {
   company: Company
@@ -230,7 +237,17 @@ export const PublicCompanyView: React.FC<PublicCompanyViewProps> = ({
   const [isCartOpen, setIsCartOpen] = useState(false)
   const [cartInitialStep, setCartInitialStep] = useState<'items' | 'delivery'>('items')
   const [coverError, setCoverError] = useState(false)
+  const [isOrderTrackerOpen, setIsOrderTrackerOpen] = useState(false)
   const [copiedLink, setCopiedLink] = useState(false)
+
+  // Estados da Área da Mesa
+  const [isCallingWaiter, setIsCallingWaiter] = useState(false)
+  const [waiterCallFeedback, setWaiterCallFeedback] = useState<string | null>(null)
+  const [isBillModalOpen, setIsBillModalOpen] = useState(false)
+  const [billPaymentMethod, setBillPaymentMethod] = useState<'pix' | 'cartao' | 'dinheiro'>('pix')
+  const [billNotes, setBillNotes] = useState('')
+  const [isSubmittingBill, setIsSubmittingBill] = useState(false)
+  const [billFeedback, setBillFeedback] = useState<string | null>(null)
 
   const [customerSession, setCustomerSession] = useState<{
     phone: string | null
@@ -364,18 +381,50 @@ export const PublicCompanyView: React.FC<PublicCompanyViewProps> = ({
     }
   }, [company.id])
 
-  // Safe external URL opener
+  // Page View analytics tracking
+  useEffect(() => {
+    if (company?.id) {
+      trackPublicEvent(company.id, 'PAGE_VIEW')
+    }
+  }, [company?.id])
+
+  // Safe external URL opener with event tracking
   const handleOpenExternalUrl = useCallback((rawUrl: string, type?: string) => {
     if (!rawUrl) return
     const validation = validateAndNormalizeExternalUrl(rawUrl, type as any)
     if (!validation.isValid || !validation.normalizedUrl) return
     const target = validation.normalizedUrl
+
+    if (company?.id) {
+      if (type === 'whatsapp') {
+        trackPublicEvent(company.id, 'WHATSAPP_CLICK')
+      } else if (type === 'location') {
+        trackPublicEvent(company.id, 'MAP_CLICK')
+      } else if (type === 'menu' || type === 'delivery') {
+        trackPublicEvent(company.id, 'MENU_CLICK')
+      } else if (type === 'appointments') {
+        trackPublicEvent(company.id, 'SCHEDULING_CLICK')
+      } else if (type === 'catalog' || type === 'store') {
+        trackPublicEvent(company.id, 'PRODUCT_CLICK')
+      } else if (type === 'services') {
+        trackPublicEvent(company.id, 'SERVICE_CLICK')
+      } else if (type === 'instagram') {
+        trackPublicEvent(company.id, 'INSTAGRAM_CLICK')
+      } else if (type === 'googleReview') {
+        trackPublicEvent(company.id, 'GOOGLE_REVIEW_CLICK')
+      } else if (['tiktok', 'facebook', 'youtube', 'linkedin', 'twitter'].includes(type || '')) {
+        trackPublicEvent(company.id, 'SOCIAL_CLICK')
+      } else {
+        trackPublicEvent(company.id, 'CUSTOM_LINK_CLICK')
+      }
+    }
+
     if (target.startsWith('tel:') || target.startsWith('mailto:')) {
       window.location.href = target
     } else {
       window.open(target, '_blank', 'noopener,noreferrer')
     }
-  }, [])
+  }, [company?.id])
 
   // Active external links sorted by order
   const activeExternalLinks = useMemo(() => {
@@ -406,16 +455,22 @@ export const PublicCompanyView: React.FC<PublicCompanyViewProps> = ({
 
   // Open Google Review
   const handleGoogleReview = useCallback(() => {
+    if (company?.id) {
+      trackPublicEvent(company.id, 'GOOGLE_REVIEW_CLICK')
+    }
     if (company.googleReviewUrl) {
       window.open(company.googleReviewUrl, '_blank', 'noopener,noreferrer')
     } else {
       const q = encodeURIComponent(`${company.name} avaliações`)
       window.open(`https://www.google.com/search?q=${q}`, '_blank', 'noopener,noreferrer')
     }
-  }, [company.googleReviewUrl, company.name])
+  }, [company.googleReviewUrl, company.name, company?.id])
 
   // Open Menu (External link, Shortcut modal or Scroll to internal cardápio)
   const handleOpenMenu = useCallback(() => {
+    if (company?.id) {
+      trackPublicEvent(company.id, 'MENU_CLICK')
+    }
     if (isExternalMenu && company.menuUrl) {
       window.open(company.menuUrl, '_blank', 'noopener,noreferrer')
     } else if (isMenuShortcutMode) {
@@ -428,10 +483,79 @@ export const PublicCompanyView: React.FC<PublicCompanyViewProps> = ({
         setIsMenuSheetOpen(true)
       }
     }
-  }, [isExternalMenu, company.menuUrl, isMenuShortcutMode, setIsMenuSheetOpen])
+  }, [isExternalMenu, company.menuUrl, company?.id, isMenuShortcutMode, setIsMenuSheetOpen])
+
+  // Chamado de Garçom pela Área da Mesa
+  const handleCallWaiter = async () => {
+    if (!displayTableLabel || isCallingWaiter) return
+    setIsCallingWaiter(true)
+    setWaiterCallFeedback(null)
+    try {
+      const res = await fetch('/api/table-calls', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          companyId: company.id,
+          tableNumber: displayTableLabel,
+          type: 'garcom',
+        }),
+      })
+      const data = await res.json()
+      if (data.success) {
+        setWaiterCallFeedback('Garçom chamado! Nossa equipe já foi notificada.')
+        setTimeout(() => setWaiterCallFeedback(null), 5000)
+      } else {
+        setWaiterCallFeedback('Erro ao chamar o garçom. Tente novamente.')
+      }
+    } catch {
+      setWaiterCallFeedback('Erro ao conectar. Tente novamente.')
+    } finally {
+      setIsCallingWaiter(false)
+    }
+  }
+
+  // Solicitar a Conta pela Área da Mesa
+  const handleRequestBill = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!displayTableLabel || isSubmittingBill) return
+    setIsSubmittingBill(true)
+    try {
+      const res = await fetch('/api/table-calls', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          companyId: company.id,
+          tableNumber: displayTableLabel,
+          type: 'conta',
+          paymentMethodPreference:
+            billPaymentMethod === 'pix'
+              ? 'Pix'
+              : billPaymentMethod === 'cartao'
+              ? 'Cartão'
+              : 'Dinheiro',
+          notes: billNotes,
+        }),
+      })
+      const data = await res.json()
+      if (data.success) {
+        setBillFeedback('Conta solicitada com sucesso! O garçom trará a sua conta.')
+        setTimeout(() => {
+          setIsBillModalOpen(false)
+          setBillFeedback(null)
+        }, 3000)
+      }
+    } catch {
+      setBillFeedback('Erro ao solicitar a conta. Tente novamente.')
+    } finally {
+      setIsSubmittingBill(false)
+    }
+  }
 
   // Open Location
   const handleOpenLocation = useCallback(() => {
+    if (company?.id) {
+      trackPublicEvent(company.id, 'MAP_CLICK')
+    }
     if (company.locationUrl) {
       const raw = company.locationUrl.trim()
       const targetUrl = /^https?:\/\//i.test(raw) ? raw : `https://${raw}`
@@ -440,10 +564,13 @@ export const PublicCompanyView: React.FC<PublicCompanyViewProps> = ({
       const targetUrl = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(company.addressText)}`
       window.open(targetUrl, '_blank', 'noopener,noreferrer')
     }
-  }, [company.locationUrl, company.addressText])
+  }, [company.locationUrl, company.addressText, company?.id])
 
   // Open WhatsApp
   const handleOpenWhatsApp = useCallback(() => {
+    if (company?.id) {
+      trackPublicEvent(company.id, 'WHATSAPP_CLICK')
+    }
     const raw = company.whatsapp || ''
     const phoneClean = raw.replace(/\D/g, '')
     if (phoneClean) {
@@ -455,20 +582,26 @@ export const PublicCompanyView: React.FC<PublicCompanyViewProps> = ({
     } else {
       handleOpenLocation()
     }
-  }, [company.whatsapp, company.name, handleOpenLocation])
+  }, [company.whatsapp, company.name, company?.id, handleOpenLocation])
 
   // Open Instagram
   const handleOpenInstagram = useCallback(() => {
     if (!company.instagram) return
+    if (company?.id) {
+      trackPublicEvent(company.id, 'INSTAGRAM_CLICK')
+    }
     const raw = company.instagram.trim().replace(/^@/, '')
     const targetUrl = /^https?:\/\//i.test(company.instagram.trim())
       ? company.instagram.trim()
       : `https://instagram.com/${raw}`
     window.open(targetUrl, '_blank', 'noopener,noreferrer')
-  }, [company.instagram])
+  }, [company.instagram, company?.id])
 
   // Open External Product Catalog
   const handleOpenCatalogExternal = useCallback(() => {
+    if (company?.id) {
+      trackPublicEvent(company.id, 'PRODUCT_CLICK')
+    }
     if (company.productCatalog?.externalUrl) {
       let raw = company.productCatalog.externalUrl.trim()
       if (!raw.startsWith('http://') && !raw.startsWith('https://')) {
@@ -476,11 +609,35 @@ export const PublicCompanyView: React.FC<PublicCompanyViewProps> = ({
       }
       window.open(raw, '_blank', 'noopener,noreferrer')
     }
-  }, [company.productCatalog])
+  }, [company.productCatalog, company?.id])
+
+  const handleOpenServices = useCallback(() => {
+    if (company?.id) {
+      trackPublicEvent(company.id, 'SERVICE_CLICK')
+    }
+    setIsServicesOpen(true)
+  }, [company?.id])
+
+  const handleOpenProductsSheet = useCallback(() => {
+    if (company?.id) {
+      trackPublicEvent(company.id, 'PRODUCT_CLICK')
+    }
+    setIsProductsSheetOpen(true)
+  }, [company?.id])
+
+  const handleOpenProductDetail = useCallback((prod: CompanyProduct) => {
+    if (company?.id) {
+      trackPublicEvent(company.id, 'PRODUCT_CLICK')
+    }
+    setSelectedProductDetail(prod)
+  }, [company?.id])
 
   // Handler para iniciar o agendamento (DiretoLink ou WhatsApp)
   const handleInitiateBooking = useCallback(
     (service?: CompanyService | null) => {
+      if (company?.id) {
+        trackPublicEvent(company.id, 'SCHEDULING_CLICK')
+      }
       const isWhatsAppMode = company.bookingSettings?.mode === 'whatsapp'
 
       if (isWhatsAppMode) {
@@ -517,6 +674,7 @@ export const PublicCompanyView: React.FC<PublicCompanyViewProps> = ({
       setIsBookingOpen(true)
     },
     [
+      company?.id,
       company.bookingSettings?.mode,
       company.bookingSettings?.whatsappMessageTemplate,
       company.whatsapp,
@@ -1282,6 +1440,105 @@ export const PublicCompanyView: React.FC<PublicCompanyViewProps> = ({
         <div className="px-4 sm:px-5 mt-5 flex-1 flex flex-col space-y-6">
 
           {/* ======================================================= */}
+          {/* ÁREA DA MESA (CONSUMO NO LOCAL)                        */}
+          {/* ======================================================= */}
+          {displayTableLabel && (
+            <div
+              className={`p-4 sm:p-5 rounded-3xl border shadow-xl space-y-3.5 backdrop-blur-xs transition-all ${
+                isDark
+                  ? 'bg-teal-950/30 border-teal-500/40'
+                  : 'bg-teal-50/80 border-teal-200'
+              }`}
+            >
+              <div className="flex items-center justify-between gap-2">
+                <div className="flex items-center gap-2.5">
+                  <div className="w-10 h-10 rounded-2xl bg-teal-600 text-white flex items-center justify-center font-black shadow-md shrink-0">
+                    <UtensilsCrossed className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <div className="flex items-center gap-1.5">
+                      <span className="text-[11px] font-mono font-bold text-teal-600 dark:text-teal-400 uppercase tracking-wider">
+                        Consumo no Local
+                      </span>
+                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-ping" />
+                    </div>
+                    <h3 className={`font-black text-base sm:text-lg ${isDark ? 'text-white' : 'text-neutral-900'}`}>
+                      Você está na {displayTableLabel}
+                    </h3>
+                  </div>
+                </div>
+
+                <span className="px-3 py-1 rounded-full text-xs font-black bg-teal-600 text-white shadow-xs">
+                  {displayTableLabel}
+                </span>
+              </div>
+
+              {waiterCallFeedback && (
+                <div className="p-3 rounded-2xl bg-emerald-50 dark:bg-emerald-950/80 border border-emerald-300 dark:border-emerald-500/50 text-emerald-800 dark:text-emerald-200 text-xs font-bold flex items-center gap-2 animate-in fade-in">
+                  <CheckCircle2 className="w-4 h-4 text-emerald-600 dark:text-emerald-400 shrink-0" />
+                  <span>{waiterCallFeedback}</span>
+                </div>
+              )}
+
+              {/* Grid de 4 Ações Rápidas da Mesa */}
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 pt-1">
+                {/* 1. Fazer Pedido */}
+                <button
+                  type="button"
+                  onClick={handleOpenMenu}
+                  className="p-3 rounded-2xl bg-teal-600 hover:bg-teal-500 text-white flex flex-col items-center justify-center text-center gap-1.5 font-bold text-xs transition-all shadow-md active:scale-95 cursor-pointer"
+                >
+                  <ShoppingBag className="w-4 h-4" />
+                  <span>Fazer Pedido</span>
+                </button>
+
+                {/* 2. Chamar Garçom */}
+                <button
+                  type="button"
+                  disabled={isCallingWaiter}
+                  onClick={handleCallWaiter}
+                  className={`p-3 rounded-2xl flex flex-col items-center justify-center text-center gap-1.5 font-bold text-xs transition-all shadow-xs active:scale-95 cursor-pointer disabled:opacity-50 border ${
+                    isDark
+                      ? 'bg-neutral-800/90 hover:bg-neutral-750 text-white border-neutral-700'
+                      : 'bg-white hover:bg-neutral-100 text-neutral-800 border-neutral-200'
+                  }`}
+                >
+                  <Bell className={`w-4 h-4 text-amber-500 ${isCallingWaiter ? 'animate-spin' : ''}`} />
+                  <span>{isCallingWaiter ? 'Chamando...' : 'Chamar Garçom'}</span>
+                </button>
+
+                {/* 3. Pedir a Conta */}
+                <button
+                  type="button"
+                  onClick={() => setIsBillModalOpen(true)}
+                  className={`p-3 rounded-2xl flex flex-col items-center justify-center text-center gap-1.5 font-bold text-xs transition-all shadow-xs active:scale-95 cursor-pointer border ${
+                    isDark
+                      ? 'bg-neutral-800/90 hover:bg-neutral-750 text-white border-neutral-700'
+                      : 'bg-white hover:bg-neutral-100 text-neutral-800 border-neutral-200'
+                  }`}
+                >
+                  <CreditCard className="w-4 h-4 text-emerald-500" />
+                  <span>Pedir a Conta</span>
+                </button>
+
+                {/* 4. Ver Pedidos da Mesa */}
+                <button
+                  type="button"
+                  onClick={() => setIsOrderTrackerOpen(true)}
+                  className={`p-3 rounded-2xl flex flex-col items-center justify-center text-center gap-1.5 font-bold text-xs transition-all shadow-xs active:scale-95 cursor-pointer border ${
+                    isDark
+                      ? 'bg-neutral-800/90 hover:bg-neutral-750 text-white border-neutral-700'
+                      : 'bg-white hover:bg-neutral-100 text-neutral-800 border-neutral-200'
+                  }`}
+                >
+                  <Clock className="w-4 h-4 text-indigo-500" />
+                  <span>Ver Pedidos</span>
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* ======================================================= */}
           {/* 4. SEÇÕES E CARDS DA PÁGINA PÚBLICA (ORDEM DINÂMICA)     */}
           {/* ======================================================= */}
           {(() => {
@@ -1330,8 +1587,8 @@ export const PublicCompanyView: React.FC<PublicCompanyViewProps> = ({
                     actionText="Ver Serviços"
                     actionIcon={<Scissors className="w-3.5 h-3.5" />}
                     actionVariant="theme"
-                    onAction={() => setIsServicesOpen(true)}
-                    onClick={() => setIsServicesOpen(true)}
+                    onAction={handleOpenServices}
+                    onClick={handleOpenServices}
                     isDark={isDark}
                     cardStyle={themedCardStyle}
                     primaryColor={primaryColor}
@@ -1368,7 +1625,7 @@ export const PublicCompanyView: React.FC<PublicCompanyViewProps> = ({
 
                       <button
                         type="button"
-                        onClick={() => setIsServicesOpen(true)}
+                        onClick={handleOpenServices}
                         className="text-xs font-bold flex items-center gap-0.5 cursor-pointer hover:opacity-80 transition-opacity"
                         style={{ color: primaryColor }}
                       >
@@ -1445,14 +1702,14 @@ export const PublicCompanyView: React.FC<PublicCompanyViewProps> = ({
                               if (activeModules.appointments) {
                                 handleInitiateBooking(srv)
                               } else {
-                                setIsServicesOpen(true)
+                                handleOpenServices()
                               }
                             }}
                             onClick={() => {
                               if (activeModules.appointments) {
                                 handleInitiateBooking(srv)
                               } else {
-                                setIsServicesOpen(true)
+                                handleOpenServices()
                               }
                             }}
                             isDark={isDark}
@@ -1468,7 +1725,7 @@ export const PublicCompanyView: React.FC<PublicCompanyViewProps> = ({
                     {activeServicesList.length > 4 && (
                       <button
                         type="button"
-                        onClick={() => setIsServicesOpen(true)}
+                        onClick={handleOpenServices}
                         className={`w-full py-2.5 rounded-2xl border text-xs font-bold flex items-center justify-center gap-1.5 transition-colors cursor-pointer ${
                           isDark ? 'hover:bg-white/[0.05]' : 'hover:bg-neutral-100'
                         }`}
@@ -1571,7 +1828,7 @@ export const PublicCompanyView: React.FC<PublicCompanyViewProps> = ({
 
                 <button
                   type="button"
-                  onClick={() => setIsProductsSheetOpen(true)}
+                  onClick={handleOpenProductsSheet}
                   className="text-xs font-bold transition-opacity hover:opacity-85 flex items-center gap-0.5 cursor-pointer"
                   style={{ color: primaryColor }}
                 >
@@ -1582,7 +1839,7 @@ export const PublicCompanyView: React.FC<PublicCompanyViewProps> = ({
 
               {/* Filtros de Categoria (se houver mais de uma categoria) */}
               {vitrineCategories.length > 1 && (
-                <div className="flex items-center gap-1.5 overflow-x-auto pb-1 scrollbar-none -mx-1 px-1">
+                <div className="flex items-center gap-2 overflow-x-auto pb-1 no-scrollbar -mx-1 px-1">
                   {vitrineCategories.map((cat) => {
                     const isSelected = selectedVitrineCategory === cat
                     return (
@@ -1625,7 +1882,7 @@ export const PublicCompanyView: React.FC<PublicCompanyViewProps> = ({
                   return (
                     <div
                       key={prod.id}
-                      onClick={() => setSelectedProductDetail(prod)}
+                      onClick={() => handleOpenProductDetail(prod)}
                       className="group flex flex-col justify-between transition-all cursor-pointer relative select-none active:scale-[0.99]"
                     >
                       <div>
@@ -1720,7 +1977,7 @@ export const PublicCompanyView: React.FC<PublicCompanyViewProps> = ({
                             type="button"
                             onClick={(e) => {
                               e.stopPropagation()
-                              setSelectedProductDetail(prod)
+                              handleOpenProductDetail(prod)
                             }}
                             className="flex-1 py-1.5 px-2 rounded-xl text-[11px] sm:text-xs font-bold flex items-center justify-center gap-1 transition-all cursor-pointer shadow-2xs active:scale-[0.98]"
                             style={{
@@ -1767,7 +2024,7 @@ export const PublicCompanyView: React.FC<PublicCompanyViewProps> = ({
               {activeProductsList.length > 2 && (
                 <button
                   type="button"
-                  onClick={() => setIsProductsSheetOpen(true)}
+                  onClick={handleOpenProductsSheet}
                   className={`w-full py-2.5 rounded-2xl border text-xs font-bold flex items-center justify-center gap-1.5 transition-colors cursor-pointer ${
                     isDark ? 'hover:bg-white/[0.05]' : 'hover:bg-neutral-100'
                   }`}
@@ -2072,7 +2329,8 @@ export const PublicCompanyView: React.FC<PublicCompanyViewProps> = ({
               ) : null,
             }
 
-            const externalLinkCards = activeExternalLinks.map((link) => {
+            const externalLinkCardMap: Record<string, React.ReactNode> = {}
+            activeExternalLinks.forEach((link) => {
               const preset = EXTERNAL_LINK_PRESETS.find((p) => p.type === link.type)
               const actionText =
                 link.type === 'menu'
@@ -2097,7 +2355,7 @@ export const PublicCompanyView: React.FC<PublicCompanyViewProps> = ({
                   ? 'Ver Serviços'
                   : 'Acessar'
 
-              return (
+              externalLinkCardMap[link.id] = (
                 <PublicCard
                   key={`ext-link-${link.id}`}
                   icon={
@@ -2127,30 +2385,43 @@ export const PublicCompanyView: React.FC<PublicCompanyViewProps> = ({
               )
             })
 
+            const renderedLinkIds = new Set<string>()
+
+            const renderCardOrLink = (key: string) => {
+              if (sectionElements[key]) {
+                return <React.Fragment key={key}>{sectionElements[key]}</React.Fragment>
+              }
+              if (externalLinkCardMap[key]) {
+                renderedLinkIds.add(key)
+                return <React.Fragment key={key}>{externalLinkCardMap[key]}</React.Fragment>
+              }
+              return null
+            }
+
             if (!isPro) {
               const allowedContactKeys = ['whatsapp', 'instagram', 'location', 'googleReview']
               return (
                 <>
-                  {externalLinkCards}
                   {effectivePageOrder
-                    .filter((key) => allowedContactKeys.includes(key))
-                    .map((sectionKey) => {
-                      const node = sectionElements[sectionKey]
-                      if (!node) return null
-                      return <React.Fragment key={sectionKey}>{node}</React.Fragment>
-                    })}
+                    .filter((key) => allowedContactKeys.includes(key) || externalLinkCardMap[key])
+                    .map((key) => renderCardOrLink(key))}
+                  {activeExternalLinks
+                    .filter((link) => !renderedLinkIds.has(link.id))
+                    .map((link) => (
+                      <React.Fragment key={link.id}>{externalLinkCardMap[link.id]}</React.Fragment>
+                    ))}
                 </>
               )
             }
 
             return (
               <>
-                {externalLinkCards}
-                {effectivePageOrder.map((sectionKey) => {
-                  const node = sectionElements[sectionKey]
-                  if (!node) return null
-                  return <React.Fragment key={sectionKey}>{node}</React.Fragment>
-                })}
+                {effectivePageOrder.map((key) => renderCardOrLink(key))}
+                {activeExternalLinks
+                  .filter((link) => !renderedLinkIds.has(link.id))
+                  .map((link) => (
+                    <React.Fragment key={link.id}>{externalLinkCardMap[link.id]}</React.Fragment>
+                  ))}
               </>
             )
           })()}
@@ -2288,6 +2559,22 @@ export const PublicCompanyView: React.FC<PublicCompanyViewProps> = ({
                   <span className="absolute top-1 right-1 w-2 h-2 rounded-full bg-emerald-500 animate-ping" />
                 )}
                 <span className="text-[9px] font-medium hidden sm:inline">Fidelidade</span>
+              </button>
+            )}
+
+            {activeModules.menu && (
+              <button
+                type="button"
+                onClick={() => setIsOrderTrackerOpen(true)}
+                className={`p-2 sm:p-2.5 rounded-xl transition-colors flex flex-col items-center gap-0.5 cursor-pointer relative ${
+                  isDark
+                    ? 'text-teal-400 hover:text-teal-300 hover:bg-white/[0.05]'
+                    : 'text-teal-600 hover:bg-teal-50'
+                }`}
+                title="Acompanhar Meu Pedido"
+              >
+                <Package className="w-4 h-4" />
+                <span className="text-[9px] font-bold">Meu Pedido</span>
               </button>
             )}
 
@@ -2472,6 +2759,131 @@ export const PublicCompanyView: React.FC<PublicCompanyViewProps> = ({
           onRemoveItem={handleRemoveCartItem}
           onClearCart={handleClearCart}
         />
+
+        {/* Modal de Acompanhamento do Pedido em Tempo Real */}
+        <OrderTrackerSheet
+          isOpen={isOrderTrackerOpen}
+          onClose={() => setIsOrderTrackerOpen(false)}
+          company={company}
+        />
+
+        {/* Modal Pedir a Conta da Mesa */}
+        {isBillModalOpen && (
+          <div className="fixed inset-0 z-50 bg-neutral-950/70 backdrop-blur-xs flex items-center justify-center p-4 animate-in fade-in">
+            <div className="bg-white dark:bg-neutral-900 rounded-3xl max-w-sm w-full p-5 shadow-2xl border border-neutral-200 dark:border-neutral-800 space-y-4 animate-in zoom-in-95">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2.5">
+                  <div className="w-10 h-10 rounded-2xl bg-teal-50 dark:bg-teal-950/50 text-teal-600 dark:text-teal-400 flex items-center justify-center border border-teal-200 dark:border-teal-800">
+                    <CreditCard className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <h3 className="font-black text-base text-neutral-900 dark:text-white">
+                      Pedir a Conta
+                    </h3>
+                    <p className="text-xs text-neutral-500 dark:text-neutral-400">
+                      {displayTableLabel}
+                    </p>
+                  </div>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => setIsBillModalOpen(false)}
+                  className="p-1.5 rounded-xl hover:bg-neutral-100 dark:hover:bg-neutral-800 text-neutral-400 hover:text-neutral-700 dark:hover:text-neutral-200 transition-colors cursor-pointer"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+
+              {billFeedback ? (
+                <div className="p-4 rounded-2xl bg-emerald-50 dark:bg-emerald-950/60 border border-emerald-300 dark:border-emerald-500/50 text-center space-y-2">
+                  <CheckCircle2 className="w-8 h-8 text-emerald-600 dark:text-emerald-400 mx-auto" />
+                  <p className="text-xs font-bold text-emerald-800 dark:text-emerald-200 leading-relaxed">
+                    {billFeedback}
+                  </p>
+                </div>
+              ) : (
+                <form onSubmit={handleRequestBill} className="space-y-3.5">
+                  <div>
+                    <label className="block text-[11px] font-bold text-neutral-600 dark:text-neutral-400 uppercase mb-1.5">
+                      Como pretende pagar?
+                    </label>
+                    <div className="grid grid-cols-3 gap-2">
+                      <button
+                        type="button"
+                        onClick={() => setBillPaymentMethod('pix')}
+                        className={`p-2.5 rounded-xl border flex flex-col items-center gap-1 text-xs font-bold transition-all cursor-pointer ${
+                          billPaymentMethod === 'pix'
+                            ? 'bg-teal-50 dark:bg-teal-950/60 border-teal-500 text-teal-700 dark:text-teal-300 shadow-xs'
+                            : 'bg-neutral-50 dark:bg-neutral-800 border-neutral-200 dark:border-neutral-700 text-neutral-600 dark:text-neutral-400'
+                        }`}
+                      >
+                        <QrCode className="w-4 h-4 text-teal-600" />
+                        <span>Pix</span>
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => setBillPaymentMethod('cartao')}
+                        className={`p-2.5 rounded-xl border flex flex-col items-center gap-1 text-xs font-bold transition-all cursor-pointer ${
+                          billPaymentMethod === 'cartao'
+                            ? 'bg-teal-50 dark:bg-teal-950/60 border-teal-500 text-teal-700 dark:text-teal-300 shadow-xs'
+                            : 'bg-neutral-50 dark:bg-neutral-800 border-neutral-200 dark:border-neutral-700 text-neutral-600 dark:text-neutral-400'
+                        }`}
+                      >
+                        <CreditCard className="w-4 h-4 text-indigo-600" />
+                        <span>Cartão</span>
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => setBillPaymentMethod('dinheiro')}
+                        className={`p-2.5 rounded-xl border flex flex-col items-center gap-1 text-xs font-bold transition-all cursor-pointer ${
+                          billPaymentMethod === 'dinheiro'
+                            ? 'bg-teal-50 dark:bg-teal-950/60 border-teal-500 text-teal-700 dark:text-teal-300 shadow-xs'
+                            : 'bg-neutral-50 dark:bg-neutral-800 border-neutral-200 dark:border-neutral-700 text-neutral-600 dark:text-neutral-400'
+                        }`}
+                      >
+                        <Banknote className="w-4 h-4 text-emerald-600" />
+                        <span>Dinheiro</span>
+                      </button>
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-[11px] font-bold text-neutral-600 dark:text-neutral-400 uppercase mb-1">
+                      Observação ou Troco (Opcional)
+                    </label>
+                    <input
+                      type="text"
+                      value={billNotes}
+                      onChange={(e) => setBillNotes(e.target.value)}
+                      placeholder="Ex: Preciso de troco para R$ 100,00"
+                      className="w-full px-3 py-2 text-xs rounded-xl border border-neutral-300 dark:border-neutral-700 bg-white dark:bg-neutral-800 text-neutral-900 dark:text-white placeholder:text-neutral-400 focus:outline-hidden focus:border-teal-500"
+                    />
+                  </div>
+
+                  <div className="pt-2 flex items-center justify-end gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setIsBillModalOpen(false)}
+                      className="px-3.5 py-2 rounded-xl border border-neutral-200 dark:border-neutral-700 text-neutral-600 dark:text-neutral-400 text-xs font-bold hover:bg-neutral-100 dark:hover:bg-neutral-800 cursor-pointer"
+                    >
+                      Cancelar
+                    </button>
+                    <button
+                      type="submit"
+                      disabled={isSubmittingBill}
+                      className="px-5 py-2 rounded-xl bg-teal-600 hover:bg-teal-500 text-white text-xs font-bold transition-all shadow-md disabled:opacity-50 cursor-pointer"
+                    >
+                      {isSubmittingBill ? 'Solicitando...' : 'Confirmar Pedido da Conta'}
+                    </button>
+                  </div>
+                </form>
+              )}
+            </div>
+          </div>
+        )}
 
         {/* Botão Flutuante do Carrinho quando houver itens */}
         {cart.length > 0 && !isCartOpen && (

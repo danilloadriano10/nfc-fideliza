@@ -56,6 +56,7 @@ import {
   Bell,
   Link2,
   CreditCard,
+  BarChart3,
 } from 'lucide-react'
 import confetti from 'canvas-confetti'
 import { BRAND_COLOR_PRESETS, sanitizeHex, getGradientContrastTextColor } from '@/lib/colors'
@@ -69,6 +70,7 @@ import {
   isCompanyPro,
   getCompanyPlan,
   isCompanyActiveOrExempt,
+  CompanyExternalLink,
 } from '@/types/platform'
 import { SubscriptionSection } from './subscription-section'
 import { CompanyActivationView } from './company-activation-view'
@@ -86,6 +88,9 @@ import {
   getCompanyFeedbacks,
   fetchFeedbacksForCompany,
   fetchCompanyCustomersFromServer,
+  getCompanyExternalLinks,
+  fetchCompanyExternalLinksFromServer,
+  toggleCompanyExternalLinkOnServerApi,
   saveCompany,
   saveCompanyLocally,
   getCompanyBySlug,
@@ -113,6 +118,7 @@ import { TableOrdersTab } from './table-orders-tab'
 import { PageThemeSelector } from './page-theme-selector'
 import { CoverAdjustModal } from './cover-adjust-modal'
 import { ExternalLinksTab } from './external-links-tab'
+import { ReportsTab } from './reports-tab'
 
 const PRESET_BANNERS = [
   { label: '☕ Cafeteria / Café', url: '/images/cafe_central_banner_1791003956057.jpg' },
@@ -126,6 +132,7 @@ interface CompanyPanelViewProps {
 
 type TabType =
   | 'dashboard'
+  | 'reports'
   | 'services'
   | 'appointments'
   | 'products'
@@ -190,6 +197,7 @@ export const CompanyPanelView: React.FC<CompanyPanelViewProps> = ({
     if (typeof window !== 'undefined') {
       const urlParams = new URLSearchParams(window.location.search)
       const tabParam = urlParams.get('tab')
+      if (tabParam === 'reports') return 'reports'
       if (tabParam === 'subscription') return 'subscription'
       if (tabParam === 'links') return 'links'
       if (tabParam === 'menu') return 'menu'
@@ -269,9 +277,20 @@ export const CompanyPanelView: React.FC<CompanyPanelViewProps> = ({
   }))
   const [isSaving, setIsSaving] = useState(false)
 
+  // External Links state for public order & resources integration
+  const [externalLinks, setExternalLinks] = useState<CompanyExternalLink[]>(() =>
+    getCompanyExternalLinks(initialCompany.id)
+  )
+
+  useEffect(() => {
+    fetchCompanyExternalLinksFromServer(company.id).then((links) => {
+      if (Array.isArray(links)) setExternalLinks(links)
+    })
+  }, [company.id])
+
   // Public Page Sections / Cards Order State
   const [orderedModuleKeys, setOrderedModuleKeys] = useState<string[]>(() => {
-    const allKnownKeys = [
+    const baseKnownKeys = [
       'whatsapp',
       'services',
       'products',
@@ -285,6 +304,9 @@ export const CompanyPanelView: React.FC<CompanyPanelViewProps> = ({
       'feedback',
       'instagram',
     ]
+    const initialExtKeys = getCompanyExternalLinks(initialCompany.id).map((l) => l.id)
+    const allKnownKeys = [...baseKnownKeys, ...initialExtKeys]
+
     const local = typeof window !== 'undefined' ? getCompanyBySlug(initialCompany.slug) : null
     const source = local || initialCompany
     const saved =
@@ -298,9 +320,9 @@ export const CompanyPanelView: React.FC<CompanyPanelViewProps> = ({
     return [...validSaved, ...missing]
   })
 
-  // Synchronize orderedModuleKeys whenever company updates
+  // Synchronize orderedModuleKeys whenever company or externalLinks update
   useEffect(() => {
-    const allKnownKeys = [
+    const baseKnownKeys = [
       'whatsapp',
       'services',
       'products',
@@ -314,6 +336,9 @@ export const CompanyPanelView: React.FC<CompanyPanelViewProps> = ({
       'feedback',
       'instagram',
     ]
+    const extKeys = externalLinks.map((l) => l.id)
+    const allKnownKeys = [...baseKnownKeys, ...extKeys]
+
     const saved =
       Array.isArray(company.publicSectionsOrder) && company.publicSectionsOrder.length > 0
         ? company.publicSectionsOrder
@@ -325,14 +350,13 @@ export const CompanyPanelView: React.FC<CompanyPanelViewProps> = ({
       const missing = allKnownKeys.filter((k) => !validSaved.includes(k))
       setOrderedModuleKeys([...validSaved, ...missing])
     }
-  }, [company.id, company.cardOrder, company.publicSectionsOrder])
+  }, [company.id, company.cardOrder, company.publicSectionsOrder, externalLinks])
   const [isSavingOrder, setIsSavingOrder] = useState(false)
   const [draggedIndex, setDraggedIndex] = useState<number | null>(null)
   const [dragOverIndex, setDragOverIndex] = useState<number | null>(null)
   const [touchDragIndex, setTouchDragIndex] = useState<number | null>(null)
 
-
-  // Requisitos: Mostrar somente os módulos ativos
+  // Requisitos: Mostrar módulos e links personalizados ativos
   const activeOrderedModules = React.useMemo(() => {
     const activeKeysSet = new Set<string>()
     if (formData.modules?.whatsapp) activeKeysSet.add('whatsapp')
@@ -349,24 +373,46 @@ export const CompanyPanelView: React.FC<CompanyPanelViewProps> = ({
     if (formData.modules?.feedback) activeKeysSet.add('feedback')
     if (formData.modules?.instagram) activeKeysSet.add('instagram')
 
-    const result: typeof ALL_ORDERABLE_MODULES = []
+    // Links personalizados ativos
+    const customItems: Array<{
+      key: string
+      label: string
+      icon: React.ComponentType<{ className?: string }>
+      color: string
+      isCustomLink?: boolean
+      url?: string
+    }> = externalLinks
+      .filter((link) => link.enabled !== false)
+      .map((link) => ({
+        key: link.id,
+        label: link.label,
+        icon: Link2,
+        color: 'text-teal-600 bg-teal-50 border-teal-200',
+        isCustomLink: true,
+        url: link.url,
+      }))
+
+    const allPool = [...ALL_ORDERABLE_MODULES, ...customItems]
+    const allActiveKeysSet = new Set([...activeKeysSet, ...customItems.map((c) => c.key)])
+
+    const result: typeof allPool = []
     orderedModuleKeys.forEach((key) => {
-      if (activeKeysSet.has(key)) {
-        const item = ALL_ORDERABLE_MODULES.find((m) => m.key === key)
+      if (allActiveKeysSet.has(key)) {
+        const item = allPool.find((m) => m.key === key)
         if (item) result.push(item)
       }
     })
 
-    // If any active module is not yet in orderedModuleKeys, append it
-    activeKeysSet.forEach((key) => {
+    // Se algum item ativo não estiver em orderedModuleKeys, adiciona ao final
+    allActiveKeysSet.forEach((key) => {
       if (!result.some((m) => m.key === key)) {
-        const item = ALL_ORDERABLE_MODULES.find((m) => m.key === key)
+        const item = allPool.find((m) => m.key === key)
         if (item) result.push(item)
       }
     })
 
     return result
-  }, [formData.modules, formData.addressText, formData.locationUrl, orderedModuleKeys])
+  }, [formData.modules, formData.addressText, formData.locationUrl, orderedModuleKeys, externalLinks])
 
   const handleMoveModule = (fromIndex: number, toIndex: number) => {
     if (toIndex < 0 || toIndex >= activeOrderedModules.length) return
@@ -977,6 +1023,7 @@ export const CompanyPanelView: React.FC<CompanyPanelViewProps> = ({
           {(isPro
             ? [
                 { id: 'dashboard', label: 'Visão Geral', icon: LayoutDashboard },
+                { id: 'reports', label: 'Relatórios', icon: BarChart3 },
                 { id: 'services', label: 'Serviços', count: servicesCount > 0 ? servicesCount : undefined, icon: Scissors },
                 {
                   id: 'appointments',
@@ -1025,6 +1072,7 @@ export const CompanyPanelView: React.FC<CompanyPanelViewProps> = ({
               ]
             : [
                 { id: 'dashboard', label: 'Visão Geral', icon: LayoutDashboard },
+                { id: 'reports', label: 'Relatórios', icon: BarChart3, badge: 'PRO' },
                 { id: 'settings', label: 'Minha Página', icon: Settings },
                 { id: 'links', label: 'Links', icon: Link2 },
                 { id: 'appearance', label: 'Aparência', icon: Palette },
@@ -1054,7 +1102,7 @@ export const CompanyPanelView: React.FC<CompanyPanelViewProps> = ({
                     setActiveTab(tab.id as TabType)
                   }
                 }}
-                className={`px-3 py-2 rounded-xl text-xs font-semibold flex items-center gap-2 whitespace-nowrap transition-all ${
+                className={`px-3 py-2 rounded-xl text-xs font-semibold flex items-center gap-2 whitespace-nowrap transition-all cursor-pointer ${
                   isActive
                     ? 'bg-violet-600 text-white shadow-xs'
                     : 'text-neutral-600 hover:text-neutral-900 hover:bg-neutral-100/80'
@@ -1062,6 +1110,17 @@ export const CompanyPanelView: React.FC<CompanyPanelViewProps> = ({
               >
                 <Icon className="w-3.5 h-3.5" />
                 <span>{tab.label}</span>
+                {'badge' in tab && tab.badge && (
+                  <span
+                    className={`text-[9px] font-black uppercase px-1.5 py-0.5 rounded-md ${
+                      isActive
+                        ? 'bg-white text-violet-700'
+                        : 'bg-violet-100 text-violet-700 border border-violet-200'
+                    }`}
+                  >
+                    {tab.badge}
+                  </span>
+                )}
                 {'count' in tab && tab.count !== undefined && tab.count > 0 && (
                   <span
                     className={`text-[10px] font-bold px-1.5 py-0.2 rounded-full ${
@@ -1527,7 +1586,7 @@ export const CompanyPanelView: React.FC<CompanyPanelViewProps> = ({
         {/* ============================================== */}
         {/* BLOQUEIO DE SEGURANÇA PARA RECURSOS EXCLUSIVOS PRO */}
         {/* ============================================== */}
-        {!isPro && ['services', 'appointments', 'products', 'menu', 'tables', 'table_orders', 'customers', 'loyalty', 'rewards', 'feedbacks', 'order'].includes(activeTab) && (
+        {!isPro && ['services', 'appointments', 'products', 'menu', 'tables', 'table_orders', 'reports', 'customers', 'loyalty', 'rewards', 'feedbacks', 'order'].includes(activeTab) && (
           <div className="bg-white rounded-3xl border border-neutral-200/80 shadow-sm p-8 text-center max-w-lg mx-auto my-12 space-y-4">
             <div className="w-14 h-14 rounded-2xl bg-amber-50 text-amber-600 flex items-center justify-center mx-auto">
               <Lock className="w-7 h-7" />
@@ -1537,7 +1596,7 @@ export const CompanyPanelView: React.FC<CompanyPanelViewProps> = ({
                 Recurso Exclusivo do Plano PRO
               </h3>
               <p className="text-xs text-neutral-600 leading-relaxed">
-                Este módulo operacional (cardápio, pedidos do salão, mesas, catálogo, agendamento e programa de fidelidade) está disponível exclusivamente para estabelecimentos no <strong>Plano PRO</strong>.
+                Este módulo operacional (relatórios gerenciais, cardápio, pedidos do salão, mesas, catálogo, agendamento e programa de fidelidade) está disponível exclusivamente para estabelecimentos no <strong>Plano PRO</strong>.
               </p>
             </div>
             <div className="pt-2 flex items-center justify-center gap-2">
@@ -1550,6 +1609,13 @@ export const CompanyPanelView: React.FC<CompanyPanelViewProps> = ({
               </button>
             </div>
           </div>
+        )}
+
+        {/* ============================================== */}
+        {/* TAB 1.4: RELATÓRIOS (EXCLUSIVO PRO) */}
+        {/* ============================================== */}
+        {activeTab === 'reports' && isPro && (
+          <ReportsTab company={company} />
         )}
 
         {/* ============================================== */}
@@ -3212,6 +3278,72 @@ export const CompanyPanelView: React.FC<CompanyPanelViewProps> = ({
                 ))}
               </div>
 
+              {/* Links Personalizados Integrados aos Recursos */}
+              {externalLinks.length > 0 && (
+                <div className="pt-4 border-t border-neutral-100 space-y-2.5">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <span className="text-xs font-bold text-neutral-800 uppercase tracking-wider block">
+                        Links Personalizados ({externalLinks.length})
+                      </span>
+                      <p className="text-[11px] text-neutral-500">
+                        Ative ou desative links diretamente aqui ou gerencie-os na aba de Links.
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setActiveTab('links')}
+                      className="text-xs font-bold text-violet-600 hover:text-violet-700 flex items-center gap-1 cursor-pointer"
+                    >
+                      <Link2 className="w-3.5 h-3.5" />
+                      <span>Gerenciar Links</span>
+                    </button>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                    {externalLinks.map((link) => {
+                      const isEnabled = link.enabled !== false
+                      return (
+                        <label
+                          key={link.id}
+                          className={`flex items-center justify-between p-3 rounded-xl border cursor-pointer transition-all ${
+                            isEnabled
+                              ? 'bg-teal-50/80 border-teal-300 shadow-2xs'
+                              : 'bg-neutral-50 border-neutral-200 hover:bg-neutral-100 opacity-60'
+                          }`}
+                        >
+                          <div className="flex items-center gap-2.5 min-w-0 pr-2">
+                            <div className="w-7 h-7 rounded-lg bg-teal-100 text-teal-700 flex items-center justify-center shrink-0">
+                              <Link2 className="w-3.5 h-3.5" />
+                            </div>
+                            <div className="min-w-0">
+                              <span className="text-xs font-bold text-neutral-800 block truncate">
+                                {link.label}
+                              </span>
+                              <span className="text-[10px] text-neutral-400 block truncate font-mono">
+                                {link.url}
+                              </span>
+                            </div>
+                          </div>
+                          <input
+                            type="checkbox"
+                            checked={isEnabled}
+                            onChange={async (e) => {
+                              const newEnabled = e.target.checked
+                              setExternalLinks((prev) =>
+                                prev.map((l) => (l.id === link.id ? { ...l, enabled: newEnabled } : l))
+                              )
+                              await toggleCompanyExternalLinkOnServerApi(link.id, company.id, newEnabled)
+                            }}
+                            className="w-4 h-4 accent-teal-600 rounded shrink-0 cursor-pointer"
+                          />
+                        </label>
+                      )
+                    })}
+                  </div>
+                </div>
+              )}
+
               {/* ======================================================== */}
               {/* SEÇÃO: ORDEM DA PÁGINA PÚBLICA (LOGO ABAIXO DOS RECURSOS) */}
               {/* ======================================================== */}
@@ -3365,11 +3497,18 @@ export const CompanyPanelView: React.FC<CompanyPanelViewProps> = ({
 
                               {/* Rótulo do Módulo */}
                               <div className="min-w-0">
-                                <span className="text-xs sm:text-sm font-bold text-neutral-900 truncate block">
-                                  {item.label}
-                                </span>
-                                <span className="text-[10px] text-neutral-400 block truncate">
-                                  {index === 0 ? '1º card no topo da página pública' : `${index + 1}º card na página pública`}
+                                <div className="flex items-center gap-1.5 flex-wrap">
+                                  <span className="text-xs sm:text-sm font-bold text-neutral-900 truncate">
+                                    {item.label}
+                                  </span>
+                                  {(item as any).isCustomLink && (
+                                    <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-md bg-teal-100 text-teal-800 shrink-0">
+                                      Link Personalizado
+                                    </span>
+                                  )}
+                                </div>
+                                <span className="text-[10px] text-neutral-400 block truncate font-mono">
+                                  {(item as any).url ? (item as any).url : index === 0 ? '1º card no topo da página pública' : `${index + 1}º card na página pública`}
                                 </span>
                               </div>
                             </div>

@@ -258,6 +258,7 @@ export const MenuCartDrawer: React.FC<MenuCartDrawerProps> = ({
     type: 'image' | 'pdf'
   } | null>(null)
   const [receiptUploadError, setReceiptUploadError] = useState<string | null>(null)
+  const [isSubmittingOrder, setIsSubmittingOrder] = useState<boolean>(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
   // Reset or update step when opening
@@ -530,9 +531,32 @@ export const MenuCartDrawer: React.FC<MenuCartDrawerProps> = ({
       })
     }
 
+    if (isSubmittingOrder) return
+    setIsSubmittingOrder(true)
+
+    // Gerar ID estável antes de enviar para evitar duplicidade entre local e servidor
+    const stableOrderId = `ord_table_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`
+
+    // Salvar último pedido no dispositivo do cliente para rastreamento instantâneo
+    if (typeof window !== 'undefined') {
+      try {
+        localStorage.setItem(
+          `diretolink_last_order_${company.id}`,
+          JSON.stringify({
+            id: stableOrderId,
+            timestamp: nowIso,
+            total: totalOrder,
+            customerPhone: deliveryInfo.customerPhone,
+            customerName: deliveryInfo.customerName,
+            status: initialOrderStatus,
+          })
+        )
+      } catch {}
+    }
+
     // Salvar pedido completo na Central de Pedidos da empresa
     saveCompanyTableOrderOnServerApi({
-      id: '',
+      id: stableOrderId,
       companyId: company.id,
       orderType,
       origin: orderType,
@@ -561,7 +585,11 @@ export const MenuCartDrawer: React.FC<MenuCartDrawerProps> = ({
       history: historyEvents,
       status: initialOrderStatus,
       createdAt: nowIso,
-    }).catch((err) => console.error('Erro ao registrar pedido na Central de Pedidos:', err))
+    })
+      .catch((err) => console.error('Erro ao registrar pedido na Central de Pedidos:', err))
+      .finally(() => {
+        setTimeout(() => setIsSubmittingOrder(false), 2000)
+      })
 
     // Montar mensagem detalhada do WhatsApp
     const message = buildMenuOrderWhatsAppMessage({
