@@ -1283,16 +1283,12 @@ export const PublicCompanyView: React.FC<PublicCompanyViewProps> = ({
                   alt={company.name}
                   fill
                   priority
-                  className={
-                    company.coverFit === 'contain'
-                      ? 'object-contain'
-                      : company.coverFit === 'logo'
-                      ? 'object-contain p-3.5 sm:p-5'
-                      : 'object-cover'
-                  }
+                  className="object-cover"
                   style={{
-                    objectPosition: `${company.coverPositionX || 'center'} ${company.coverPositionY || 'center'}`,
-                    transform: company.coverZoom && company.coverZoom !== 1 ? `scale(${company.coverZoom})` : undefined,
+                    objectPosition: `${company.coverPositionX || '50%'} ${company.coverPositionY || '50%'}`,
+                    transform:
+                      company.coverZoom && company.coverZoom > 1 ? `scale(${company.coverZoom})` : undefined,
+                    transformOrigin: `${company.coverPositionX || '50%'} ${company.coverPositionY || '50%'}`,
                   }}
                   sizes="(max-width: 480px) 100vw, 448px"
                   referrerPolicy="no-referrer"

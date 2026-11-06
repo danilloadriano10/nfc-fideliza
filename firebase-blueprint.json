@@ -694,6 +694,42 @@
         "totalAmount": {
           "type": "number"
         },
+        "deliveryAddress": {
+          "type": "string"
+        },
+        "postalCode": {
+          "type": "string"
+        },
+        "street": {
+          "type": "string"
+        },
+        "number": {
+          "type": "string"
+        },
+        "neighborhood": {
+          "type": "string"
+        },
+        "city": {
+          "type": "string"
+        },
+        "state": {
+          "type": "string"
+        },
+        "block": {
+          "type": "string"
+        },
+        "lot": {
+          "type": "string"
+        },
+        "complement": {
+          "type": "string"
+        },
+        "referencePoint": {
+          "type": "string"
+        },
+        "formattedAddress": {
+          "type": "string"
+        },
         "notes": {
           "type": "string",
           "maxLength": 1000
@@ -884,9 +920,109 @@
         "enabled",
         "order"
       ]
+    },
+    "TableCall": {
+      "title": "TableCall",
+      "description": "Waiter call or bill request triggered by dining table customers.",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "maxLength": 128
+        },
+        "companyId": {
+          "type": "string",
+          "maxLength": 128
+        },
+        "tableNumber": {
+          "type": "string",
+          "maxLength": 50
+        },
+        "tableId": {
+          "type": "string",
+          "maxLength": 128
+        },
+        "type": {
+          "type": "string",
+          "enum": ["garcom", "conta"]
+        },
+        "paymentMethodPreference": {
+          "type": "string",
+          "maxLength": 50
+        },
+        "notes": {
+          "type": "string",
+          "maxLength": 500
+        },
+        "status": {
+          "type": "string",
+          "enum": ["pending", "resolved"]
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "resolvedAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "id",
+        "companyId",
+        "tableNumber",
+        "type",
+        "status",
+        "createdAt"
+      ]
+    },
+    "DailyCompanyAnalytics": {
+      "title": "DailyCompanyAnalytics",
+      "description": "Daily aggregated metrics of company page views and action clicks.",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "maxLength": 128
+        },
+        "companyId": {
+          "type": "string",
+          "maxLength": 128
+        },
+        "date": {
+          "type": "string",
+          "maxLength": 20
+        },
+        "pageViews": {
+          "type": "number"
+        },
+        "whatsappClicks": {
+          "type": "number"
+        },
+        "totalActions": {
+          "type": "number"
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "id",
+        "companyId",
+        "date"
+      ]
     }
   },
   "firestore": {
+    "/tableCalls/{callId}": {
+      "schema": "TableCall",
+      "description": "Dining table calls for waiter attention and bill requests."
+    },
+    "/analytics_daily/{docId}": {
+      "schema": "DailyCompanyAnalytics",
+      "description": "Daily metrics for establishment reports."
+    },
     "/externalLinks/{linkId}": {
       "schema": "CompanyExternalLink",
       "description": "External links managed per company for the public page."

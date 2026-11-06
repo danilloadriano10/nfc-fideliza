@@ -20,7 +20,11 @@ import {
   ChevronDown,
 } from 'lucide-react'
 import { TableOrder } from '@/types/platform'
-import { formatMoneyBRL } from '@/lib/order-delivery'
+import {
+  formatMoneyBRL,
+  formatStructuredDeliveryAddress,
+  formatSingleLineAddress,
+} from '@/lib/order-delivery'
 import { formatPhone, getWhatsappLink } from '@/lib/utils'
 
 interface PageProps {
@@ -136,21 +140,44 @@ export default function CourierDeliveryPage({ params }: PageProps) {
   }
 
   const isCompleted = order.status === 'entregue' || order.status === 'finalizado'
-  const fullAddress = [
-    order.deliveryAddress || order.address,
-    order.addressNumber ? `nº ${order.addressNumber}` : '',
-    order.neighborhood ? `- ${order.neighborhood}` : '',
-    order.complement ? `(${order.complement})` : '',
-    order.city,
-  ]
-    .filter(Boolean)
-    .join(' ')
+
+  const structuredAddressText =
+    order.formattedAddress ||
+    formatStructuredDeliveryAddress({
+      postalCode: order.postalCode,
+      street: order.street || order.address,
+      address: order.address || order.deliveryAddress,
+      number: order.number || order.addressNumber,
+      neighborhood: order.neighborhood,
+      city: order.city,
+      state: order.state,
+      block: order.block,
+      lot: order.lot,
+      complement: order.complement,
+      reference: order.reference || order.referencePoint,
+    })
+
+  const singleLineAddress =
+    formatSingleLineAddress({
+      postalCode: order.postalCode,
+      street: order.street || order.address,
+      address: order.address || order.deliveryAddress,
+      number: order.number || order.addressNumber,
+      neighborhood: order.neighborhood,
+      city: order.city,
+      state: order.state,
+      block: order.block,
+      lot: order.lot,
+      complement: order.complement,
+      reference: order.reference || order.referencePoint,
+    }) ||
+    order.deliveryAddress ||
+    order.address ||
+    ''
 
   const mapsUrl =
     order.locationUrl ||
-    `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(
-      fullAddress || order.deliveryAddress || order.address || ''
-    )}`
+    `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(singleLineAddress)}`
 
   return (
     <div className="min-h-screen bg-neutral-950 text-white pb-12">
@@ -313,9 +340,9 @@ export default function CourierDeliveryPage({ params }: PageProps) {
               <span>Endereço de Entrega</span>
             </span>
 
-            <p className="text-sm font-semibold text-white leading-relaxed">
-              {fullAddress || 'Endereço a confirmar com a loja'}
-            </p>
+            <div className="text-sm font-semibold text-white leading-relaxed whitespace-pre-line bg-neutral-950/70 p-3 rounded-2xl border border-neutral-800/80">
+              {structuredAddressText || 'Endereço a confirmar com a loja'}
+            </div>
 
             {order.referencePoint && (
               <p className="text-xs text-neutral-400 bg-neutral-850 p-2 rounded-xl">

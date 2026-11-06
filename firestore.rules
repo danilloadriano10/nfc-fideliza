@@ -101,6 +101,27 @@ service cloud.firestore {
     match /mpWebhookEvents/{eventId} {
       allow read, write: if true;
     }
+
+    // Table Calls: Chamados de mesa gerenciados via API segura /api/table-calls
+    match /tableCalls/{callId} {
+      allow create: if request.resource.data.companyId is string
+                    && request.resource.data.companyId.size() > 0
+                    && request.resource.data.tableNumber is string
+                    && (request.resource.data.type == 'garcom' || request.resource.data.type == 'conta')
+                    && request.resource.data.status == 'pending';
+      allow read: if resource.data.companyId is string
+                  && resource.data.companyId.size() > 0;
+      allow update: if resource.data.companyId is string
+                    && request.resource.data.companyId == resource.data.companyId
+                    && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'resolvedAt']);
+      allow delete: if false;
+    }
+
+    // Analytics Daily: Métricas diárias para relatórios do estabelecimento
+    match /analytics_daily/{docId} {
+      allow read: if true;
+      allow write: if request.resource.data.companyId is string;
+    }
   }
 }
 

@@ -533,6 +533,28 @@ export interface TableOrder {
   complement?: string
   referencePoint?: string
   city?: string
+  // Endereço estruturado e detalhado (CEP, Goiás Qd/Lt, etc)
+  postalCode?: string
+  street?: string
+  number?: string
+  state?: string
+  block?: string // Quadra (Qd.)
+  lot?: string // Lote (Lt.)
+  reference?: string
+  formattedAddress?: string
+  structuredAddress?: {
+    postalCode?: string
+    street?: string
+    number?: string
+    neighborhood?: string
+    city?: string
+    state?: string
+    block?: string
+    lot?: string
+    complement?: string
+    reference?: string
+    formattedAddress?: string
+  }
   locationUrl?: string | null
   // Forma e status do pagamento (independente do status operacional do pedido)
   paymentMethod?: string // 'pix' | 'dinheiro' | 'cartao_debito' | 'cartao_credito' | 'vale_refeicao' | etc.

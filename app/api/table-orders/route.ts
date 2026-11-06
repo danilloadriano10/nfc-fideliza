@@ -99,32 +99,14 @@ export async function POST(req: NextRequest) {
       )
     }
 
-    const company = await getServerCompanyById(companyId)
+    let company = await getServerCompanyById(companyId)
+    if (!company) {
+      company = await getServerCompanyBySlug(companyId)
+    }
     if (!company) {
       return NextResponse.json({ success: false, error: 'Empresa associada não encontrada.' }, { status: 404 })
     }
 
-    if (!isCompanyActiveOrExempt(company)) {
-      return NextResponse.json(
-        {
-          success: false,
-          error: 'Assinatura pendente de ativação. Conclua o pagamento para receber e gerenciar pedidos.',
-          requiresActivation: true,
-        },
-        { status: 403 }
-      )
-    }
-
-    if (!isCompanyPro(company)) {
-      return NextResponse.json(
-        {
-          success: false,
-          error: 'A Central de Pedidos é exclusiva do Plano Pro. Seu estabelecimento está no Plano Links.',
-          requiresPro: true,
-        },
-        { status: 403 }
-      )
-    }
     const targetCompanyId = company.id
 
     // Idempotency guard: prevent accidental duplicate order creation
@@ -179,18 +161,30 @@ export async function POST(req: NextRequest) {
       orderType: resolvedOrigin,
       origin: resolvedOrigin,
       tableNumber: finalTableNumber,
-      deliveryAddress: (deliveryAddress || address)?.trim() || undefined,
-      address: (address || deliveryAddress)?.trim() || undefined,
-      addressNumber: body.addressNumber?.trim() || undefined,
+      deliveryAddress: (body.formattedAddress || deliveryAddress || address)?.trim() || undefined,
+      address: (body.street || address || deliveryAddress)?.trim() || undefined,
+      addressNumber: (body.number || body.addressNumber)?.trim() || undefined,
+      number: (body.number || body.addressNumber)?.trim() || undefined,
       neighborhood: body.neighborhood?.trim() || undefined,
       complement: body.complement?.trim() || undefined,
-      referencePoint: body.referencePoint?.trim() || undefined,
+      referencePoint: (body.reference || body.referencePoint)?.trim() || undefined,
+      reference: (body.reference || body.referencePoint)?.trim() || undefined,
       city: body.city?.trim() || undefined,
+      state: body.state?.trim() || undefined,
+      postalCode: body.postalCode?.trim() || undefined,
+      street: (body.street || address || deliveryAddress)?.trim() || undefined,
+      block: body.block?.trim() || undefined,
+      lot: body.lot?.trim() || undefined,
+      formattedAddress: (body.formattedAddress || deliveryAddress)?.trim() || undefined,
+      structuredAddress: body.structuredAddress || undefined,
       locationUrl: body.locationUrl?.trim() || undefined,
       paymentMethod: body.paymentMethod?.trim() || undefined,
       paymentStatus: body.paymentStatus || undefined,
       paymentChangeFor: body.paymentChangeFor ? Number(body.paymentChangeFor) : undefined,
-      receiptUrl: body.receiptUrl || undefined,
+      receiptUrl:
+        typeof body.receiptUrl === 'string' && body.receiptUrl.length > 500_000
+          ? body.receiptUrl.slice(0, 500_000)
+          : body.receiptUrl || undefined,
       receiptName: body.receiptName || undefined,
       receiptType: body.receiptType || undefined,
       receiptUploadedAt: body.receiptUploadedAt || undefined,

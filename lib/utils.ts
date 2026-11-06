@@ -56,3 +56,21 @@ export function getWhatsappLink(raw: string, message?: string): string {
   return base
 }
 
+/**
+ * Normalizes a Brazilian CEP to digits only (max 8 characters)
+ */
+export function normalizeCep(raw?: string | null): string {
+  if (!raw) return ""
+  return raw.replace(/\D/g, "").slice(0, 8)
+}
+
+/**
+ * Formats a Brazilian CEP to 00000-000
+ */
+export function formatCep(raw?: string | null): string {
+  const digits = normalizeCep(raw)
+  if (!digits) return ""
+  if (digits.length <= 5) return digits
+  return `${digits.slice(0, 5)}-${digits.slice(5, 8)}`
+}
+

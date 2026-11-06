@@ -119,6 +119,9 @@ import {
   saveFirestoreExternalLinksOrder,
   recordFirestoreAnalyticsEvent,
   getFirestoreDailyAnalytics,
+  getFirestoreTableCalls,
+  saveFirestoreTableCall,
+  resolveFirestoreTableCall,
   ensureFirestoreInitialized,
 } from './firestore-service'
 
@@ -137,6 +140,7 @@ import {
   CompanyTable,
   TableOrder,
   TableOrderStatus,
+  CompanyTableCall,
   CompanyCourier,
   CompanySubscription,
   CompanyExternalLink,
@@ -730,6 +734,22 @@ export async function getServerDailyAnalytics(
   endDate: string
 ): Promise<DailyCompanyAnalytics[]> {
   return await getFirestoreDailyAnalytics(companyId, startDate, endDate)
+}
+
+// ==========================================
+// 14. CHAMADOS DE MESA (GARÇOM & PEDIR CONTA)
+// ==========================================
+
+export async function getServerTableCalls(companyId: string): Promise<CompanyTableCall[]> {
+  return await getFirestoreTableCalls(companyId)
+}
+
+export async function saveServerTableCall(call: CompanyTableCall): Promise<CompanyTableCall> {
+  return await saveFirestoreTableCall(call)
+}
+
+export async function resolveServerTableCall(callId: string, companyId: string): Promise<boolean> {
+  return await resolveFirestoreTableCall(callId, companyId)
 }
 
 

@@ -825,16 +825,11 @@ export const PageThemeSelector: React.FC<PageThemeSelectorProps> = ({
                     src={company.coverUrl}
                     alt={company.name}
                     fill
-                    className={
-                      company.coverFit === 'contain'
-                        ? 'object-contain'
-                        : company.coverFit === 'logo'
-                        ? 'object-contain p-3'
-                        : 'object-cover'
-                    }
+                    className="object-cover"
                     style={{
-                      objectPosition: `${company.coverPositionX || 'center'} ${company.coverPositionY || 'center'}`,
-                      transform: company.coverZoom && company.coverZoom !== 1 ? `scale(${company.coverZoom})` : undefined,
+                      objectPosition: `${company.coverPositionX || '50%'} ${company.coverPositionY || '50%'}`,
+                      transform: company.coverZoom && company.coverZoom > 1 ? `scale(${company.coverZoom})` : undefined,
+                      transformOrigin: `${company.coverPositionX || '50%'} ${company.coverPositionY || '50%'}`,
                     }}
                     sizes="380px"
                     referrerPolicy="no-referrer"

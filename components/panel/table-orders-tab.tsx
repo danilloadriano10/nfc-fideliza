@@ -1696,9 +1696,9 @@ export const TableOrdersTab: React.FC<TableOrdersTabProps> = ({
                           <span className="font-bold text-[10px] uppercase tracking-wider text-emerald-700 block">
                             Endereço de Entrega:
                           </span>
-                          <p className="font-medium text-emerald-950 leading-relaxed">
-                            {order.deliveryAddress || order.address}
-                          </p>
+                          <div className="font-semibold text-emerald-950 leading-relaxed whitespace-pre-line text-xs">
+                            {order.formattedAddress || order.deliveryAddress || order.address}
+                          </div>
                         </div>
                       </div>
 
@@ -1706,7 +1706,7 @@ export const TableOrdersTab: React.FC<TableOrdersTabProps> = ({
                         href={
                           order.locationUrl ||
                           `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(
-                            order.deliveryAddress || order.address || ''
+                            (order.formattedAddress || order.deliveryAddress || order.address || '').replace(/\n/g, ', ')
                           )}`
                         }
                         target="_blank"

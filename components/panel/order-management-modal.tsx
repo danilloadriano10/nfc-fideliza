@@ -732,19 +732,20 @@ export const OrderManagementModal: React.FC<OrderManagementModalProps> = ({
             </div>
 
             {/* Endereço de Entrega (se for Entrega) */}
+            {/* Endereço de Entrega (se for Entrega) */}
             {origin === 'entrega' && (
-              <div className="pt-2 border-t border-neutral-200/60 space-y-2">
+              <div className="pt-2 border-t border-neutral-200/60 space-y-2.5">
                 <div className="flex items-center justify-between">
                   <label className="text-[11px] font-bold text-emerald-800 uppercase flex items-center gap-1">
                     <MapPin className="w-3.5 h-3.5 text-emerald-600" />
                     <span>Endereço de Entrega Completo</span>
                   </label>
-                  {editedOrder.deliveryAddress && (
+                  {(editedOrder.formattedAddress || editedOrder.deliveryAddress || editedOrder.locationUrl) && (
                     <a
                       href={
                         editedOrder.locationUrl ||
                         `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(
-                          editedOrder.deliveryAddress || ''
+                          (editedOrder.formattedAddress || editedOrder.deliveryAddress || editedOrder.address || '').replace(/\n/g, ', ')
                         )}`
                       }
                       target="_blank"
@@ -757,52 +758,126 @@ export const OrderManagementModal: React.FC<OrderManagementModalProps> = ({
                   )}
                 </div>
 
+                {editedOrder.formattedAddress && (
+                  <div className="p-3 rounded-xl bg-emerald-50/90 border border-emerald-200 text-xs font-semibold text-emerald-950 whitespace-pre-line leading-relaxed">
+                    {editedOrder.formattedAddress}
+                  </div>
+                )}
+
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
                   <div className="sm:col-span-2">
+                    <label className="block text-[10px] font-bold text-neutral-500 mb-0.5">Rua / Logradouro</label>
                     <input
                       type="text"
                       disabled={isLocked}
-                      value={editedOrder.deliveryAddress || editedOrder.address || ''}
+                      value={editedOrder.street || editedOrder.deliveryAddress || editedOrder.address || ''}
                       onChange={(e) =>
                         setEditedOrder({
                           ...editedOrder,
+                          street: e.target.value,
                           deliveryAddress: e.target.value,
                           address: e.target.value,
                         })
                       }
-                      placeholder="Rua / Avenida e Bairro"
+                      placeholder="Rua / Avenida"
                       className="w-full px-3 py-2 text-xs rounded-xl border border-neutral-300 bg-white focus:outline-hidden focus:border-teal-500 disabled:bg-neutral-100"
                     />
                   </div>
                   <div>
+                    <label className="block text-[10px] font-bold text-neutral-500 mb-0.5">Número</label>
                     <input
                       type="text"
                       disabled={isLocked}
-                      value={editedOrder.addressNumber || ''}
-                      onChange={(e) => setEditedOrder({ ...editedOrder, addressNumber: e.target.value })}
-                      placeholder="Número (ex: 120)"
+                      value={editedOrder.number || editedOrder.addressNumber || ''}
+                      onChange={(e) =>
+                        setEditedOrder({
+                          ...editedOrder,
+                          number: e.target.value,
+                          addressNumber: e.target.value,
+                        })
+                      }
+                      placeholder="Nº ou S/N"
                       className="w-full px-3 py-2 text-xs rounded-xl border border-neutral-300 bg-white focus:outline-hidden focus:border-teal-500 disabled:bg-neutral-100"
                     />
                   </div>
                 </div>
 
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                  <div>
+                    <label className="block text-[10px] font-bold text-neutral-500 mb-0.5">Quadra (Qd.)</label>
+                    <input
+                      type="text"
+                      disabled={isLocked}
+                      value={editedOrder.block || ''}
+                      onChange={(e) => setEditedOrder({ ...editedOrder, block: e.target.value })}
+                      placeholder="Ex: 10"
+                      className="w-full px-3 py-2 text-xs rounded-xl border border-neutral-300 bg-white focus:outline-hidden focus:border-teal-500 disabled:bg-neutral-100"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[10px] font-bold text-neutral-500 mb-0.5">Lote (Lt.)</label>
+                    <input
+                      type="text"
+                      disabled={isLocked}
+                      value={editedOrder.lot || ''}
+                      onChange={(e) => setEditedOrder({ ...editedOrder, lot: e.target.value })}
+                      placeholder="Ex: 07"
+                      className="w-full px-3 py-2 text-xs rounded-xl border border-neutral-300 bg-white focus:outline-hidden focus:border-teal-500 disabled:bg-neutral-100"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[10px] font-bold text-neutral-500 mb-0.5">Bairro</label>
+                    <input
+                      type="text"
+                      disabled={isLocked}
+                      value={editedOrder.neighborhood || ''}
+                      onChange={(e) => setEditedOrder({ ...editedOrder, neighborhood: e.target.value })}
+                      placeholder="Bairro"
+                      className="w-full px-3 py-2 text-xs rounded-xl border border-neutral-300 bg-white focus:outline-hidden focus:border-teal-500 disabled:bg-neutral-100"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[10px] font-bold text-neutral-500 mb-0.5">CEP</label>
+                    <input
+                      type="text"
+                      disabled={isLocked}
+                      value={editedOrder.postalCode || ''}
+                      onChange={(e) => setEditedOrder({ ...editedOrder, postalCode: e.target.value })}
+                      placeholder="00000-000"
+                      className="w-full px-3 py-2 text-xs rounded-xl border border-neutral-300 bg-white focus:outline-hidden focus:border-teal-500 disabled:bg-neutral-100 font-mono"
+                    />
+                  </div>
+                </div>
+
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                  <input
-                    type="text"
-                    disabled={isLocked}
-                    value={editedOrder.complement || ''}
-                    onChange={(e) => setEditedOrder({ ...editedOrder, complement: e.target.value })}
-                    placeholder="Complemento (Apto, Bloco)"
-                    className="w-full px-3 py-2 text-xs rounded-xl border border-neutral-300 bg-white focus:outline-hidden focus:border-teal-500 disabled:bg-neutral-100"
-                  />
-                  <input
-                    type="text"
-                    disabled={isLocked}
-                    value={editedOrder.referencePoint || ''}
-                    onChange={(e) => setEditedOrder({ ...editedOrder, referencePoint: e.target.value })}
-                    placeholder="Ponto de Referência"
-                    className="w-full px-3 py-2 text-xs rounded-xl border border-neutral-300 bg-white focus:outline-hidden focus:border-teal-500 disabled:bg-neutral-100"
-                  />
+                  <div>
+                    <label className="block text-[10px] font-bold text-neutral-500 mb-0.5">Complemento</label>
+                    <input
+                      type="text"
+                      disabled={isLocked}
+                      value={editedOrder.complement || ''}
+                      onChange={(e) => setEditedOrder({ ...editedOrder, complement: e.target.value })}
+                      placeholder="Complemento (Apto, Bloco, Casa 2)"
+                      className="w-full px-3 py-2 text-xs rounded-xl border border-neutral-300 bg-white focus:outline-hidden focus:border-teal-500 disabled:bg-neutral-100"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[10px] font-bold text-neutral-500 mb-0.5">Ponto de Referência</label>
+                    <input
+                      type="text"
+                      disabled={isLocked}
+                      value={editedOrder.reference || editedOrder.referencePoint || ''}
+                      onChange={(e) =>
+                        setEditedOrder({
+                          ...editedOrder,
+                          reference: e.target.value,
+                          referencePoint: e.target.value,
+                        })
+                      }
+                      placeholder="Ponto de Referência"
+                      className="w-full px-3 py-2 text-xs rounded-xl border border-neutral-300 bg-white focus:outline-hidden focus:border-teal-500 disabled:bg-neutral-100"
+                    />
+                  </div>
                 </div>
               </div>
             )}

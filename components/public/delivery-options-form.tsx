@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useState } from 'react'
+import React, { useState, useRef } from 'react'
 import {
   MapPin,
   Truck,
@@ -15,9 +15,10 @@ import {
   ExternalLink,
   Loader2,
   UtensilsCrossed,
+  Search,
 } from 'lucide-react'
 import { motion, AnimatePresence } from 'motion/react'
-import { formatPhone, normalizePhone } from '@/lib/utils'
+import { formatPhone, normalizePhone, formatCep, normalizeCep } from '@/lib/utils'
 import { OrderDeliveryInfo, DeliveryType } from '@/lib/order-delivery'
 
 interface DeliveryOptionsFormProps {
@@ -37,6 +38,76 @@ export const DeliveryOptionsForm: React.FC<DeliveryOptionsFormProps> = ({
 }) => {
   const [isLocating, setIsLocating] = useState(false)
   const [locationError, setLocationError] = useState<string | null>(null)
+  const [isSearchingCep, setIsSearchingCep] = useState(false)
+  const [cepFeedback, setCepFeedback] = useState<{
+    type: 'success' | 'not_found' | 'error'
+    text: string
+  } | null>(null)
+  const lastFetchedCepRef = useRef<string>('')
+
+  const searchCep = async (cepDigits: string) => {
+    if (cepDigits.length !== 8) return
+    if (lastFetchedCepRef.current === cepDigits) return
+
+    lastFetchedCepRef.current = cepDigits
+    setIsSearchingCep(true)
+    setCepFeedback(null)
+
+    try {
+      const res = await fetch(`/api/cep?cep=${encodeURIComponent(cepDigits)}`)
+      const data = await res.json()
+
+      if (data.success && data.found) {
+        setCepFeedback({
+          type: 'success',
+          text: `Localizado: ${data.city || ''}${data.state ? `/${data.state}` : ''}`,
+        })
+        onChange({
+          ...info,
+          postalCode: data.postalCode || formatCep(cepDigits),
+          street: data.street || info.street || info.address || '',
+          address: data.street || info.address || '',
+          neighborhood: data.neighborhood || info.neighborhood || '',
+          city: data.city || info.city || '',
+          state: data.state || info.state || '',
+        })
+      } else if (data.found === false) {
+        setCepFeedback({
+          type: 'not_found',
+          text: 'CEP não encontrado. Preencha o endereço manualmente.',
+        })
+      } else {
+        setCepFeedback({
+          type: 'error',
+          text: 'Não foi possível consultar o CEP. Preencha manualmente.',
+        })
+      }
+    } catch {
+      setCepFeedback({
+        type: 'error',
+        text: 'Não foi possível consultar o CEP. Preencha manualmente.',
+      })
+    } finally {
+      setIsSearchingCep(false)
+    }
+  }
+
+  const handleCepChange = (raw: string) => {
+    const formatted = formatCep(raw)
+    const digits = normalizeCep(raw)
+
+    onChange({
+      ...info,
+      postalCode: formatted,
+    })
+
+    if (digits.length === 8) {
+      searchCep(digits)
+    } else {
+      lastFetchedCepRef.current = ''
+      setCepFeedback(null)
+    }
+  }
 
   const handleTypeChange = (type: DeliveryType) => {
     if (type === 'dine_in' && autoDetectedTable && !info.tableNumber) {
@@ -357,14 +428,67 @@ export const DeliveryOptionsForm: React.FC<DeliveryOptionsFormProps> = ({
               <span className="text-[10px] text-neutral-400">* campos obrigatórios</span>
             </div>
 
-            {/* Endereço / Rua */}
+            {/* 1. CEP com consulta automática */}
             <div>
+              <div className="flex items-center justify-between mb-1">
+                <label className="text-[11px] font-bold text-neutral-400 flex items-center gap-1.5">
+                  <Search className="w-3.5 h-3.5 text-teal-500" />
+                  <span>CEP</span>
+                </label>
+                {isSearchingCep ? (
+                  <span className="text-[10px] text-teal-500 font-bold flex items-center gap-1">
+                    <Loader2 className="w-3 h-3 animate-spin" />
+                    Buscando CEP...
+                  </span>
+                ) : cepFeedback?.type === 'success' ? (
+                  <span className="text-[10px] text-emerald-500 font-bold flex items-center gap-1">
+                    <CheckCircle2 className="w-3 h-3" />
+                    {cepFeedback.text}
+                  </span>
+                ) : null}
+              </div>
+
+              <div className="relative">
+                <input
+                  type="text"
+                  inputMode="numeric"
+                  value={info.postalCode || ''}
+                  onChange={(e) => handleCepChange(e.target.value)}
+                  placeholder="00000-000 (digite o CEP para preencher)"
+                  maxLength={9}
+                  className={`${inputBaseClass} pr-9 font-mono`}
+                />
+                <div className="absolute right-3 top-1/2 -translate-y-1/2 text-neutral-400 pointer-events-none">
+                  {isSearchingCep ? (
+                    <Loader2 className="w-4 h-4 animate-spin text-teal-500" />
+                  ) : (
+                    <Search className="w-4 h-4" />
+                  )}
+                </div>
+              </div>
+
+              {cepFeedback && cepFeedback.type !== 'success' && (
+                <p className="text-[10px] text-amber-500 mt-1 flex items-center gap-1 font-medium">
+                  <AlertCircle className="w-3 h-3 shrink-0" />
+                  <span>{cepFeedback.text}</span>
+                </p>
+              )}
+            </div>
+
+            {/* 2. Endereço / Rua */}
+            <div>
+              <label className="text-[11px] font-bold text-neutral-400 block mb-1">
+                Rua / Logradouro <span className="text-rose-500">*</span>
+              </label>
               <div className="relative">
                 <Home className="w-4 h-4 text-neutral-400 absolute left-3 top-1/2 -translate-y-1/2" />
                 <input
                   type="text"
-                  value={info.address}
-                  onChange={(e) => handleFieldChange('address', e.target.value)}
+                  value={info.street || info.address || ''}
+                  onChange={(e) => {
+                    handleFieldChange('street', e.target.value)
+                    handleFieldChange('address', e.target.value)
+                  }}
                   placeholder="Rua, Avenida, Alameda... *"
                   className={`${inputBaseClass} pl-9 ${errors.address ? inputErrorClass : ''}`}
                 />
@@ -377,24 +501,60 @@ export const DeliveryOptionsForm: React.FC<DeliveryOptionsFormProps> = ({
               )}
             </div>
 
-            {/* Número e Bairro */}
-            <div className="grid grid-cols-5 gap-2">
-              <div className="col-span-2">
+            {/* 3. Número, Quadra e Lote (Especial Goiás e residências) */}
+            <div className="grid grid-cols-3 gap-2">
+              <div>
+                <label className="text-[10px] font-bold text-neutral-400 block mb-1">
+                  Número <span className="text-rose-500">*</span>
+                </label>
                 <input
                   type="text"
                   value={info.number}
                   onChange={(e) => handleFieldChange('number', e.target.value)}
-                  placeholder="Nº *"
+                  placeholder="Nº ou S/N *"
                   className={`${inputBaseClass} ${errors.number ? inputErrorClass : ''}`}
                 />
                 {errors.number && (
-                  <p className="text-[10px] text-rose-500 mt-1 flex items-center gap-1 font-medium">
-                    <AlertCircle className="w-3 h-3 shrink-0" />
+                  <p className="text-[9px] text-rose-500 mt-1 flex items-center gap-1 font-medium">
+                    <AlertCircle className="w-2.5 h-2.5 shrink-0" />
                     <span>{errors.number}</span>
                   </p>
                 )}
               </div>
-              <div className="col-span-3">
+
+              <div>
+                <label className="text-[10px] font-bold text-neutral-400 block mb-1 truncate" title="Quadra (Qd.)">
+                  Quadra (Qd.)
+                </label>
+                <input
+                  type="text"
+                  value={info.block || ''}
+                  onChange={(e) => handleFieldChange('block', e.target.value)}
+                  placeholder="Ex: 10"
+                  className={inputBaseClass}
+                />
+              </div>
+
+              <div>
+                <label className="text-[10px] font-bold text-neutral-400 block mb-1 truncate" title="Lote (Lt.)">
+                  Lote (Lt.)
+                </label>
+                <input
+                  type="text"
+                  value={info.lot || ''}
+                  onChange={(e) => handleFieldChange('lot', e.target.value)}
+                  placeholder="Ex: 07"
+                  className={inputBaseClass}
+                />
+              </div>
+            </div>
+
+            {/* 4. Bairro e Cidade/UF */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+              <div>
+                <label className="text-[10px] font-bold text-neutral-400 block mb-1">
+                  Bairro <span className="text-rose-500">*</span>
+                </label>
                 <input
                   type="text"
                   value={info.neighborhood}
@@ -409,25 +569,57 @@ export const DeliveryOptionsForm: React.FC<DeliveryOptionsFormProps> = ({
                   </p>
                 )}
               </div>
+
+              <div>
+                <label className="text-[10px] font-bold text-neutral-400 block mb-1">
+                  Cidade / UF
+                </label>
+                <div className="grid grid-cols-3 gap-1.5">
+                  <input
+                    type="text"
+                    value={info.city || ''}
+                    onChange={(e) => handleFieldChange('city', e.target.value)}
+                    placeholder="Cidade"
+                    className={`${inputBaseClass} col-span-2`}
+                  />
+                  <input
+                    type="text"
+                    maxLength={2}
+                    value={info.state || ''}
+                    onChange={(e) => handleFieldChange('state', e.target.value.toUpperCase())}
+                    placeholder="UF"
+                    className={`${inputBaseClass} text-center uppercase`}
+                  />
+                </div>
+              </div>
             </div>
 
-            {/* Complemento (Opcional) */}
+            {/* 5. Complemento (Opcional) */}
             <div>
+              <label className="text-[10px] font-bold text-neutral-400 block mb-1">
+                Complemento (opcional)
+              </label>
               <input
                 type="text"
                 value={info.complement || ''}
                 onChange={(e) => handleFieldChange('complement', e.target.value)}
-                placeholder="Complemento (Apto, Bloco, Casa...) (opcional)"
+                placeholder="Complemento (Apto, Bloco, Casa 2...) (opcional)"
                 className={inputBaseClass}
               />
             </div>
 
-            {/* Ponto de Referência (Opcional) */}
+            {/* 6. Ponto de Referência (Opcional) */}
             <div>
+              <label className="text-[10px] font-bold text-neutral-400 block mb-1">
+                Ponto de Referência (opcional)
+              </label>
               <input
                 type="text"
                 value={info.reference || ''}
-                onChange={(e) => handleFieldChange('reference', e.target.value)}
+                onChange={(e) => {
+                  handleFieldChange('reference', e.target.value)
+                  handleFieldChange('referencePoint', e.target.value)
+                }}
                 placeholder="Ponto de Referência (Ex: próximo ao mercado...) (opcional)"
                 className={inputBaseClass}
               />

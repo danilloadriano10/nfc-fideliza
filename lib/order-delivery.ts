@@ -1,5 +1,5 @@
 import { CartItem } from '@/components/public/menu-item-modal'
-import { formatPhone, getWhatsappLink, normalizePhone } from './utils'
+import { formatCep, formatPhone, getWhatsappLink, normalizeCep, normalizePhone } from './utils'
 import { Company, CompanyPaymentConfig } from '@/types/platform'
 
 export type DeliveryType = 'pickup' | 'delivery' | 'dine_in'
@@ -9,13 +9,20 @@ export interface OrderDeliveryInfo {
   customerName: string
   customerPhone: string
   tableNumber?: string
-  address: string
+  // Endereço e CEP
+  postalCode?: string // CEP (00000-000)
+  street?: string // Logradouro / Rua
+  address: string // Compatibilidade (Rua)
   number: string
   neighborhood: string
+  city?: string
+  state?: string // UF (ex: GO, SP)
+  block?: string // Quadra (Qd.)
+  lot?: string // Lote (Lt.)
   complement?: string
   reference?: string
   referencePoint?: string
-  city?: string
+  formattedAddress?: string
   notes?: string
   locationCoordinates?: {
     lat: number
@@ -29,6 +36,130 @@ export interface OrderDeliveryInfo {
   receiptUrl?: string
   receiptName?: string
   receiptType?: string
+}
+
+/**
+ * Gera o endereço estruturado formatado com quebras de linha para WhatsApp, Central de Pedidos e Motoboy
+ */
+export function formatStructuredDeliveryAddress(info: {
+  postalCode?: string
+  street?: string
+  address?: string
+  number?: string
+  neighborhood?: string
+  city?: string
+  state?: string
+  block?: string
+  lot?: string
+  complement?: string
+  reference?: string
+  referencePoint?: string
+}): string {
+  const lines: string[] = []
+  const streetName = (info.street || info.address || '').trim()
+  const num = (info.number || '').trim()
+
+  if (streetName && num) {
+    lines.push(`${streetName}, nº ${num}`)
+  } else if (streetName) {
+    lines.push(streetName)
+  } else if (num) {
+    lines.push(`nº ${num}`)
+  }
+
+  const qdLote: string[] = []
+  if (info.block && info.block.trim()) {
+    qdLote.push(`Qd. ${info.block.trim()}`)
+  }
+  if (info.lot && info.lot.trim()) {
+    qdLote.push(`Lt. ${info.lot.trim()}`)
+  }
+  if (qdLote.length > 0) {
+    lines.push(qdLote.join(', '))
+  }
+
+  if (info.complement && info.complement.trim()) {
+    lines.push(`Compl: ${info.complement.trim()}`)
+  }
+
+  const neigh = (info.neighborhood || '').trim()
+  const city = (info.city || '').trim()
+  const uf = (info.state || '').trim().toUpperCase()
+
+  if (neigh && city && uf) {
+    lines.push(`${neigh} — ${city}/${uf}`)
+  } else if (neigh && (city || uf)) {
+    lines.push(`${neigh} — ${[city, uf].filter(Boolean).join('/')}`)
+  } else if (neigh) {
+    lines.push(neigh)
+  } else if (city || uf) {
+    lines.push([city, uf].filter(Boolean).join('/'))
+  }
+
+  if (info.postalCode && info.postalCode.trim()) {
+    lines.push(`CEP ${formatCep(info.postalCode)}`)
+  }
+
+  const ref = (info.reference || info.referencePoint || '').trim()
+  if (ref) {
+    lines.push(`Referência: ${ref}`)
+  }
+
+  return lines.join('\n')
+}
+
+/**
+ * Gera o endereço completo em linha única para pesquisas e mapas
+ */
+export function formatSingleLineAddress(info: {
+  postalCode?: string
+  street?: string
+  address?: string
+  number?: string
+  neighborhood?: string
+  city?: string
+  state?: string
+  block?: string
+  lot?: string
+  complement?: string
+  reference?: string
+  referencePoint?: string
+}): string {
+  const chunks: string[] = []
+  const streetName = (info.street || info.address || '').trim()
+  const num = (info.number || '').trim()
+  if (streetName && num) chunks.push(`${streetName}, nº ${num}`)
+  else if (streetName) chunks.push(streetName)
+  else if (num) chunks.push(`nº ${num}`)
+
+  const qdLote: string[] = []
+  if (info.block && info.block.trim()) qdLote.push(`Qd. ${info.block.trim()}`)
+  if (info.lot && info.lot.trim()) qdLote.push(`Lt. ${info.lot.trim()}`)
+  if (qdLote.length > 0) chunks.push(qdLote.join(', '))
+
+  if (info.complement && info.complement.trim()) chunks.push(`(${info.complement.trim()})`)
+
+  const neigh = (info.neighborhood || '').trim()
+  const city = (info.city || '').trim()
+  const uf = (info.state || '').trim().toUpperCase()
+  if (neigh && (city || uf)) {
+    chunks.push(`${neigh} — ${[city, uf].filter(Boolean).join('/')}`)
+  } else if (neigh) {
+    chunks.push(neigh)
+  } else if (city || uf) {
+    chunks.push([city, uf].filter(Boolean).join('/'))
+  }
+
+  if (info.postalCode && info.postalCode.trim()) {
+    chunks.push(`CEP ${formatCep(info.postalCode)}`)
+  }
+
+  const ref = (info.reference || info.referencePoint || '').trim()
+  if (ref) {
+    chunks.push(`[Ref: ${ref}]`)
+  }
+
+  return chunks.join(', ')
 }
 
 export function getDefaultCompanyPaymentConfig(company?: Partial<Company>): CompanyPaymentConfig {
@@ -73,9 +204,15 @@ export function loadSavedDeliveryInfo(companyId?: string): Partial<OrderDelivery
       customerName: parsed.customerName || '',
       customerPhone: parsed.customerPhone || '',
       tableNumber: parsed.tableNumber || '',
-      address: parsed.address || '',
+      postalCode: parsed.postalCode || '',
+      street: parsed.street || parsed.address || '',
+      address: parsed.address || parsed.street || '',
       number: parsed.number || '',
       neighborhood: parsed.neighborhood || '',
+      city: parsed.city || '',
+      state: parsed.state || '',
+      block: parsed.block || '',
+      lot: parsed.lot || '',
       complement: parsed.complement || '',
       reference: parsed.reference || '',
     }
@@ -96,9 +233,15 @@ export function saveDeliveryInfo(info: OrderDeliveryInfo, companyId?: string): v
       customerName: info.customerName,
       customerPhone: info.customerPhone,
       tableNumber: info.tableNumber || '',
-      address: info.address,
+      postalCode: info.postalCode || '',
+      street: info.street || info.address || '',
+      address: info.address || info.street || '',
       number: info.number,
       neighborhood: info.neighborhood,
+      city: info.city || '',
+      state: info.state || '',
+      block: info.block || '',
+      lot: info.lot || '',
       complement: info.complement || '',
       reference: info.reference || '',
     }
@@ -193,13 +336,13 @@ export function buildMenuOrderWhatsAppMessage(options: {
 
   if (deliveryInfo.deliveryType === 'delivery') {
     msg += `\n📍 *ENDEREÇO DE ENTREGA:*\n`
-    msg += `• Endereço: ${deliveryInfo.address.trim()}, Nº ${deliveryInfo.number.trim() || 'S/N'}\n`
-    msg += `• Bairro: ${deliveryInfo.neighborhood.trim()}\n`
-    if (deliveryInfo.complement && deliveryInfo.complement.trim()) {
-      msg += `• Complemento: ${deliveryInfo.complement.trim()}\n`
-    }
-    if (deliveryInfo.reference && deliveryInfo.reference.trim()) {
-      msg += `• Ponto de Referência: ${deliveryInfo.reference.trim()}\n`
+    const formatted = formatStructuredDeliveryAddress(deliveryInfo)
+    if (formatted) {
+      formatted.split('\n').forEach((line) => {
+        msg += `• ${line}\n`
+      })
+    } else {
+      msg += `• Endereço: ${deliveryInfo.address.trim()}, Nº ${deliveryInfo.number.trim() || 'S/N'}\n`
     }
     if (deliveryInfo.locationUrl && deliveryInfo.locationUrl.trim()) {
       msg += `• Link da Localização: ${deliveryInfo.locationUrl.trim()}\n`
@@ -291,13 +434,13 @@ export function buildProductOrderWhatsAppMessage(options: {
 
   if (deliveryInfo.deliveryType === 'delivery') {
     msg += `\n📍 *ENDEREÇO DE ENTREGA:*\n`
-    msg += `• Endereço: ${deliveryInfo.address.trim()}, Nº ${deliveryInfo.number.trim() || 'S/N'}\n`
-    msg += `• Bairro: ${deliveryInfo.neighborhood.trim()}\n`
-    if (deliveryInfo.complement && deliveryInfo.complement.trim()) {
-      msg += `• Complemento: ${deliveryInfo.complement.trim()}\n`
-    }
-    if (deliveryInfo.reference && deliveryInfo.reference.trim()) {
-      msg += `• Ponto de Referência: ${deliveryInfo.reference.trim()}\n`
+    const formatted = formatStructuredDeliveryAddress(deliveryInfo)
+    if (formatted) {
+      formatted.split('\n').forEach((line) => {
+        msg += `• ${line}\n`
+      })
+    } else {
+      msg += `• Endereço: ${deliveryInfo.address.trim()}, Nº ${deliveryInfo.number.trim() || 'S/N'}\n`
     }
     if (deliveryInfo.locationUrl && deliveryInfo.locationUrl.trim()) {
       msg += `• Link da Localização: ${deliveryInfo.locationUrl.trim()}\n`
@@ -340,7 +483,27 @@ export function buildCourierDeliveryWhatsAppMessage(options: {
   }
 
   msg += `\n📍 *ENDEREÇO DE ENTREGA:*\n`
-  if (order.address || order.deliveryAddress) {
+  const formattedAddr =
+    order.formattedAddress ||
+    formatStructuredDeliveryAddress({
+      postalCode: order.postalCode,
+      street: order.street || order.address,
+      address: order.address || order.deliveryAddress,
+      number: order.number || order.addressNumber,
+      neighborhood: order.neighborhood,
+      city: order.city,
+      state: order.state,
+      block: order.block,
+      lot: order.lot,
+      complement: order.complement,
+      reference: order.reference || order.referencePoint,
+    })
+
+  if (formattedAddr) {
+    formattedAddr.split('\n').forEach((l: string) => {
+      msg += `• ${l}\n`
+    })
+  } else if (order.address || order.deliveryAddress) {
     const rawAddress = order.address || order.deliveryAddress
     msg += `• ${rawAddress}\n`
     if (order.addressNumber) {
@@ -360,10 +523,11 @@ export function buildCourierDeliveryWhatsAppMessage(options: {
   }
 
   // Google Maps link
+  const mapsQuery = order.formattedAddress || order.deliveryAddress || order.address || ''
   if (order.locationUrl && order.locationUrl.trim()) {
     msg += `• 🗺️ Google Maps: ${order.locationUrl.trim()}\n`
-  } else if (order.address || order.deliveryAddress) {
-    const queryAddress = encodeURIComponent(order.address || order.deliveryAddress)
+  } else if (mapsQuery) {
+    const queryAddress = encodeURIComponent(mapsQuery.replace(/\n/g, ', '))
     msg += `• 🗺️ Google Maps: https://www.google.com/maps/search/?api=1&query=${queryAddress}\n`
   }
 

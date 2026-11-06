@@ -20,6 +20,7 @@ import {
   MapPin,
   CheckCircle2,
   AlertCircle,
+  Loader2,
 } from 'lucide-react'
 import {
   Company,
@@ -32,7 +33,8 @@ import {
   OrderPaymentStatus,
 } from '@/types/platform'
 import { getCompanyMenuItems, saveCompanyTableOrderOnServerApi } from '@/lib/storage'
-import { formatMoneyBRL } from '@/lib/order-delivery'
+import { formatMoneyBRL, formatStructuredDeliveryAddress } from '@/lib/order-delivery'
+import { formatCep, normalizeCep, formatPhone } from '@/lib/utils'
 
 interface ManualOrderModalProps {
   company: Company
@@ -53,12 +55,19 @@ export const ManualOrderModal: React.FC<ManualOrderModalProps> = ({
   const [customerPhone, setCustomerPhone] = useState('')
 
   // Campos de entrega
+  const [postalCode, setPostalCode] = useState('')
   const [address, setAddress] = useState('')
   const [addressNumber, setAddressNumber] = useState('')
+  const [block, setBlock] = useState('')
+  const [lot, setLot] = useState('')
   const [neighborhood, setNeighborhood] = useState('')
+  const [city, setCity] = useState('')
+  const [state, setState] = useState('')
   const [complement, setComplement] = useState('')
   const [referencePoint, setReferencePoint] = useState('')
   const [deliveryFee, setDeliveryFee] = useState<string>('0')
+  const [isSearchingCep, setIsSearchingCep] = useState(false)
+  const [cepFeedback, setCepFeedback] = useState<{ type: 'success' | 'not_found' | 'error'; text: string } | null>(null)
 
   // Desconto e observação
   const [discount, setDiscount] = useState<string>('0')
@@ -135,6 +144,46 @@ export const ManualOrderModal: React.FC<ManualOrderModalProps> = ({
     }
     return base
   }, [selectedMenuItem, selectedSizeIndex, selectedExtras])
+
+  // Consulta automática de CEP
+  const handleCepChange = async (val: string) => {
+    const formatted = formatCep(val)
+    const digits = normalizeCep(val)
+    setPostalCode(formatted)
+
+    if (digits.length === 8) {
+      setIsSearchingCep(true)
+      setCepFeedback(null)
+      try {
+        const res = await fetch(`/api/cep?cep=${digits}`)
+        const data = await res.json()
+        if (data.success && data.found) {
+          if (data.street && !address) setAddress(data.street)
+          if (data.neighborhood && !neighborhood) setNeighborhood(data.neighborhood)
+          if (data.city) setCity(data.city)
+          if (data.state) setState(data.state)
+          setCepFeedback({
+            type: 'success',
+            text: `Localizado: ${data.city || ''}${data.state ? `/${data.state}` : ''}`,
+          })
+        } else if (data.found === false) {
+          setCepFeedback({
+            type: 'not_found',
+            text: 'CEP não encontrado.',
+          })
+        }
+      } catch {
+        setCepFeedback({
+          type: 'error',
+          text: 'Falha ao buscar CEP. Preencha manualmente.',
+        })
+      } finally {
+        setIsSearchingCep(false)
+      }
+    } else {
+      setCepFeedback(null)
+    }
+  }
 
   // Adicionar item à comanda
   const handleAddItem = () => {
@@ -266,13 +315,21 @@ export const ManualOrderModal: React.FC<ManualOrderModalProps> = ({
       })
     }
 
-    const formattedAddress =
+    const structuredFormattedAddress =
       orderType === 'entrega'
-        ? `${address.trim()}${addressNumber.trim() ? `, ${addressNumber.trim()}` : ''}${
-            complement.trim() ? ` (${complement.trim()})` : ''
-          }${neighborhood.trim() ? ` - ${neighborhood.trim()}` : ''}${
-            referencePoint.trim() ? ` [Ref: ${referencePoint.trim()}]` : ''
-          }`
+        ? formatStructuredDeliveryAddress({
+            postalCode,
+            street: address,
+            address,
+            number: addressNumber,
+            neighborhood,
+            city,
+            state,
+            block,
+            lot,
+            complement,
+            reference: referencePoint,
+          })
         : undefined
 
     const newOrderData: TableOrder = {
@@ -286,12 +343,34 @@ export const ManualOrderModal: React.FC<ManualOrderModalProps> = ({
           : orderType === 'retirada'
           ? 'Retirada no Balcão'
           : 'Entrega Delivery',
-      deliveryAddress: formattedAddress,
+      deliveryAddress: structuredFormattedAddress,
       address: address.trim() || undefined,
       addressNumber: addressNumber.trim() || undefined,
+      number: addressNumber.trim() || undefined,
+      postalCode: postalCode.trim() || undefined,
+      street: address.trim() || undefined,
       neighborhood: neighborhood.trim() || undefined,
+      city: city.trim() || undefined,
+      state: state.trim() || undefined,
+      block: block.trim() || undefined,
+      lot: lot.trim() || undefined,
       complement: complement.trim() || undefined,
       referencePoint: referencePoint.trim() || undefined,
+      reference: referencePoint.trim() || undefined,
+      formattedAddress: structuredFormattedAddress,
+      structuredAddress: {
+        postalCode: postalCode.trim() || undefined,
+        street: address.trim() || undefined,
+        number: addressNumber.trim() || undefined,
+        neighborhood: neighborhood.trim() || undefined,
+        city: city.trim() || undefined,
+        state: state.trim() || undefined,
+        block: block.trim() || undefined,
+        lot: lot.trim() || undefined,
+        complement: complement.trim() || undefined,
+        reference: referencePoint.trim() || undefined,
+        formattedAddress: structuredFormattedAddress,
+      },
       customerName: customerName.trim() || (orderType === 'mesa' ? tableNumber.trim() : 'Cliente Balcão'),
       customerPhone: customerPhone.trim() || undefined,
       items,
@@ -484,72 +563,159 @@ export const ManualOrderModal: React.FC<ManualOrderModalProps> = ({
             {/* Endereço de Entrega */}
             {orderType === 'entrega' && (
               <div className="pt-3 border-t border-neutral-200/80 space-y-3">
-                <span className="text-[11px] font-bold text-emerald-800 uppercase flex items-center gap-1">
-                  <MapPin className="w-3.5 h-3.5 text-emerald-600" />
-                  <span>Endereço de Entrega</span>
-                </span>
+                <div className="flex items-center justify-between">
+                  <span className="text-[11px] font-bold text-emerald-800 uppercase flex items-center gap-1">
+                    <MapPin className="w-3.5 h-3.5 text-emerald-600" />
+                    <span>Endereço de Entrega</span>
+                  </span>
+                  {isSearchingCep ? (
+                    <span className="text-[10px] text-teal-600 font-bold flex items-center gap-1">
+                      <Loader2 className="w-3 h-3 animate-spin" />
+                      Consultando CEP...
+                    </span>
+                  ) : cepFeedback?.type === 'success' ? (
+                    <span className="text-[10px] text-emerald-600 font-bold flex items-center gap-1">
+                      <CheckCircle2 className="w-3 h-3" />
+                      {cepFeedback.text}
+                    </span>
+                  ) : null}
+                </div>
+
+                {/* CEP */}
+                <div>
+                  <label className="block text-[10px] font-bold text-neutral-500 uppercase mb-1 flex items-center gap-1">
+                    <Search className="w-3 h-3 text-neutral-400" />
+                    <span>CEP (Busca Automática)</span>
+                  </label>
+                  <div className="relative">
+                    <input
+                      type="text"
+                      value={postalCode}
+                      onChange={(e) => handleCepChange(e.target.value)}
+                      placeholder="00000-000"
+                      maxLength={9}
+                      className="w-full sm:max-w-xs px-3 py-2 text-xs rounded-xl border border-neutral-300 bg-white font-mono focus:outline-hidden focus:border-emerald-500"
+                    />
+                  </div>
+                  {cepFeedback && cepFeedback.type !== 'success' && (
+                    <p className="text-[10px] text-amber-600 mt-1 flex items-center gap-1 font-medium">
+                      <AlertCircle className="w-3 h-3 shrink-0" />
+                      <span>{cepFeedback.text}</span>
+                    </p>
+                  )}
+                </div>
 
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                   <div className="sm:col-span-2">
                     <label className="block text-[10px] font-bold text-neutral-500 uppercase mb-1">
-                      Rua / Avenida *
+                      Rua / Logradouro *
                     </label>
                     <input
                       type="text"
                       value={address}
                       onChange={(e) => setAddress(e.target.value)}
-                      placeholder="Ex: Av. Paulista"
+                      placeholder="Ex: Av. Goiás, Rua 10"
                       className="w-full px-3 py-2 text-xs rounded-xl border border-neutral-300 bg-white focus:outline-hidden focus:border-emerald-500"
                     />
                   </div>
                   <div>
                     <label className="block text-[10px] font-bold text-neutral-500 uppercase mb-1">
-                      Número
+                      Número *
                     </label>
                     <input
                       type="text"
                       value={addressNumber}
                       onChange={(e) => setAddressNumber(e.target.value)}
-                      placeholder="Ex: 1000"
+                      placeholder="Ex: 1000 ou S/N"
                       className="w-full px-3 py-2 text-xs rounded-xl border border-neutral-300 bg-white focus:outline-hidden focus:border-emerald-500"
                     />
                   </div>
                 </div>
 
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                {/* Quadra, Lote e Bairro */}
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
                   <div>
                     <label className="block text-[10px] font-bold text-neutral-500 uppercase mb-1">
-                      Bairro
+                      Quadra (Qd.)
+                    </label>
+                    <input
+                      type="text"
+                      value={block}
+                      onChange={(e) => setBlock(e.target.value)}
+                      placeholder="Ex: 10"
+                      className="w-full px-3 py-2 text-xs rounded-xl border border-neutral-300 bg-white focus:outline-hidden focus:border-emerald-500"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[10px] font-bold text-neutral-500 uppercase mb-1">
+                      Lote (Lt.)
+                    </label>
+                    <input
+                      type="text"
+                      value={lot}
+                      onChange={(e) => setLot(e.target.value)}
+                      placeholder="Ex: 07"
+                      className="w-full px-3 py-2 text-xs rounded-xl border border-neutral-300 bg-white focus:outline-hidden focus:border-emerald-500"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[10px] font-bold text-neutral-500 uppercase mb-1">
+                      Bairro *
                     </label>
                     <input
                       type="text"
                       value={neighborhood}
                       onChange={(e) => setNeighborhood(e.target.value)}
-                      placeholder="Ex: Centro"
+                      placeholder="Ex: Setor Bueno"
                       className="w-full px-3 py-2 text-xs rounded-xl border border-neutral-300 bg-white focus:outline-hidden focus:border-emerald-500"
                     />
                   </div>
                   <div>
                     <label className="block text-[10px] font-bold text-neutral-500 uppercase mb-1">
-                      Complemento
+                      Cidade / UF
+                    </label>
+                    <div className="flex gap-1">
+                      <input
+                        type="text"
+                        value={city}
+                        onChange={(e) => setCity(e.target.value)}
+                        placeholder="Cidade"
+                        className="w-full px-2 py-2 text-xs rounded-xl border border-neutral-300 bg-white focus:outline-hidden focus:border-emerald-500"
+                      />
+                      <input
+                        type="text"
+                        maxLength={2}
+                        value={state}
+                        onChange={(e) => setState(e.target.value.toUpperCase())}
+                        placeholder="UF"
+                        className="w-12 px-1 text-center uppercase text-xs rounded-xl border border-neutral-300 bg-white focus:outline-hidden focus:border-emerald-500"
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-[10px] font-bold text-neutral-500 uppercase mb-1">
+                      Complemento (opcional)
                     </label>
                     <input
                       type="text"
                       value={complement}
                       onChange={(e) => setComplement(e.target.value)}
-                      placeholder="Ex: Apto 42, Bloco B"
+                      placeholder="Ex: Apto 42, Bloco B, Casa 2"
                       className="w-full px-3 py-2 text-xs rounded-xl border border-neutral-300 bg-white focus:outline-hidden focus:border-emerald-500"
                     />
                   </div>
                   <div>
                     <label className="block text-[10px] font-bold text-neutral-500 uppercase mb-1">
-                      Ponto de Referência
+                      Ponto de Referência (opcional)
                     </label>
                     <input
                       type="text"
                       value={referencePoint}
                       onChange={(e) => setReferencePoint(e.target.value)}
-                      placeholder="Ex: Próximo à padaria"
+                      placeholder="Ex: Próximo à padaria, supermercado..."
                       className="w-full px-3 py-2 text-xs rounded-xl border border-neutral-300 bg-white focus:outline-hidden focus:border-emerald-500"
                     />
                   </div>

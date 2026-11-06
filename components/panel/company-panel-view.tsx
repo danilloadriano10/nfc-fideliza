@@ -614,7 +614,8 @@ export const CompanyPanelView: React.FC<CompanyPanelViewProps> = ({
       const validUrl = res.url
       setFormData((prev) => ({ ...prev, coverUrl: validUrl }))
       setCoverPreview(validUrl)
-      showToast('success', 'Foto de capa atualizada com sucesso!')
+      showToast('success', 'Foto de capa atualizada! Ajuste o enquadramento desejado.')
+      setIsCoverAdjustOpen(true)
     } else {
       showToast('error', res.error || 'Erro ao enviar foto de capa.')
     }
@@ -2401,22 +2402,19 @@ export const CompanyPanelView: React.FC<CompanyPanelViewProps> = ({
                         <img
                           src={coverPreview}
                           alt="Cover Preview"
-                          className={`w-full h-full transition-all duration-150 select-none ${
-                            (formData.coverFit || company.coverFit) === 'contain'
-                              ? 'object-contain'
-                              : (formData.coverFit || company.coverFit) === 'logo'
-                              ? 'object-contain p-3.5 sm:p-5'
-                              : 'object-cover'
-                          }`}
+                          className="w-full h-full object-cover select-none transition-all duration-150"
                           style={{
-                            objectPosition: `${formData.coverPositionX || company.coverPositionX || 'center'} ${
-                              formData.coverPositionY || company.coverPositionY || 'center'
+                            objectPosition: `${formData.coverPositionX || company.coverPositionX || '50%'} ${
+                              formData.coverPositionY || company.coverPositionY || '50%'
                             }`,
                             transform:
                               (formData.coverZoom || company.coverZoom) &&
-                              (formData.coverZoom || company.coverZoom) !== 1
+                              (formData.coverZoom || company.coverZoom)! > 1
                                 ? `scale(${formData.coverZoom || company.coverZoom})`
                                 : undefined,
+                            transformOrigin: `${formData.coverPositionX || company.coverPositionX || '50%'} ${
+                              formData.coverPositionY || company.coverPositionY || '50%'
+                            }`,
                           }}
                         />
                       ) : (

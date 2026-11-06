@@ -2429,6 +2429,7 @@ export async function saveCompanyTableOrderOnServerApi(
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(orderWithId),
+      keepalive: true,
     })
     const data = await res.json()
     if (res.ok && data.success) {

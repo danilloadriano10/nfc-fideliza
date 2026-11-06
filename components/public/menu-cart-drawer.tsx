@@ -20,8 +20,9 @@ import {
   CreditCard,
   QrCode,
   ShieldCheck,
+  Loader2,
 } from 'lucide-react'
-import { Company, TableOrderHistoryEvent } from '@/types/platform'
+import { Company, TableOrder, TableOrderHistoryEvent } from '@/types/platform'
 import { getPublicTheme } from '@/lib/public-themes'
 import { CartItem } from './menu-item-modal'
 import { DeliveryOptionsForm } from './delivery-options-form'
@@ -29,6 +30,7 @@ import {
   OrderDeliveryInfo,
   buildMenuOrderWhatsAppMessage,
   formatMoneyBRL,
+  formatStructuredDeliveryAddress,
   getDefaultCompanyPaymentConfig,
   loadSavedDeliveryInfo,
   openOrderInWhatsApp,
@@ -81,9 +83,15 @@ export const MenuCartDrawer: React.FC<MenuCartDrawerProps> = ({
       customerName: initialCustomerName || saved.customerName || '',
       customerPhone: initialCustomerPhone || saved.customerPhone || '',
       tableNumber: autoDetectedTable || saved.tableNumber || '',
-      address: saved.address || '',
+      postalCode: saved.postalCode || '',
+      street: saved.street || saved.address || '',
+      address: saved.address || saved.street || '',
       number: saved.number || '',
       neighborhood: saved.neighborhood || '',
+      city: saved.city || '',
+      state: saved.state || '',
+      block: saved.block || '',
+      lot: saved.lot || '',
       complement: saved.complement || '',
       reference: saved.reference || '',
       locationCoordinates: null,
@@ -278,9 +286,15 @@ export const MenuCartDrawer: React.FC<MenuCartDrawerProps> = ({
           ...prev,
           customerName: prev.customerName || initialCustomerName || saved.customerName || '',
           customerPhone: prev.customerPhone || initialCustomerPhone || saved.customerPhone || '',
-          address: prev.address || saved.address || '',
+          postalCode: prev.postalCode || saved.postalCode || '',
+          street: prev.street || saved.street || prev.address || saved.address || '',
+          address: prev.address || saved.address || prev.street || saved.street || '',
           number: prev.number || saved.number || '',
           neighborhood: prev.neighborhood || saved.neighborhood || '',
+          city: prev.city || saved.city || '',
+          state: prev.state || saved.state || '',
+          block: prev.block || saved.block || '',
+          lot: prev.lot || saved.lot || '',
           complement: prev.complement || saved.complement || '',
           reference: prev.reference || saved.reference || '',
         }
@@ -390,7 +404,7 @@ export const MenuCartDrawer: React.FC<MenuCartDrawerProps> = ({
   }
 
   // Finalizar e Enviar para o WhatsApp
-  const handleFinalizeWhatsAppOrder = useCallback(() => {
+  const handleFinalizeWhatsAppOrder = useCallback(async () => {
     if (cart.length === 0) return
     if (!validateDeliveryForm()) {
       setStep('delivery')
@@ -449,11 +463,19 @@ export const MenuCartDrawer: React.FC<MenuCartDrawerProps> = ({
 
     const formattedAddress =
       orderType === 'entrega'
-        ? `${deliveryInfo.address || ''}, ${deliveryInfo.number || 'S/N'}${
-            deliveryInfo.complement ? ` (${deliveryInfo.complement})` : ''
-          } - ${deliveryInfo.neighborhood || ''}${
-            deliveryInfo.city ? `, ${deliveryInfo.city}` : ''
-          }${deliveryInfo.reference ? ` [Ref: ${deliveryInfo.reference}]` : ''}`
+        ? formatStructuredDeliveryAddress({
+            postalCode: deliveryInfo.postalCode,
+            street: deliveryInfo.street || deliveryInfo.address,
+            address: deliveryInfo.address || deliveryInfo.street,
+            number: deliveryInfo.number,
+            neighborhood: deliveryInfo.neighborhood,
+            city: deliveryInfo.city,
+            state: deliveryInfo.state,
+            block: deliveryInfo.block,
+            lot: deliveryInfo.lot,
+            complement: deliveryInfo.complement,
+            reference: deliveryInfo.reference,
+          })
         : undefined
 
     // Determina o status financeiro inicial
@@ -554,43 +576,6 @@ export const MenuCartDrawer: React.FC<MenuCartDrawerProps> = ({
       } catch {}
     }
 
-    // Salvar pedido completo na Central de Pedidos da empresa
-    saveCompanyTableOrderOnServerApi({
-      id: stableOrderId,
-      companyId: company.id,
-      orderType,
-      origin: orderType,
-      tableNumber: activeTable,
-      deliveryAddress: formattedAddress,
-      address: deliveryInfo.address,
-      addressNumber: deliveryInfo.number,
-      neighborhood: deliveryInfo.neighborhood,
-      complement: deliveryInfo.complement,
-      referencePoint: deliveryInfo.reference,
-      customerName: deliveryInfo.customerName,
-      customerPhone: deliveryInfo.customerPhone,
-      items: orderItems,
-      totalAmount: totalOrder,
-      notes: deliveryInfo.notes,
-      paymentMethod: selectedPaymentMethod,
-      paymentStatus,
-      paymentChangeFor:
-        selectedPaymentMethod === 'dinheiro' && needsChange && parsedChangeFor > 0
-          ? parsedChangeFor
-          : undefined,
-      receiptUrl: receiptFile?.dataUrl,
-      receiptName: receiptFile?.name,
-      receiptType: receiptFile?.type,
-      receiptUploadedAt: receiptFile ? nowIso : undefined,
-      history: historyEvents,
-      status: initialOrderStatus,
-      createdAt: nowIso,
-    })
-      .catch((err) => console.error('Erro ao registrar pedido na Central de Pedidos:', err))
-      .finally(() => {
-        setTimeout(() => setIsSubmittingOrder(false), 2000)
-      })
-
     // Montar mensagem detalhada do WhatsApp
     const message = buildMenuOrderWhatsAppMessage({
       companyName: company.name,
@@ -611,7 +596,77 @@ export const MenuCartDrawer: React.FC<MenuCartDrawerProps> = ({
       },
     })
 
+    // Salvar pedido completo na Central de Pedidos com AWAIT para garantir persistência antes de redirecionar
+    try {
+      const orderPayload: TableOrder = {
+        id: stableOrderId,
+        companyId: company.id,
+        orderType,
+        origin: orderType,
+        tableNumber: activeTable,
+        deliveryAddress: formattedAddress,
+        address: deliveryInfo.street || deliveryInfo.address,
+        addressNumber: deliveryInfo.number,
+        number: deliveryInfo.number,
+        postalCode: deliveryInfo.postalCode,
+        street: deliveryInfo.street || deliveryInfo.address,
+        neighborhood: deliveryInfo.neighborhood,
+        city: deliveryInfo.city,
+        state: deliveryInfo.state,
+        block: deliveryInfo.block,
+        lot: deliveryInfo.lot,
+        complement: deliveryInfo.complement,
+        referencePoint: deliveryInfo.reference,
+        reference: deliveryInfo.reference,
+        formattedAddress,
+        structuredAddress: {
+          postalCode: deliveryInfo.postalCode,
+          street: deliveryInfo.street || deliveryInfo.address,
+          number: deliveryInfo.number,
+          neighborhood: deliveryInfo.neighborhood,
+          city: deliveryInfo.city,
+          state: deliveryInfo.state,
+          block: deliveryInfo.block,
+          lot: deliveryInfo.lot,
+          complement: deliveryInfo.complement,
+          reference: deliveryInfo.reference,
+          formattedAddress,
+        },
+        locationUrl: deliveryInfo.locationUrl,
+        customerName: deliveryInfo.customerName,
+        customerPhone: deliveryInfo.customerPhone,
+        items: orderItems,
+        totalAmount: totalOrder,
+        notes: deliveryInfo.notes,
+        paymentMethod: selectedPaymentMethod,
+        paymentStatus,
+        paymentChangeFor:
+          selectedPaymentMethod === 'dinheiro' && needsChange && parsedChangeFor > 0
+            ? parsedChangeFor
+            : undefined,
+        receiptUrl:
+          typeof receiptFile?.dataUrl === 'string' && receiptFile.dataUrl.length > 500_000
+            ? receiptFile.dataUrl.slice(0, 500_000)
+            : receiptFile?.dataUrl,
+        receiptName: receiptFile?.name,
+        receiptType: receiptFile?.type,
+        receiptUploadedAt: receiptFile ? nowIso : undefined,
+        history: historyEvents,
+        status: initialOrderStatus,
+        createdAt: nowIso,
+      }
+
+      await saveCompanyTableOrderOnServerApi(orderPayload)
+    } catch (err) {
+      console.error('Erro ao registrar pedido na Central de Pedidos:', err)
+    } finally {
+      setIsSubmittingOrder(false)
+    }
+
     openOrderInWhatsApp(company.whatsapp, message)
+    if (onClearCart) {
+      onClearCart()
+    }
     onClose()
   }, [
     cart,
@@ -1342,12 +1397,22 @@ export const MenuCartDrawer: React.FC<MenuCartDrawerProps> = ({
             ) : (
               <button
                 type="button"
+                disabled={isSubmittingOrder}
                 onClick={handleFinalizeWhatsAppOrder}
-                className="w-full py-3.5 px-4 rounded-2xl bg-emerald-600 hover:bg-emerald-500 active:scale-[0.99] text-white font-bold text-xs sm:text-sm shadow-lg shadow-emerald-600/30 transition-all flex items-center justify-center gap-2 cursor-pointer"
+                className="w-full py-3.5 px-4 rounded-2xl bg-emerald-600 hover:bg-emerald-500 active:scale-[0.99] text-white font-bold text-xs sm:text-sm shadow-lg shadow-emerald-600/30 transition-all flex items-center justify-center gap-2 cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed"
               >
-                <MessageCircle className="w-4.5 h-4.5 fill-white shrink-0" />
-                <span>Confirmar e Pedir no WhatsApp</span>
-                <ArrowRight className="w-4 h-4 ml-auto" />
+                {isSubmittingOrder ? (
+                  <>
+                    <Loader2 className="w-4.5 h-4.5 animate-spin shrink-0" />
+                    <span>Registrando Pedido na Central...</span>
+                  </>
+                ) : (
+                  <>
+                    <MessageCircle className="w-4.5 h-4.5 fill-white shrink-0" />
+                    <span>Confirmar e Pedir no WhatsApp</span>
+                    <ArrowRight className="w-4 h-4 ml-auto" />
+                  </>
+                )}
               </button>
             )}
 
